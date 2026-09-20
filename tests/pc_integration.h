@@ -139,7 +139,7 @@ struct Session {
         until(
             [&]() {
                 return pc_state::sample(run.ctx).mode == pc_state::Mode::Center &&
-                       run.read(0xcc28) == 3;
+                       run.read(0xcc28) == (run.read(0xd5a1) ? 4 : 3);
             },
             "Center main menu");
         run.press("A");

@@ -1,6 +1,6 @@
 # Plan: Pokédex and PC in 3D
 
-Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 completed and verified; B3 pending. Goal active after resuming the integrated objective.
+Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 completed and verified; B3 completed and verified. Goal active after resuming the integrated objective.
 
 ## Goal and scope
 
@@ -233,9 +233,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] Storing and withdrawing a Poké Ball in storage keeps the scene and the correct counter.
-- [ ] Oak's evaluation reads on the monitor with matching counters.
-- [ ] With a private champion fixture, the Hall of Fame shows the real team read from cartridge RAM.
+- [x] Storing and withdrawing a Poké Ball in storage keeps the scene and the correct counter.
+- [x] Oak's evaluation reads on the monitor with matching counters.
+- [x] With a private champion fixture, the Hall of Fame shows the real team read from cartridge RAM.
 
 ## Accepted limitations
 
@@ -601,3 +601,72 @@ completed evidence: the original-engine nest oracle, full `dex`/`dex-fp`
 journeys and cold loads, original unknown-area pixels, and preserved world
 caches. All thirteen QA suites and both CTest configurations completed before
 this audit. B3 remains open; no PC/Hall criteria are implied by A3 closure.
+
+### B3 completed and verified, 2026-09-20
+
+The three B3 acceptance criteria are closed against the complete local
+regression and original-engine evidence below. The change is delivered through
+the `pc-complete` pull request with required CI checks before merging.
+
+- The item PC shows occupied slots out of 50; Oak shows the original
+  nineteen-byte seen/caught bit counts. The counters sit above the monitor:
+  visual review caught that the initial lower placement was hidden by the
+  desk. Main screens retain all 23,040 original LCD pixels; item lists and
+  confirmation screens retain the original full image over the dimmed room.
+- `pc_hall3d.h` owns a separate gallery, atlas and bounded portrait cache.
+  The bank-zero SRAM team supplies every pedestal's species, nickname and
+  level. Live ROM-validated calls and the original saved loop counter identify
+  each member, even for identical teammates. The current record must agree
+  with WRAM and its decoded portrait must match live VRAM. The camera follows
+  the original selection using guest time; repeated paused frames do not
+  rebuild the gallery, upload portraits or modify machine buffers.
+- The private champion fixture takes the actual Pikachu/Pidgey party and
+  executes the original `SaveHallOfFameTeams` at bank 1C:7E2E, then restores
+  the copied world with that SRAM record. It is an explicit test fixture,
+  not a claimed league playthrough. Subsequent PC selections, text, box
+  saves, item quantities and confirmations run in the original engine.
+- `tests/pc_details_qa.sh` passed all four modes in
+  `build/qa/pc-details-Zzu09h/`: `pc-details`, `pc-details-fp`, `pc`, `pc-fp`.
+  The complete modes deposit/withdraw a Pokémon, switch boxes 1/7/1,
+  deposit/withdraw/toss a Poké Ball, read Oak's evaluation and view the saved
+  Hall team. Hall checks include 13,568 exact original text pixels per
+  displayed member, live VRAM portraits, corrupted-SRAM fallback and state
+  reload. Every presented frame checks WRAM, VRAM, SRAM, framebuffer and GL.
+- Reviewed gallery and counter placement:
+  `build/qa/logs/pc-b3-gallery-review.png` and
+  `build/qa/logs/pc-b3-counter-position.png`. The newer counter-glyph pixel
+  assertion is included in the full regression run, rather than inferred
+  from the earlier focused result.
+- Final full CTest passes **25/25**, independent ROM-free CTest **9/9**,
+  and clang-format passes. Logs are `pc-b3-ctest-final.log`,
+  `pc-b3-no-rom.log` and `pc-b3-format.log` under `build/qa/logs/`.
+- All **fourteen** `tests/*_qa.sh` suites pass. The first invocation was
+  externally terminated with exit 143 during the combined PC run, without
+  an assertion failure. The completed `pc-details` and `pc-details-fp`
+  results were preserved; `pc` and `pc-fp` were rerun from the original
+  private fixture, followed by all thirteen existing suites. The resumed
+  driver exited 0. Final PC evidence is `build/qa/pc-details-yEEzZV/`;
+  the helper hash matches the current binary, and original ROM/state hashes
+  remain unchanged. No interrupted result is counted as a pass.
+- All **38 exterior captures remain byte-identical** to the main baseline
+  `build/qa/kanto-hvoPvo/`. The current world run is
+  `build/qa/kanto-LSf8Kn/`; comparison is recorded in
+  `build/qa/logs/pc-b3-exterior-comparison.txt`. Additional suites include
+  FP `firstperson-BXCKBa`, interiors `interiors-tRCw6k`, all 151 original
+  portraits `dex-portraits-bGmo31`, AREA `dex-area-o3vuKF` and storage
+  `pc-storage-qDowqq`, all under `build/qa/`.
+- The consolidated local acceptance audit is
+  `build/qa/logs/pc-b3-acceptance.json`; all suite logs use the `pc-b3-`
+  prefix. The final executable is `build/pokeyellow3d`.
+
+Reproduce with private fixtures:
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 4
+ctest --test-dir build --output-on-failure
+tests/pc_details_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/pc-storage-4lUeyZ/center.state
+bash build/qa/logs/run-pc-b3-regressions.sh
+# Recorded recovery of the interrupted invocation:
+bash build/qa/logs/resume-pc-b3-regressions.sh
+```

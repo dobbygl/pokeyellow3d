@@ -68,6 +68,12 @@ struct PalletPCInfo {
     std::array<float, 8> screen;
 };
 PalletPCInfo pallet3d_pc();
+struct PalletPCDetailsInfo {
+    bool items, oak;
+    int stored, quantity, seen, caught;
+    std::array<float, 8> counter_screen;
+};
+PalletPCDetailsInfo pallet3d_pc_details();
 struct PalletStorageInfo {
     bool active, party;
     int box, selected;
@@ -116,3 +122,12 @@ struct PalletBattleInfo {
     float player_hp, enemy_hp, player_damage, enemy_damage;
 };
 PalletBattleInfo pallet3d_battle();
+
+struct PalletHallInfo {
+    bool active;
+    int team, selected, count;
+    uint64_t fingerprint;
+    size_t builds, uploads;
+    float camera_x;
+};
+PalletHallInfo pallet3d_hall();

@@ -49,6 +49,8 @@ static void capture_surface(const char *path) {
 #include "presentation_integration.h"
 #include "dex_integration.h"
 #include "pc_integration.h"
+#include "pc_details_integration.h"
+#include "pc_hall_integration.h"
 
 int main(int argc, char **argv) {
     if (argc < 3) {
@@ -132,6 +134,22 @@ int main(int argc, char **argv) {
     if (argc > 3 &&
         (!std::strcmp(argv[3], "dex-screen") || !std::strcmp(argv[3], "dex-screen-fp"))) {
         int result = dex_qa::screen(ctx, !std::strcmp(argv[3], "dex-screen-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "pc-details") || !std::strcmp(argv[3], "pc-details-fp"))) {
+        int result = pc_details_qa::items_and_oak(ctx, !std::strcmp(argv[3], "pc-details-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && (!std::strcmp(argv[3], "pc") || !std::strcmp(argv[3], "pc-fp"))) {
+        int result = pc_hall_qa::journey(ctx, !std::strcmp(argv[3], "pc-fp"), true);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && (!std::strcmp(argv[3], "pc-hall") || !std::strcmp(argv[3], "pc-hall-fp"))) {
+        int result = pc_hall_qa::journey(ctx, !std::strcmp(argv[3], "pc-hall-fp"));
         gb_platform_shutdown();
         return result;
     }

@@ -436,7 +436,7 @@ desarrollo de la validación final y sus regresiones.
 | PC del Centro Pokémon y dormitorio | Acercamiento al monitor; menú principal sobre su pantalla y submenús originales sobre la escena atenuada |
 | Ficha de datos de la Pokédex desde su lista | Dispositivo rojo 3D, texto original y retrato verificado; fase A1 completada |
 | Lista de la Pokédex | Dispositivo 3D con retrato, silueta o pantalla vacía según capturado/visto/ausente; fase A2 completada |
-| AREA de la Pokédex | LCD original enmarcado; fase A3 pendiente |
+| AREA de la Pokédex | Vista del catálogo de Kanto con nidos originales, parpadeo y texto del juego |
 | Disposición de menú desconocida con escena residente | Mismo encuadre completo; no se descarta texto |
 | Savestate de menú completo cargado sin escena previa | LCD original hasta disponer de una escena válida |
 | Combate normal y presentación del entrenador | Arena 3D y compositor de combate existente |
@@ -529,7 +529,7 @@ marcas de registro, comprueba los contadores, abre CRY y vuelve al mundo
 con su cámara y mallas intactas. Capturas:
 `build/qa/logs/dex-a2-list-final.png`.
 
-La galería del Hall de la Fama sigue pendiente. AREA ya tiene una vista del
+La galería del Salón de la Fama está validada en B3. AREA ya tiene una vista del
 mundo 3D; su validación se detalla abajo. La ficha
 original usa A/B para salir; para cambiar de especie se vuelve a su lista,
 sin añadir controles nuevos al juego. El estado de cada fase y sus pruebas
@@ -598,3 +598,36 @@ fases de parpadeo, las cargas directas y la conservación de cámara y cachés.
 WRAM, VRAM, RAM de cartucho y framebuffer se comprueban en cada frame.
 Capturas revisadas: `build/qa/logs/dex-a3-area-review.png`. El registro del plan
 indica el estado de las regresiones posteriores antes de cerrar A3.
+
+
+### Objetos, evaluación y Salón de la Fama (B3)
+
+El PC de objetos muestra las posiciones ocupadas de sus 50 espacios en el
+borde superior del monitor. Las listas de depósito, retirada y descarte
+conservan el framebuffer original sobre el interior atenuado. La evaluación
+de Oak mantiene sus textos en el monitor y añade los contadores originales
+de Pokémon vistos y capturados.
+
+El Salón de la Fama lee cada equipo de `sHallOfFame` en el banco cero de
+SRAM. Muestra un pedestal con retrato, nombre y nivel por miembro; la cámara
+sigue al Pokémon que selecciona el programa original. Los cuadros de datos
+y número de equipo son píxeles del juego. La selección requiere llamadas
+vivas verificadas, coincidencia del registro SRAM/WRAM y retrato idéntico a
+VRAM; los estados no reconocidos conservan la presentación anterior.
+
+La batería privada se ejecuta con:
+
+```sh
+tests/pc_details_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/pc-storage-4lUeyZ/center.state
+```
+
+Necesita un estado a la entrada del Centro de Ciudad Verde, dos Pokémon,
+una caja vacía y Poké Balls en la mochila. Ejecuta `pc-details` y `pc`
+en ambas cámaras. `pc` incluye depósito y retirada de un Pokémon, cambio de
+caja, operaciones con objetos, Oak y el Salón de la Fama. La fixture de
+campeón usa el equipo real de esa copia y la rutina recompilada original
+`SaveHallOfFameTeams`; no representa una partida completada. La preparación
+solo modifica la copia privada. Cada frame presentado comprueba que el
+renderer no altera WRAM, VRAM, SRAM ni framebuffer. La aceptación completa
+de B3 y sus resultados se registran en `PLAN_POKEDEX_PC.md`.

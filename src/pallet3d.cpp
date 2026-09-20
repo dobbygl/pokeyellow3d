@@ -9,6 +9,7 @@
 #include "battle_transition_state.h"
 #include "mon_pic_cache.h"
 #include "pc_box_state.h"
+#include "pc_details.h"
 #include "dex_nests.h"
 #include <SDL_opengles2.h>
 #include <algorithm>
@@ -942,6 +943,7 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
 }
 
 #include "pc_boxes.h"
+#include "pc_hall3d.h"
 #include "pc3d.h"
 
 void hud(const GBContext *ctx) {
@@ -976,6 +978,7 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
     dex_area3d::synchronize(ctx);
     pc3d::presented = false;
     pc_boxes::presented = false;
+    pc_hall3d::presented = false;
     if (frozen_blend(ctx)) {
         active = presentation::draw(presentation::history, width, height);
         return;
@@ -1496,6 +1499,26 @@ PalletPCInfo pallet3d_pc() {
             pc_motion.amount,
             pc3d::matrix,
             pc3d::screen};
+}
+PalletPCDetailsInfo pallet3d_pc_details() {
+    bool drawn = pc3d::presented && active;
+    return {drawn && pc3d::stored_items.valid,
+            drawn && pc3d::dex_rating.valid,
+            pc3d::stored_items.count,
+            pc3d::stored_items.quantity,
+            pc3d::dex_rating.seen,
+            pc3d::dex_rating.caught,
+            pc3d::counter_screen};
+}
+PalletHallInfo pallet3d_hall() {
+    return {pc_hall3d::presented && active,
+            pc_hall3d::team.index,
+            pc_hall3d::team.selected,
+            pc_hall3d::team.count,
+            pc_hall3d::team.fingerprint,
+            pc_hall3d::builds,
+            pc_hall3d::uploads,
+            pc_hall3d::camera_x};
 }
 PalletStorageInfo pallet3d_storage() {
     PalletStorageInfo info{};

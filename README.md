@@ -17,14 +17,14 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 `pokeyellow3d` is a fork of [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow), powered by [gb-recompiled](https://github.com/GB-Recomp/gb-recompiled). It builds Pokémon Yellow into a native executable and adds a 3D view of the world. Movement, collisions, encounters, story events, battles, and saving remain under the original game's control.
 
 > [!NOTE]
-> This is a playable prototype under active development. Outdoor exploration and interiors have automated coverage; battle presentation and effects are still being refined. See [development status](#development-status) for the current scope.
+> This is a playable prototype under active development. Outdoor exploration, interiors, and battle presentation have automated coverage, including the completed B1/B2 battle milestones. Validation covers representative scenarios, not a complete story playthrough. See [development status](#development-status) for the current scope.
 
 ## Highlights
 
 - **A connected Kanto.** Explore 36 connected outdoor maps, plus Viridian Forest and Vermilion Dock, with terrain, buildings, and textures derived from the ROM.
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
-- **An evolving battle view.** Normal battles use a 3D arena with original Pokémon portraits, health displays, and the game's original menus and text.
+- **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
 - **Original 2D at a keypress.** Press `F2` to switch presentation. Unsupported scenes and full-screen interfaces use the original framebuffer automatically.
 - **Bounded rendering work.** Outdoor meshes are cached for the current map and its immediate neighbors, with at most five resident maps.
 
@@ -37,7 +37,7 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 | [![First-person view between Pallet Town's houses, looking toward the path ahead](docs/screenshots/first-person.png)](docs/screenshots/first-person.png) | [![The player and Pikachu exploring Viridian City from the overhead camera](docs/screenshots/viridian-city.png)](docs/screenshots/viridian-city.png) |
 | **Celadon City** | **Viridian Forest** |
 | [![Catalog overview of Celadon City's buildings, streets, and department store](docs/screenshots/celadon-city.png)](docs/screenshots/celadon-city.png) | [![Catalog overview of Viridian Forest's paths and dense rows of trees](docs/screenshots/viridian-forest.png)](docs/screenshots/viridian-forest.png) |
-| **Professor Oak's laboratory** | **Battle presentation · in development** |
+| **Professor Oak's laboratory** | **Battle presentation** |
 | [![Professor Oak's laboratory with its desks, equipment, and original characters](docs/screenshots/oaks-lab.png)](docs/screenshots/oaks-lab.png) | [![Pikachu facing a wild Rattata in the 3D arena above the original battle menu](docs/screenshots/battle.png)](docs/screenshots/battle.png) |
 
 ## Get started
@@ -123,7 +123,7 @@ First person follows the original movement grid; it does not provide free moveme
 | Outdoor world | 36 connected maps, Viridian Forest, and Vermilion Dock; geometry audits and representative journeys are implemented. |
 | First person | Movement, turning, transitions, dialogue overlays, and camera parity have dedicated checks. |
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
-| Battles | 3D arenas, portraits, HUDs, party changes, and capture scenarios are implemented. Battle coverage and effects remain in development. |
+| Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
 | Menus and transitions | Original 2D interfaces remain available; broader presentation work is planned. |
 | Pokédex and PC | Original interfaces remain in use; dedicated presentation work is planned. |
 

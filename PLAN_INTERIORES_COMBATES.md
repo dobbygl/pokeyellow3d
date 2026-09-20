@@ -1,6 +1,6 @@
 # Plan: interiores y combates en 3D
 
-Fecha: 2026-09-19. Estado: A1 y A2 completadas; B1 en desarrollo; B2 pendiente.
+Fecha: 2026-09-19. Estado: A1, A2, B1 y B2 completadas y verificadas el 2026-09-20.
 
 ## Objetivo y alcance
 
@@ -184,7 +184,7 @@ Criterios de aceptación:
 
 - [x] Un encuentro salvaje en Ruta 1 se presenta en 3D con ambos retratos correctos y sus marcadores coincidentes con los valores de WRAM.
 - [x] Menú de lucha, elección de movimiento, mochila, lista de equipo y huida son operables y legibles.
-- [ ] El cambio de Pokémon, la derrota de un rival y el fin del combate no dejan frames con retrato equivocado.
+- [x] El cambio de Pokémon, la derrota de un rival y el fin del combate no dejan frames con retrato equivocado.
 - [x] El recorrido `journey` gana su combate con la escena 3D activa y vuelve a Ruta 1 en 3D.
 - [x] Cero errores OpenGL y WRAM, VRAM y framebuffer intactos en cada frame.
 
@@ -211,10 +211,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Toda animación de movimiento se ve completa, en 2D compuesto o en 3D, sin frames negros ni retratos duplicados.
-- [ ] Al menos las cuatro categorías básicas tienen efecto 3D y las capturas revisadas muestran cada una.
-- [ ] Una captura de Pokémon salvaje y un combate de entrenador pasan en `pallet_render_smoke` con la escena activa.
-- [ ] Ningún efecto depende de escribir el estado de la máquina.
+- [x] Toda animación de movimiento se ve completa, en 2D compuesto o en 3D, sin frames negros ni retratos duplicados.
+- [x] Al menos las cuatro categorías básicas tienen efecto 3D y las capturas revisadas muestran cada una.
+- [x] Una captura de Pokémon salvaje y un combate de entrenador pasan en `pallet_render_smoke` con la escena activa.
+- [x] Ningún efecto depende de escribir el estado de la máquina.
 
 ## Limitaciones asumidas
 
@@ -380,3 +380,106 @@ Criterios de aceptación:
 - La animación de captura sigue siendo la original en 2D. Esta prueba prepara
   la validación de cambios de equipo y no acredita aún los efectos 3D ni el
   combate de entrenador exigidos por B2.
+
+### B1 y B2: cambios, entrenador, captura y efectos, 2026-09-20
+
+Batería reproducible:
+
+```sh
+tests/battles_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/logs/town-route1.state \
+  build/qa/firstperson-9cB3FJ/route.state
+```
+
+Resultado **PASS** en `build/qa/battles-xtPavN/`; resumen en
+`build/qa/logs/b2-battles-final.log`. Esta ejecución resuelve los pendientes de
+B1 y B2 de las entradas históricas anteriores.
+
+- `battle3d` encadena una captura real de Rattata tras dos lanzamientos, con
+  891 frames de escena y 537 de Poké Ball; intercambios Pikachu/reserva con
+  555 comprobaciones exactas de los retratos subidos a GPU contra VRAM;
+  curación; aproximación y combate contra el rival de Ruta 22. No depende
+  de capturar una especie concreta ni concede Pokémon en estas pruebas.
+- El rival presenta su retrato de entrenador, envía Spearow y Eevee y se
+  verifica el reemplazo. Pikachu cae, se elige la reserva mediante el menú
+  original y el jugador gana. Hay 3.448 frames de arena comprobados y se
+  termina también el diálogo posterior antes de acreditar 90 frames de
+  mundo 3D estable. `trainer-result.ppm` muestra ese regreso.
+- La prueba anterior `build/qa/interiors/logs/b1-trainer.log` cubrió además
+  la derrota de ambos miembros: retorno a Ciudad Verde y curación original
+  del equipo (26/17 HP). El helper distingue ese teletransporte de una
+  conexión de borde y comprueba el destino de curación.
+- Cuatro efectos derivados de la tabla `Moves` de ROM: golpe físico,
+  proyectil con estela, estado sobre el rival y brillo propio. En la prueba
+  integrada se observan respectivamente 32, 136, 90 y 24 frames; los dos
+  ataques dañinos muestran además 24 frames de sacudida/parpadeo con barra
+  interpolada dentro de los límites de HP del motor.
+- Agilidad tiene un destello original de dos frames. Se conserva su evento y
+  se añade una estela cosmética de hasta 0,55 s, sin ralentizar el juego.
+  Las Poké Balls usan el contador original de subanimación para la trayectoria
+  y las sacudidas; el motor decide fuga, fallo y éxito.
+- Las llamadas vivas a `PlayMoveAnimation`, su limpieza, `MoveAnimation` y
+  `TossBallAnimation` delimitan la presentación. El ID y los contadores de
+  animación son alias; su persistencia aislada no activa efectos.
+- Los 165 registros están presentes en el manifiesto y tienen una ruta de
+  presentación: 45 físicos, 26 proyectiles, 24 de estado, 20 propios y 50 que
+  conservan el LCD original. El test unitario comprueba la propiedad y salida
+  de la animación para los 165 IDs aun con el tilemap borrado y la paleta
+  destellando. Las animaciones especiales fuera de esa tabla también usan
+  el respaldo original. No se afirma haber jugado 165 combates diferentes.
+- Vuelo verifica el respaldo durante una animación real de dos turnos: 79
+  frames de composición opaca y **cero diferencias entre los 23.040 píxeles
+  del LCD y su imagen presentada**. El fundido oculta los billboards mientras
+  compone el LCD, evitando duplicar los retratos. Las capturas de ambas rutas
+  se han revisado en `logs/b2-review.png` de la carpeta de esta ejecución.
+- `battle-effects` prepara movimientos únicamente en estados privados de QA;
+  los ejecuta a través del menú original. Producción no escribe WRAM, VRAM ni
+  framebuffer. `QaWalk` compara los 32 KiB, 16 KiB y 23.040 píxeles completos
+  antes y después de cada frame presentado y exige cero errores GL.
+- Se corrige la invalidación del terreno al cargar otro combate: volver a
+  la fixture de Ruta 1 desde Ruta 22 recupera hierba. Se verifica expresamente.
+- Se corrige el reloj de las entradas de QA: el contador SDL sobrevive a
+  varias instancias de helper y el reloj de CPU tiene 32 bits. Las pulsaciones
+  quedan activas hasta su liberación explícita, incluso al cruzar ese límite.
+  Los cambios afectan al helper, no al runtime descargado ni al C generado.
+
+Validaciones finales ya superadas: CTest 7/7; Kanto completo en
+`build/qa/kanto-PW04nG/`; primera persona y paridad del motor en
+`build/qa/firstperson-uorAnd/`; combate en `build/qa/battles-xtPavN/`.
+Las 38 capturas de exterior siguen idénticas byte a byte a la referencia
+anterior a A1, según `build/qa/logs/b2-exterior-comparison.txt`.
+La repetición completa de interiores también pasa en
+`build/qa/interiors-VfIUU4/`: casa en ambas cámaras, centro y tienda, entrega
+del paquete, compra, regreso a Ruta 1, escaleras, ascensor, cueva y catálogo de
+179 mallas. En la cueva se produce un encuentro real: el helper huye mediante
+el menú original antes de capturar el pasillo en primera persona y regresar
+por la escalera. No se suprime el encuentro ni se modifica el RNG.
+
+### Auditoría de entrega, 2026-09-20
+
+| Requisito | Evidencia final inspeccionada |
+| --- | --- |
+| A1: ambas plantas, mobiliario, NPC, laboratorio, cámara y retorno | `interiors-VfIUU4/logs/house.log`, `house-fp.log`, `final-review.png`; `interior_test` |
+| A2: catálogo completo, clasificación, warps planos y límites | `interiors-VfIUU4/logs/interiors.csv`, `catalog.log`; `interior_audit` y `interior_test` |
+| A2: curar, comprar, escaleras, ascensor y cueva | `interiors-VfIUU4/logs/{town,elevator,cave}.log`, sus capturas y `result.txt` |
+| B1: retratos, marcadores, menús, cambio, debilitamiento y rival nuevo | `battles-xtPavN/logs/{menus,battle3d}.log`, `b2-review.png`; `battle_state_test` |
+| B1: victoria y regreso al mapa | `kanto-PW04nG/logs/journey.log`, `battles-xtPavN/logs/trainer-result.ppm` |
+| B2: categorías, respaldo LCD, captura y entrenador | `battles-xtPavN/logs/battle3d.log`, trazas `effect-*.csv` y `b2-review.png` |
+| Invariantes de memoria, GL, caché y selección de escena | Comprobaciones por frame de `QaWalk`/`ReadOnlyMemory` en las cuatro baterías; catálogos completos |
+| Regresión de exteriores y primera persona | `kanto-PW04nG/`, `firstperson-uorAnd/`; 38/38 imágenes idénticas en `logs/b2-exterior-comparison.txt` |
+| Unitarias y compilación | CTest 7/7 en `logs/b2-interiors-final.log`; `build/pokeyellow3d` compilado |
+| Fixtures locales requeridas | `interiors-VfIUU4/logs/{reds-house-1f,viridian-center}.state`; `battles-xtPavN/logs/{capture-start,route22-trainer}.state` |
+| CSV y documentación | `build/qa/logs/interiors.csv`, `PALLET3D.md`, `README.md` y este plan |
+
+Las rutas abreviadas de la tabla parten de `build/qa/`. Los hashes de ROM y
+fixtures de entrada de las baterías siguen intactos. El runtime descargado
+sigue limpio y fijado a `6581880fce60e6f139901a5942fc984e9c1db8ab`; no se
+modificó el C generado del juego.
+
+Los límites asumidos siguen vigentes: 2.960 casillas de interior sin regla
+artística permanecen planas (cero índices gráficos inválidos); los Pokémon son
+billboards; las cuevas tienen geometría básica; link, tutorial y Safari
+conservan 2D. Las animaciones complejas usan el LCD original. Las verificaciones
+jugables son representativas y se complementan con auditorías del catálogo y
+de los 165 registros de movimientos; no se afirma haber terminado la historia.
+No quedan criterios pendientes dentro del alcance de este plan.

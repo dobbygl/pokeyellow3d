@@ -26,11 +26,14 @@ giro limitado y zoom. También admiten primera persona, con techo y niebla oscur
 en cuevas. El mobiliario es una interpretación: 2.960 casillas sin clasificación
 artística conservan su textura plana y se registran en el CSV.
 
-Los combates normales tienen una primera escena 3D con retratos de VRAM,
-paletas originales y marcadores de vida. B1 sigue en validación: no se afirma
-todavía cobertura completa de cambios de Pokémon ni combates de entrenador.
-El texto y los menús son el framebuffer original; las animaciones conservan
-la imagen completa. Link, tutorial, Safari y estados no reconocidos siguen en
+Los combates normales tienen una escena 3D con retratos de VRAM, paletas
+originales, vida, estado y experiencia. Incluye cambios de equipo, presentación
+del entrenador, efectos de golpe, proyectil, estado y mejora propia, además de
+trayectoria y sacudidas de Poké Ball. El daño provoca sacudida y parpadeo; la
+barra de vida interpola las lecturas del motor. Texto y menús conservan el
+framebuffer original. Los movimientos complejos conservan su animación completa
+mediante una composición con fundido, sin duplicar los retratos. Link, tutorial,
+Safari y estados no reconocidos siguen en
 2D. En primera persona los cuadros de diálogo inferiores reconocidos se
 superponen al mundo 3D.
 
@@ -118,6 +121,34 @@ build/interior_audit build/roms/pokeyellow.gbc > build/qa/logs/interiors.csv
 `unknown_graphics` detecta índices inválidos; `unclassified_flat_cells` registra
 gráficos válidos que aún no tienen regla artística. Son medidas distintas.
 
+Para repetir la integración de combates B1/B2:
+
+```sh
+tests/battles_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/logs/town-route1.state \
+  build/qa/firstperson-9cB3FJ/route.state
+```
+
+La primera fixture está en Ruta 1 (10,4), con las diez Poké Balls compradas por
+`town`; la segunda en Ruta 1 (10,28). Se copian ROM, ejecutable y estados a
+`build/qa/battles-XXXXXX/`. El modo `battle3d` encadena captura, cambios de equipo,
+curación, aproximación al rival de Ruta 22, combate de entrenador y efectos.
+El helper contrasta los retratos subidos a GPU con VRAM y comprueba GL y toda
+la WRAM/VRAM/framebuffer después de cada presentación. No guarda batería.
+
+`battle-effects` concede exclusivamente en sus copias privadas Placaje,
+Impactrueno, Gruñido, Agilidad y Vuelo para probar las cuatro categorías y el
+respaldo original. Los ataques se ejecutan mediante los menús del juego. La
+captura y el combate del rival usan el equipo obtenido por el motor, sin
+conceder Pokémon, cambiar el RNG ni decidir el resultado. Se guardan capturas,
+trazas de efectos y estados para repetir los casos.
+
+La tabla de 165 movimientos se lee de la ROM. Las pruebas unitarias comprueban
+todos sus registros y la conservación del compositor durante la limpieza de
+la animación; las pruebas jugables ejercitan las cuatro categorías y Vuelo,
+con comparación exacta de los 23.040 píxeles del LCD para el respaldo opaco.
+Esto no equivale a haber jugado 165 combates distintos.
+
 ## Datos y arquitectura
 
 - `src/kanto_rom.h`: lector de bancos, headers, conexiones, bloques, tilesets,
@@ -129,8 +160,16 @@ gráficos válidos que aún no tienen regla artística. Son medidas distintas.
   tileset y cámara independiente del exterior.
 - `src/battle_state.h`: selección de combate, retratos por columnas desde
   `wTileMap` y VRAM, paletas de especie, HP, nivel, estado y experiencia.
+  `wAnimationID=0xD07B` y el contador `0xD086` tienen alias: su valor aislado
+  no indica una animación. Se verifican los retornos CALL vivos del motor y
+  sus operandos ROM antes de usar los efectos o la composición original.
 - `src/battle3d.h`: arena independiente, dos plataformas, billboards y marcadores
   ImGui. Usa su propia textura y cámara; no modifica las mallas del mundo.
+  Mantiene los retratos durante efectos que borran temporalmente el tilemap;
+  los invalida al cambiar de especie, salir del combate o retroceder el reloj.
+  Relee el terreno al cargar un combate de otro mapa o posición. Agilidad
+  añade una estela visual limitada a 0,55 s porque el destello original dura
+  dos frames; no retrasa el motor. Las fases de captura siguen sus contadores.
 - `src/world_scene.h`: catálogo, clasificación visual por tileset e inferencia
   de edificios. Hay 140 volúmenes; los patrones de borde de tejado separan
   edificios contiguos. Torre Pokémon y sede de la Liga tienen correcciones
@@ -268,8 +307,8 @@ escribir RAM. `CATALOG_CAPTURE_DIR` guarda cada mapa y `CATALOG_BENCH_FRAMES`
 activa la medición. `PALLET3D_TRACE=1` registra cambios de vista y coordenadas;
 `PALLET3D_CAPTURE=ruta.ppm` captura el juego normal después de 30 frames 3D.
 
-- La ampliación de interiores y combates está en curso, según
-  `PLAN_INTERIORES_COMBATES.md`. No incluye cámara libre ni alturas transitables nuevas. Primera persona conserva movimiento por
+- La ampliación de interiores y combates está validada con el alcance y las
+  evidencias de `PLAN_INTERIORES_COMBATES.md`. No incluye cámara libre ni alturas transitables nuevas. Primera persona conserva movimiento por
   casillas y cuatro direcciones de interacción; el ratón no gira al jugador.
 - Los cuadros inferiores con borde completo y mapa visible detrás conservan
   el 3D en primera persona: se copian las filas 96–143 del framebuffer original.

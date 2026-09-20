@@ -1,6 +1,6 @@
 # Plan: runtime extension API and CI on GitHub Actions
 
-Date: 2026-09-20. Status: phases 1–3 verified; phases 4–5 in progress; goal active. Develops points 1 and 2
+Date: 2026-09-20. Status: phases 1–4 verified; phase 5 in progress; goal active. Develops points 1 and 2
 of `PLAN_MEJORAS.md`.
 
 ## Goal and scope
@@ -190,7 +190,7 @@ Acceptance criteria:
 
 - [x] A push to `main` and a test pull request show the workflow passing on Linux. Windows and macOS jobs are defined but disabled: the pinned runtime includes POSIX headers unconditionally and uses C++20 designated initializers under the project's C++17 standard; macOS lacks GLES2 headers.
 - [x] A pull request that breaks the synthetic reader fails in CI with the test flagged.
-- [ ] A `v0.1.0` tag produces a release with Linux binaries (Windows once the runtime is portable).
+- [x] A `v0.1.0` tag produces a release with Linux binaries (Windows once the runtime is portable).
 - [x] Total workflow time with a warm cache is under ten minutes.
 
 ## Phase 5: contribution to the original project
@@ -212,7 +212,7 @@ Work:
 Acceptance criteria:
 
 - [ ] The pull request is open with the original project's CI passing.
-- [ ] This repository builds against the original tag after the merge, or against the fork in the meantime, without textual patches in either case.
+- [x] This repository builds against the original tag after the merge, or against the fork in the meantime, without textual patches in either case.
 
 ## Accepted limitations
 
@@ -488,3 +488,51 @@ standalone host tests pass on real Windows/MSVC and Linux at
 https://github.com/dobbygl/gb-recompiled/actions/runs/35527532377 .
 This proves the filesystem layer only; sockets, threading and GLES remain
 pending, and the game's pinned `presentation-api-v1` runtime is unchanged.
+
+
+### Phase 4 complete: inspected Linux release, 2026-09-20
+
+PR #3 merged as `5554ccd7a69a0605214b4d12268f6c018ec2b4f1`.
+Main CI passes: https://github.com/dobbygl/pokeyellow3d/actions/runs/35527950022 .
+Tag `v0.1.0` points to that commit and its release workflow passes:
+https://github.com/dobbygl/pokeyellow3d/actions/runs/35527967051 .
+
+Release: https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.1.0 .
+Downloaded asset `pokeyellow3d-linux-x86_64-v0.1.0.zip`, 441,633 bytes,
+SHA-256 `8fdfb478b4a557166803e47e90e7b0ea03c867184b759251f8f197c8848f2309`,
+matching GitHub's asset digest. The archive contains exactly the executable,
+`README.md`, `PALLET3D.md`, `RUN.md` and `DEPENDENCIES.txt`; no ROM or saves.
+The executable permission is preserved, all linked libraries resolve on this
+host, and `--list-games` identifies the cartridge without needing a ROM.
+
+A private copy of the ROM was then added only to the extracted QA directory.
+The **downloaded executable** verifies its SHA-1, extracts 145 asset sections,
+boots without a savestate and exits normally at frame 180. Reviewed captures
+show the original white startup at frame 60 and copyright at frame 180.
+This is a package startup check, **not** the pending 3D title/main-menu `boot`
+mode in the menus plan. The host's libcurl emits a version-information warning;
+it does not prevent this launcher or boot test from succeeding.
+
+Evidence under `build/qa/logs/`: `release-v0.1.0-{audit.json,run.json,boot.log,
+boot-review.png}`, `ci-main-hardening.json`. Reproduce download/audit with:
+
+```sh
+gh release download -R dobbygl/pokeyellow3d v0.1.0 --pattern '*.zip' --dir build/qa/release-v0.1.0
+python3 build/qa/logs/audit-release.py
+cd build/qa/release-v0.1.0/extracted/pokeyellow3d-linux-x86_64-v0.1.0
+# Private roms/pokeyellow.gbc supplied locally; never part of the archive.
+SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy LIBGL_ALWAYS_SOFTWARE=1 \
+  ./pokeyellow3d --limit-frames 180 --dump-present-frames 60,180 --screenshot-prefix release
+```
+
+The full thirteen-suite gate, 24/24 CTest, separate ROM-free 8/8 and exact
+38/179/215 capture comparisons recorded above validate this release's source.
+The local `build/pokeyellow3d` has also been rebuilt from the merged commit.
+Phase 5's fork-build criterion is independently met by this CI/release, which
+fetches `presentation-api-v1` without runtime text patches. Its upstream PR and
+complete Windows networking/GLES portability remain pending.
+
+The isolated filesystem portability commit also passes the original runtime
+presentation contract and a freshly regenerated procedural game. Frames
+1/30/60 remain byte-identical (`gb-recompiled-windows/logs/windows-filesystem-*`).
+This does not change the runtime version used by the release.

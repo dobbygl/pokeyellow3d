@@ -6,6 +6,8 @@ movimiento, colisiones, encuentros, combates, historia y guardado.
 
 ## Ejecutar
 
+Está disponible el [paquete Linux x86_64 v0.1.0](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.1.0), compilado en Ubuntu 24.04. Descomprímelo, coloca tu ROM en `roms/pokeyellow.gbc` junto al ejecutable y sigue `RUN.md`; las bibliotecas necesarias están en `DEPENDENCIES.txt`. No incluye ROM ni partida. Para la compilación local:
+
 ```sh
 cd build
 ./pokeyellow3d

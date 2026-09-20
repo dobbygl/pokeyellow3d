@@ -43,7 +43,7 @@ document covers what comes next. Facts verified on 2026-09-20:
 | 9 | Photo mode and event cameras | Shareability | Low | 3 |
 | 10 | Cable link between instances | Trades and battles | Medium | 1 |
 
-Points 1 and 2 are detailed in `PLAN_API_CI.md`.
+Points 1 and 2 are detailed in `PLAN_API_CI.md`. Their implementation criteria below are verified by its phases 1–4 execution records, including the Linux `v0.1.0` release. The upstream contribution and full Windows portability in phase 5 remain pending.
 
 ## 1. Stable extension API in gb-recompiled
 
@@ -58,9 +58,9 @@ the 3D layer.
 
 Acceptance criteria:
 
-- [ ] `cmake/Pallet3D.cmake` contains no textual replacement of the runtime.
-- [ ] The 3D layer builds against a tagged runtime version that declares the API version.
-- [ ] The existing regression suites pass with no behavior changes.
+- [x] `cmake/Pallet3D.cmake` contains no textual replacement of the runtime.
+- [x] The 3D layer builds against a tagged runtime version that declares the API version.
+- [x] The existing regression suites pass with no behavior changes.
 
 ## 2. CI on GitHub Actions and tests without the ROM
 
@@ -76,8 +76,8 @@ verify a contribution.
 Acceptance criteria:
 
 - [x] Every push and every pull request builds and passes CTest on Linux; Windows and macOS jobs stay disabled.
-- [ ] At minimum, the ROM reader, the terrain and interior classifiers, `view()`, and the renderer in preview mode are tested without the ROM.
-- [ ] Tests that require the ROM remain separated and documented for local execution.
+- [x] At minimum, the ROM reader, the terrain and interior classifiers, `view()`, and the renderer in preview mode are tested without the ROM.
+- [x] Tests that require the ROM remain separated and documented for local execution.
 
 ## 3. Data-driven art pass and lighting
 

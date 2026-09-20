@@ -1,4 +1,5 @@
 build/
+.codegraph/
 assets/
 
 # ROMs are user-supplied; don't commit them.
@@ -13,6 +14,7 @@ roms/*.sgb
 
 # Runtime prefs file.
 *.prefs
+imgui.ini
 
 # Editor / OS noise.
 .idea/

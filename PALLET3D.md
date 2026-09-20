@@ -529,7 +529,7 @@ marcas de registro, comprueba los contadores, abre CRY y vuelve al mundo
 con su cámara y mallas intactas. Capturas:
 `build/qa/logs/dex-a2-list-final.png`.
 
-La galería del Salón de la Fama se está verificando en B3. AREA ya tiene una vista del
+La galería del Salón de la Fama está validada en B3. AREA ya tiene una vista del
 mundo 3D; su validación se detalla abajo. La ficha
 original usa A/B para salir; para cambiar de especie se vuelve a su lista,
 sin añadir controles nuevos al juego. El estado de cada fase y sus pruebas

@@ -20,7 +20,7 @@ void before_swap(int width, int height, bool menu_open) {
 }
 } // namespace
 
-bool pallet3d_register() {
+GBPresentationHooks pallet3d_presentation_hooks() {
     GBPresentationHooks hooks{};
     hooks.api_version = GB_PRESENTATION_API_VERSION;
     hooks.struct_size = sizeof(hooks);
@@ -32,6 +32,11 @@ bool pallet3d_register() {
     hooks.shutdown = pallet3d_shutdown;
     hooks.input_poll = pallet3d_poll_controls;
     hooks.state_loaded = pallet3d_state_loaded;
+    return hooks;
+}
+
+bool pallet3d_register() {
+    auto hooks = pallet3d_presentation_hooks();
     return gb_platform_set_presentation(&hooks);
 }
 

@@ -154,13 +154,13 @@ with wind; NPCs outside the original screen animated from their movement
 state and the ROM's sprite sheets; particles when walking in grass and when
 surfing.
 
-Why: today the world is a diorama with actors frozen at a distance.
+Why: bring the ROM's tile and actor animation into the 3D presentation.
 
 Acceptance criteria:
 
-- [ ] Water and flowers animate at the original game's cadence.
+- [x] Water and flowers animate at the original game's cadence.
 - [ ] An NPC walking outside the original screen shows its walking frames.
-- [ ] The regression journeys keep passing with memory intact.
+- [x] The regression journeys keep passing with memory intact.
 
 ### Phase 5A: original tileset animation
 
@@ -174,9 +174,81 @@ Work:
 
 Acceptance criteria:
 
-- [ ] Water and flower frames match original VRAM over complete animation periods.
-- [ ] Non-animated tilesets, pauses and loads select the correct frame without stale textures.
-- [ ] Full CTest, ROM-free CTest and every QA suite pass; frame guards cover all guest memory.
+- [x] Water and flower frames match original VRAM over complete animation periods.
+- [x] Non-animated tilesets, pauses and loads select the correct frame without stale textures.
+- [x] Full CTest, ROM-free CTest and every QA suite pass; frame guards cover all guest memory.
+
+### 5A execution record — 2026-09-21
+
+Branch `tileset-animations-5a`, [PR #6](https://github.com/dobbygl/pokeyellow3d/pull/6).
+The user explicitly selected 5A while the broader integrated goal remained
+paused; 5B and the other pending milestones are not part of this change.
+
+`src/tile_animation.h` reconstructs the water tile's rotation and the three
+flower frames from ROM. It finds the exact resident phase by matching the
+original VRAM, rather than estimating it from elapsed host time or a counter
+that survives tileset changes. ROM animation flags select none, water, or
+water+flowers. Pauses and loads need no accumulated presentation clock;
+unrecognized tiles keep their original static appearance. The renderer
+uploads only changed 8×8 cells in its private atlas. The catalog's fixed ROM
+phase and all other geometry, actor and game behavior remain unchanged.
+
+The original routine is `UpdateMovingBgTiles` at `00:1c75`, verified with
+`pokeyellow_metadata.json`, `pokeyellow_internal.h`, and live execution.
+[pret's original routine](https://github.com/pret/pokeyellow/blob/master/home/vcopy.asm)
+explains the eight alternating rotation steps: water updates at counter 20,
+and flag 2 copies a flower at counter 21 before resetting. The integration
+oracle checks those counter transitions, direction and flower sequence
+independently of the renderer's VRAM-matching implementation.
+
+Validation completed:
+
+- 26/26 CTest tests, 10/10 tests in the independent ROM-free build, and
+  clang-format 18.1.8. The new synthetic test uses procedural bytes only.
+- `tests/tile_animation_qa.sh` passed all 20 scenarios: maps 0, 51, 40, 65,
+  95, 94, 59, 83, 9 and 37 in both cameras. This covers all nine animated
+  tilesets and one disabled tileset. Each scenario verifies 360 engine frames,
+  two full animation periods, live VRAM, actual GPU texels, frozen guest
+  frames and immediate state reload. The Pallet scenarios also traverse the
+  original house entrance and exit and switch to/from a fixed catalog preview.
+- Evidence: `build/qa/tile-animation-mNqcoQ/`,
+  `build/qa/logs/tiles-5a-animation-summary.json`,
+  `tiles-5a-phases-review.png` and `tiles-5a-cameras-review.png`.
+  Every presented frame is guarded against WRAM, VRAM, SRAM and framebuffer writes.
+- All 38 exterior catalog images in `build/qa/kanto-39A2jj/logs/catalog`
+  exactly match `build/qa/kanto-hvoPvo/logs/catalog`.
+- Of the 215 interior journey/catalog images, 210 are byte-identical to the
+  deterministic pre-5A reference `interiors-3jiH2O`, including all 179 catalog
+  views. The five intentional changes are `lab-return[-fp].ppm`,
+  `pallet-return[-fp].ppm` and `town-route1.ppm`: reviewed differences affect
+  only animated water/flowers. Counts and highlighted comparisons are in
+  `tiles-5a-interior-comparison.json` and `tiles-5a-intentional-differences.png`
+  under `build/qa/logs/`.
+
+The complete 15-suite regression passed with exit 0, followed by 26/26 CTest
+and an exact 38-image exterior comparison. Suites: tile animation, PC details,
+world, first person, interiors, battles, battle UI, crossfades, menus,
+transitions, Dex list, all 151 Dex portraits, Dex areas, PC focus and PC storage.
+`tiles-5a-regressions.log`, `tiles-5a-acceptance.json`,
+`tiles-5a-exterior-comparison.txt` and the individual suite logs record the
+results under `build/qa/logs/`. The PR's Linux GCC, Clang, 2D-only and format
+checks also passed for the implementation commit. The final documentation
+commit must keep those checks green before merge.
+
+Reproducible commands (private fixtures remain local):
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 4
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+tests/tile_animation_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state
+bash build/qa/logs/run-tiles-5a-regressions.sh
+```
+
+The driver configures/builds the independent no-ROM directory, checks format,
+runs every `tests/*_qa.sh`, repeats full CTest, and compares the 38 exterior
+reference images. ROMs, states and captures remain ignored in `build/qa/`.
 
 ### Phase 5B: distant actors, wind and particles
 
@@ -198,7 +270,12 @@ Acceptance criteria:
 
 ### Execution and validation order for points 5 and 4
 
-Implement 5A, 5B, 4A, then 4B after the three prerequisite plans. Every phase
+The user explicitly advanced phase 5A on 2026-09-21 while the integrated
+goal remained paused. This changes the order for 5A only; the other phases
+and prerequisite work remain pending.
+
+After the 5A exception above, implement 5B, 4A, then 4B after the three
+prerequisite plans. Every phase
 records build/test commands and output directories; unchecked criteria remain
 pending until the relevant evidence is inspected. ROMs, saves and captures stay
 private under `build/qa/`. Unsupported input retains the existing presentation.

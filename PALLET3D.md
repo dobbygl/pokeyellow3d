@@ -631,3 +631,40 @@ campeón usa el equipo real de esa copia y la rutina recompilada original
 solo modifica la copia privada. Cada frame presentado comprueba que el
 renderer no altera WRAM, VRAM, SRAM ni framebuffer. La aceptación completa
 de B3 y sus resultados se registran en `PLAN_POKEDEX_PC.md`.
+
+
+### Agua y flores (5A)
+
+`src/tile_animation.h` reconstruye los tiles animados a partir de la ROM.
+Busca la rotación del agua y el fotograma de flor que coinciden exactamente
+con la VRAM residente del motor; no integra un reloj propio. Esto conserva
+la fase al pausar, cargar estado, cambiar de mapa o volver desde F2.
+Los tilesets vecinos usan esa fase y sus propios gráficos y flags de ROM.
+Un tile no reconocido conserva su textura estática anterior.
+
+En Yellow UE, `UpdateMovingBgTiles` está en `00:1c75`: el agua (`$14`,
+VRAM `$9140`) rota en el VBlank 20. Los tilesets con flag 2 copian la flor
+(`$03`, VRAM `$9030`) en el siguiente VBlank y reinician el contador;
+con flag 1 lo reinician tras rotar el agua. El contador de pasos alterna
+cuatro rotaciones a cada lado en un ciclo de ocho pasos. Las tres flores
+se leen en `00:1cd5`, `00:1ce5` y `00:1cf5`. Los contadores vivos están en
+`$FFD8` y `$D084`, y el flag en `$FFD7`, cotejados con
+`pokeyellow_internal.h` y la ejecución del motor original.
+
+Solo se actualizan rectángulos de 8×8 de la textura privada cuando sus
+píxeles cambian. Los previews de catálogo conservan la fase estática de
+ROM para comparar las 38 referencias; los recorridos jugables sí animan.
+No se escribe en la ROM, WRAM, VRAM, SRAM ni framebuffer del juego.
+
+```sh
+ctest --test-dir build -R tile_animation_test --output-on-failure
+tests/tile_animation_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state
+```
+
+La batería usa una copia privada en Paleta (9,7), prepara los demás mapas
+con el warp del motor y comprueba todos los tilesets animados y un interior
+sin animación en ambas cámaras. Registra dos ciclos completos, verifica
+cada frame contra VRAM, lee los texels reales de la GPU y revisa pausa,
+recarga y entrada/salida de la casa. Las secuencias quedan en
+`build/qa/tile-animation-*/`, fuera de Git.

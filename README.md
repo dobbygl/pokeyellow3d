@@ -25,6 +25,7 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 ## Highlights
 
 - **A connected Kanto.** Explore 36 connected outdoor maps, plus Viridian Forest and Vermilion Dock, with terrain, buildings, and textures derived from the ROM.
+- **Animated water and flowers.** Original ROM frames follow the live Game Boy animation phase, including pauses and save-state loads.
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
 - **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
@@ -135,7 +136,7 @@ First person follows the original movement grid; it does not provide free moveme
 | Menus and transitions | A1/A2/A3 and C1/C2 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle transitions, and save-state transitions. Title-screen and special travel transitions remain pending. |
 | Pokédex and PC | 3D list/data device, ROM-verified portraits, AREA overview and Bill’s twelve-box storage are implemented. The item PC and Oak show live counters; the Hall of Fame reads saved teams from cartridge RAM into a pedestal gallery. |
 
-The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, water and vegetation are static, and neighboring-map NPCs are not simulated. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
+The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, grass wind and particles remain pending, and neighboring-map NPCs are not simulated. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
 
 ## Development and validation
 

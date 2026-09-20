@@ -4,6 +4,10 @@
 #include <SDL.h>
 #include <array>
 
+// The same callback table is used by the playable frontend and QA adapters.
+struct GBPresentationHooks;
+GBPresentationHooks pallet3d_presentation_hooks();
+
 // Register before initializing the runtime SDL frontend.
 bool pallet3d_register();
 
@@ -131,3 +135,11 @@ struct PalletHallInfo {
     float camera_x;
 };
 PalletHallInfo pallet3d_hall();
+
+// Read-only diagnostics for original tileset animation and private atlas QA.
+struct PalletTileAnimationInfo {
+    int water_shift = -1, flower_frame = -1;
+    unsigned texture = 0;
+    size_t uploads = 0;
+};
+PalletTileAnimationInfo pallet3d_tile_animation();

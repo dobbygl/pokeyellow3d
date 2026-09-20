@@ -46,6 +46,10 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 
 ## Get started
 
+### Prebuilt Linux package
+
+Download [v0.1.0 for Linux x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.1.0), extract it, and follow its `RUN.md`. It is built on Ubuntu 24.04 and uses system SDL2, libcurl and OpenGL/GLES libraries; `DEPENDENCIES.txt` lists them. Supply your matching ROM as `roms/pokeyellow.gbc` beside the executable, then run `./pokeyellow3d` from that directory. The package includes no ROM or save.
+
 ### Requirements
 
 The current build and graphics checks have been run on Linux with Mesa. Other platforms have not been validated for this fork.

@@ -20,7 +20,7 @@ class Rom {
     const uint8_t* bytes_; size_t size_;
 public:
     Rom(const uint8_t* bytes,size_t size):bytes_(bytes),size_(size) {
-        if(!bytes || size!=RomSize)throw std::runtime_error("Expected 1 MiB UE Yellow ROM");
+        if(!bytes || size<RomSize)throw std::runtime_error("Expected 1 MiB UE Yellow ROM");
     }
     void range(size_t at,size_t count) const {
         if(at>size_ || count>size_-at)throw std::runtime_error("ROM range exceeds image");

@@ -24,28 +24,32 @@ constexpr uint8_t InvalidBlock = 200;
 // bottom is what battle::portrait's back-picture crop has to close, so the
 // same tiles decode differently for the front and the back rectangle.
 inline int portrait_index(int x, int y) {
-    if (x < 8 || x > 47 || y < 8) return 0;                    // outside the body
-    if (x == 8 || x == 47 || y == 8) return 3;                 // outline, bottom left open
-    if (x >= 16 && x <= 23 && y >= 16 && y <= 23)              // enclosed pocket
+    if (x < 8 || x > 47 || y < 8)
+        return 0; // outside the body
+    if (x == 8 || x == 47 || y == 8)
+        return 3;                                 // outline, bottom left open
+    if (x >= 16 && x <= 23 && y >= 16 && y <= 23) // enclosed pocket
         return (x == 16 || x == 23 || y == 16 || y == 23) ? 3 : 0;
-    if (x >= 30 && x <= 39 && y >= 28 && y <= 37) return 2;    // dark patch
-    if (x >= 12 && x <= 43 && y >= 42 && y <= 50) return 1;    // light patch
-    return 0;                                                  // white body fill
+    if (x >= 30 && x <= 39 && y >= 28 && y <= 37)
+        return 2; // dark patch
+    if (x >= 12 && x <= 43 && y >= 42 && y <= 50)
+        return 1; // light patch
+    return 0;     // white body fill
 }
 
 struct Context {
     std::vector<uint8_t> image;
-    std::array<uint8_t, 0x2000> wram{};   // C000-DFFF
-    std::array<uint8_t, 0x2000> vram{};   // 8000-9FFF
-    std::array<uint8_t, 0x2000> eram{};   // A000-BFFF
+    std::array<uint8_t, 0x2000> wram{}; // C000-DFFF
+    std::array<uint8_t, 0x2000> vram{}; // 8000-9FFF
+    std::array<uint8_t, 0x2000> eram{}; // A000-BFFF
     std::array<uint8_t, 0xa0> oam{};
-    std::array<uint8_t, 0x80> hram{};     // FF80-FFFE, one spare byte
-    std::array<uint8_t, 0x80> io{};       // FF00-FF7F
+    std::array<uint8_t, 0x80> hram{}; // FF80-FFFE, one spare byte
+    std::array<uint8_t, 0x80> io{};   // FF00-FF7F
     std::array<uint32_t, 160 * 144> framebuffer{};
     GBContext ctx{};
 
-    Context(const Context&) = delete;
-    Context& operator=(const Context&) = delete;
+    Context(const Context &) = delete;
+    Context &operator=(const Context &) = delete;
 
     Context() : image(rom()) {
         // Poison one unused block in both block tables; see InvalidBlock.
@@ -64,21 +68,33 @@ struct Context {
     }
 
     // --- raw accessors -----------------------------------------------------
-    uint8_t& at(int address) { return wram[size_t(address - 0xc000)]; }
-    void write(int address, int value) { at(address) = uint8_t(value); }
+    uint8_t &at(int address) {
+        return wram[size_t(address - 0xc000)];
+    }
+    void write(int address, int value) {
+        at(address) = uint8_t(value);
+    }
     // Battle HP and stat words are big endian, as battle::word reads them.
     void write_hp(int address, int value) {
         at(address) = uint8_t((value >> 8) & 0xff);
         at(address + 1) = uint8_t(value & 0xff);
     }
-    void tile(int x, int y, int value) { at(0xc3a0 + y * 20 + x) = uint8_t(value); }
+    void tile(int x, int y, int value) {
+        at(0xc3a0 + y * 20 + x) = uint8_t(value);
+    }
 
     // --- LCD ---------------------------------------------------------------
     // Bit 4 keeps tile data at 8000 so battle::portrait indexes VRAM directly;
     // bit 5 stays clear so the battle UI is read from the BG map at 9800.
-    void lcd_on(bool on = true) { io[0x40] = uint8_t(on ? (io[0x40] | 0x80) : (io[0x40] & ~0x80)); }
-    void bgp(int value) { io[0x47] = uint8_t(value); }
-    void set_font(bool loaded) { write(pallet::Font, loaded ? 1 : 0); }
+    void lcd_on(bool on = true) {
+        io[0x40] = uint8_t(on ? (io[0x40] | 0x80) : (io[0x40] & ~0x80));
+    }
+    void bgp(int value) {
+        io[0x47] = uint8_t(value);
+    }
+    void set_font(bool loaded) {
+        write(pallet::Font, loaded ? 1 : 0);
+    }
 
     void reset() {
         wram.fill(0);
@@ -89,42 +105,44 @@ struct Context {
         io.fill(0);
         framebuffer.fill(0xffe0f8d0);
         ctx.sp = 0xdf00;
-        io[0x40] = 0x91;  // LCD on, tile data at 8000, BG enabled, window off
-        io[0x42] = 0;     // SCY
-        io[0x43] = 0;     // SCX
-        io[0x4a] = 0;     // WY
-        io[0x4b] = 7;     // WX
+        io[0x40] = 0x91; // LCD on, tile data at 8000, BG enabled, window off
+        io[0x42] = 0;    // SCY
+        io[0x43] = 0;    // SCX
+        io[0x4a] = 0;    // WY
+        io[0x4b] = 7;    // WX
         bgp(0xe4);
     }
 
     // --- overworld ---------------------------------------------------------
     // wOverworldMap keeps a three-block border on every side.
-    uint8_t& live_block(const pallet::Scene& s, int x, int z) {
+    uint8_t &live_block(const pallet::Scene &s, int x, int z) {
         return at(0xc6e8 + (z + 3) * (s.width / 2 + 6) + x + 3);
     }
-    void write_live_map(const pallet::Scene& s) {
+    void write_live_map(const pallet::Scene &s) {
         const int bw = s.width / 2, bh = s.height / 2;
         for (int z = 0; z < bh + 6; z++)
-            for (int x = 0; x < bw + 6; x++) at(0xc6e8 + z * (bw + 6) + x) = uint8_t(s.border);
+            for (int x = 0; x < bw + 6; x++)
+                at(0xc6e8 + z * (bw + 6) + x) = uint8_t(s.border);
         for (int z = 0; z < bh; z++)
-            for (int x = 0; x < bw; x++) live_block(s, x, z) = s.block_data[size_t(z * bw + x)];
+            for (int x = 0; x < bw; x++)
+                live_block(s, x, z) = s.block_data[size_t(z * bw + x)];
     }
     // Header bytes, sprite slot and live map of a standing player.
-    const pallet::Scene* place_player(int map, int x, int y, int facing) {
+    const pallet::Scene *place_player(int map, int x, int y, int facing) {
         pallet::load_catalog(ctx.rom, ctx.rom_size);
-        const auto* s = pallet::ensure_scene(map);
+        const auto *s = pallet::ensure_scene(map);
         write(pallet::Map, map);
         write(pallet::X, x);
         write(pallet::Y, y);
         write(pallet::Walk, 0);
         write(pallet::Font, 0);
         write(pallet::UpdateSprites, 1);
-        write(pallet::Sprite1, 1);      // slot in use
-        write(pallet::Sprite1 + 2, 0);  // on-screen image index
+        write(pallet::Sprite1, 1);     // slot in use
+        write(pallet::Sprite1 + 2, 0); // on-screen image index
         write(pallet::Sprite1 + 4, 0x3c);
         write(pallet::Sprite1 + 6, 0x40);
         write(0xc109, facing);
-        write(pallet::HiddenList, 255);  // empty hidden-object list
+        write(pallet::HiddenList, 255); // empty hidden-object list
         if (s) {
             write(pallet::Tileset, s->tileset);
             write(pallet::Width, s->width / 2);
@@ -137,7 +155,8 @@ struct Context {
     // The exact six-row full-width text box pallet::bottom_dialogue accepts.
     void open_bottom_dialogue() {
         for (int y = 0; y < 12; y++)
-            for (int x = 0; x < 20; x++) tile(x, y, 0);
+            for (int x = 0; x < 20; x++)
+                tile(x, y, 0);
         tile(0, 12, 0x79);
         tile(19, 12, 0x7b);
         tile(0, 17, 0x7d);
@@ -149,7 +168,8 @@ struct Context {
         for (int y = 13; y < 17; y++) {
             tile(0, y, 0x7c);
             tile(19, y, 0x7c);
-            for (int x = 1; x < 19; x++) tile(x, y, 0x80 + (x * 3 + y * 7) % 26);
+            for (int x = 1; x < 19; x++)
+                tile(x, y, 0x80 + (x * 3 + y * 7) % 26);
         }
     }
 
@@ -159,8 +179,10 @@ struct Context {
             uint8_t low = 0, high = 0;
             for (int tx = 0; tx < 8; tx++) {
                 int v = portrait_index(column * 8 + tx, row * 8 + ty);
-                if (v & 1) low = uint8_t(low | (0x80 >> tx));
-                if (v & 2) high = uint8_t(high | (0x80 >> tx));
+                if (v & 1)
+                    low = uint8_t(low | (0x80 >> tx));
+                if (v & 2)
+                    high = uint8_t(high | (0x80 >> tx));
             }
             vram[size_t(id) * 16 + size_t(ty) * 2] = low;
             vram[size_t(id) * 16 + size_t(ty) * 2 + 1] = high;
@@ -173,47 +195,53 @@ struct Context {
             for (int x = 0; x < 7; x++) {
                 int id = r.base + x * 7 + y;
                 tile(r.x + x, r.y + y, id);
-                if (displayed) vram[size_t(0x1800 + (r.y + y) * 32 + r.x + x)] = uint8_t(id);
+                if (displayed)
+                    vram[size_t(0x1800 + (r.y + y) * 32 + r.x + x)] = uint8_t(id);
                 write_portrait_tile(id, x, y);
             }
     }
     // Uppercase name in WRAM plus the HUD glyphs at the column CenterMonName
     // shifts short names to.
-    void write_name(int address, const char* text, int x, int y) {
+    void write_name(int address, const char *text, int x, int y) {
         int length = 0;
-        while (text[length]) ++length;
-        for (int i = 0; i < length; i++) write(address + i, 0x80 + (text[i] - 'A'));
+        while (text[length])
+            ++length;
+        for (int i = 0; i < length; i++)
+            write(address + i, 0x80 + (text[i] - 'A'));
         write(address + length, 0x50);
         int shift = length <= 2 ? 2 : length <= 4 ? 1 : 0;
-        for (int i = 0; i < length; i++) tile(x + shift + i, y, 0x80 + (text[i] - 'A'));
+        for (int i = 0; i < length; i++)
+            tile(x + shift + i, y, 0x80 + (text[i] - 'A'));
     }
     void clear_names() {
-        for (int x = 0; x < 10; x++) tile(x, 0, 0);
-        for (int x = 8; x < 20; x++) tile(x, 7, 0);
+        for (int x = 0; x < 10; x++)
+            tile(x, 0, 0);
+        for (int x = 8; x < 20; x++)
+            tile(x, 7, 0);
     }
     // Everything battle::ready checks outside the LCD registers: a wild battle
     // with both HUD names, both HP words and both portrait rectangles.
-    void start_battle(int enemy_species, int player_species,
-                      const char* enemy_name = "PIKACH", const char* player_name = "BULBAS") {
+    void start_battle(int enemy_species, int player_species, const char *enemy_name = "PIKACH",
+                      const char *player_name = "BULBAS") {
         write(battle::IsInBattle, 1);
         write(battle::BattleType, 0);
         write(battle::Link, 0);
         write(battle::Animation, 0);
-        write(0xd11c, 0);   // no full-screen list over the arena
-        write(0xd030, 0);   // no trainer engaged
-        write(0xcfe7, 0);   // enemy party position, FF only during the intro
+        write(0xd11c, 0); // no full-screen list over the arena
+        write(0xd030, 0); // no trainer engaged
+        write(0xcfe7, 0); // enemy party position, FF only during the intro
         write(0xcfe4, enemy_species);
         write_hp(0xcfe5, 18);
         write_hp(0xcff3, 24);
-        write(0xcfe8, 0);   // enemy status
-        write(0xcff2, 7);   // enemy level
-        write(0xcf1d, 1);   // enemy HP bar colour
+        write(0xcfe8, 0); // enemy status
+        write(0xcff2, 7); // enemy level
+        write(0xcf1d, 1); // enemy HP bar colour
         write(0xd013, player_species);
         write_hp(0xd014, 26);
         write_hp(0xd022, 31);
-        write(0xd017, 0);   // player status
-        write(0xd021, 9);   // player level
-        write(0xcf1c, 1);   // player HP bar colour
+        write(0xd017, 0); // player status
+        write(0xd021, 9); // player level
+        write(0xcf1c, 1); // player HP bar colour
         write_rectangle(battle::Enemy);
         write_rectangle(battle::Player);
         write_name(0xcfd9, enemy_name, 1, 0);
@@ -235,4 +263,4 @@ struct Context {
         write(ctx.sp + 1, 0);
     }
 };
-}  // namespace synthetic
+} // namespace synthetic

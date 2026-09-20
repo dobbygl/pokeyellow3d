@@ -416,3 +416,75 @@ override. Upstream remains at the original pinned revision. Windows work is
 isolated on `windows-portability`; only the C++17 initializer issue has been
 fixed and checked on Linux so far. POSIX networking/directory access and the
 Windows GLES backend still need work and actual Windows validation.
+
+
+### CI hardening in progress, 2026-09-20
+
+The API migration is merged as `d727fa66a40d4a967e390bd9248e5e1bbd0ceeeb`;
+main's Linux CI passes at
+https://github.com/dobbygl/pokeyellow3d/actions/runs/35526424594 .
+
+- Added a pinned clang-format 18.1.8 check and formatted only `src/` and
+  `tests/`. Generated cartridge C and runtime sources are untouched.
+- `cmake/ProjectWarnings.cmake` applies strict warnings to the two owned
+  renderer/adapter sources and test targets. Actual Ninja commands verify
+  **23 owned translation units** have `-Wall -Wextra -Werror`; **71 other
+  units** do not. Evidence: `build/qa/logs/ci-hardening-warning-scope.txt`.
+  CMake minimum is now 3.18 for source properties in another target directory.
+- Removed an unused parameter name and value-initialized a QA actor before
+  its checked lookup. The GCC build now passes with warnings as errors.
+- The 2D job now caches ccache too. Format validation passes locally.
+- Local CTest passes **24/24**, and the separate no-ROM build passes
+  **8/8**. Logs: `build/qa/logs/ci-ctest.log` and
+  `build/qa/logs/ci-no-rom.log`.
+- The full post-hardening graphics gate is still running via
+  `bash build/qa/logs/run-ci-regressions.sh` at this checkpoint; its final
+  result and remote CI are not yet verified. The phase remains open.
+
+
+### CI hardening validated, 2026-09-20
+
+PR https://github.com/dobbygl/pokeyellow3d/pull/3 passes GCC, Clang, 2D and
+clang-format at run https://github.com/dobbygl/pokeyellow3d/actions/runs/35527339148 .
+The required checks on `main` now include `clang-format`, preserving the three
+existing checks, strict up-to-date status and administrator enforcement.
+The Linux matrix checks the CTest JUnit result to reject a skipped renderer
+or any renderer other than software Mesa; the release workflow does the same.
+
+- The complete local gate exits **0**, all **13** `tests/*_qa.sh` suites pass,
+  and final CTest is **24/24**. The independent ROM-free build is **8/8**.
+  Evidence: `ci-regressions.exit`, `ci-regressions-summary.txt`,
+  `ci-ctest-final.log` and `ci-no-rom.log`, all under `build/qa/logs/`.
+- All **38 exterior** captures match `kanto-pv52hf` versus `kanto-hvoPvo`;
+  all **179 interior catalog** captures match `interiors-lPijAF` versus
+  `interiors-K77PW7`. Reports: `ci-world-comparison.txt` and
+  `ci-interiors-comparison.txt`.
+- The supplementary fixed-ImGui-time journey also passes. All **215**
+  interior captures match the preserved API baseline `interiors-Zo43uK`
+  versus `interiors-lwsDEA`, including moving-camera captures. Report:
+  `ci-fixed-interior-comparison.txt`. The old baseline binary and images
+  were not overwritten; the new helper is `pallet-fixed-ci`.
+- Only two source changes beyond formatting were necessary: the unused
+  parameter name and the initialized QA actor documented above. Both Linux
+  compilers pass strict warnings; generated C and external runtime flags
+  remain unchanged.
+
+Reproduce with the retained private fixtures:
+
+```sh
+bash build/qa/logs/run-ci-regressions.sh
+bash build/qa/logs/run-ci-fixed-interiors.sh
+```
+
+The second script waits for the original full-gate process if it is still
+running, then links the current helper with the same fixed-time wrapper used
+for the API migration. It also validates the local software-render JUnit data.
+Phase 4 still awaits the actual `v0.1.0` release artifact and its inspection.
+
+Windows work remains isolated on the fork's `windows-portability` branch.
+Commit `3de463a` replaces POSIX directory scans/creation with a C interface to
+C++17 filesystem operations, preserving POSIX creation permissions. The
+standalone host tests pass on real Windows/MSVC and Linux at
+https://github.com/dobbygl/gb-recompiled/actions/runs/35527532377 .
+This proves the filesystem layer only; sockets, threading and GLES remain
+pending, and the game's pinned `presentation-api-v1` runtime is unchanged.

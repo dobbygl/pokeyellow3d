@@ -50,7 +50,7 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 
 The current build and graphics checks have been run on Linux with Mesa. Other platforms have not been validated for this fork.
 
-- Git and CMake **3.16 or newer**.
+- Git and CMake **3.18 or newer**.
 - A compiler with **C11 and C++17** support, plus Make or Ninja.
 - **SDL2**, **libcurl**, and **OpenGL ES 2** development libraries and a compatible graphics driver.
 - A matching **English USA/Europe Pokémon Yellow ROM**, supplied by you.
@@ -242,6 +242,17 @@ ctest --test-dir build -LE rom --output-on-failure
 ```
 
 > [!NOTE]
-> Tests tagged `rom` register only when `build/roms/pokeyellow.gbc` and, for some journeys, private save states are present at configure time; without them they are simply never registered, not failed. `-LE rom` additionally excludes them when a ROM is present, so a local run with the ROM stays comparable to CI. The ROM and any save state are never part of this repository or of the CI environment.
+> Tests tagged `rom` register only when `build/roms/pokeyellow.gbc` exists at configure time. Original-engine comparisons additionally require private QA exports and report an explicit skip if those are absent. Journey scripts require private savestates and run locally. `-LE rom` additionally excludes them when a ROM is present, so a local run with the ROM stays comparable to CI. The ROM and any save state are never part of this repository or of the CI environment.
+
+Project-owned presentation sources and tests compile with `-Wall -Wextra -Werror` on GCC/Clang (`/W4 /WX` on MSVC). These flags do not apply to upstream runtime sources or generated cartridge C. CMake 3.18 is needed to set the presentation sources' flags in the runtime target's directory.
+
+CI also checks `src/` and `tests/` with **clang-format 18.1.8** and the repository's `.clang-format`. Use the same pinned formatter locally:
+
+```sh
+python3 -m venv build/format-tools
+build/format-tools/bin/python -m pip install clang-format==18.1.8
+git ls-files -z 'src/*.cpp' 'src/*.h' 'src/*.c' 'tests/*.cpp' 'tests/*.h' 'tests/*.c' \
+  | xargs -0 build/format-tools/bin/clang-format --dry-run --Werror
+```
 
 Tagging a commit `vX.Y.Z` triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds Linux and publishes `pokeyellow3d` packages (with `PALLET3D.md`, `README.md`, and a `RUN.md`) to the GitHub release. It never bundles a ROM either.

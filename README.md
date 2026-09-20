@@ -6,7 +6,10 @@
 
 A 3D presentation layer for statically recompiled Pokémon Yellow, with an overhead camera, first-person exploration, and the original game logic.
 
-[Get started](#get-started) · [Screenshots](#screenshots) · [Controls](#controls) · [Development status](#development-status) · [Documentation](#documentation)
+[![CI](https://github.com/dobbygl/pokeyellow3d/actions/workflows/ci.yml/badge.svg)](https://github.com/dobbygl/pokeyellow3d/actions/workflows/ci.yml)
+[![Release](https://github.com/dobbygl/pokeyellow3d/actions/workflows/release.yml/badge.svg)](https://github.com/dobbygl/pokeyellow3d/actions/workflows/release.yml)
+
+[Get started](#get-started) · [Screenshots](#screenshots) · [Controls](#controls) · [Development status](#development-status) · [Documentation](#documentation) · [Contributing](#contributing)
 
 ![Pallet Town in 3D, with its red-roofed houses, Professor Oak's laboratory, and the path to Route 1](docs/screenshots/pallet-town.png)
 
@@ -221,3 +224,20 @@ The detailed engineering notes and plans are currently written in Spanish.
 ## Acknowledgments
 
 Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the [gb-recompiled runtime and recompiler](https://github.com/GB-Recomp/gb-recompiled), with the [pret/pokeyellow disassembly](https://github.com/pret/pokeyellow) as a reference for the original game's data and behavior. Rendering and runtime UI use SDL2, OpenGL ES 2, and Dear ImGui.
+
+## Contributing
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) and Windows (MSVC) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. macOS runs best-effort and does not block merges. Match that locally before opening a pull request:
+
+```sh
+cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel
+cmake --build build --parallel 4
+
+# Same selection the CI runs: everything that doesn't need the real ROM.
+ctest --test-dir build -LE rom --output-on-failure
+```
+
+> [!NOTE]
+> Tests tagged `rom` register only when `build/roms/pokeyellow.gbc` and, for some journeys, private save states are present at configure time; without them they are simply never registered, not failed. `-LE rom` additionally excludes them when a ROM is present, so a local run with the ROM stays comparable to CI. The ROM and any save state are never part of this repository or of the CI environment.
+
+Tagging a commit `vX.Y.Z` triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds Linux and Windows and publishes `pokeyellow3d` packages (with `PALLET3D.md`, `README.md`, and a `RUN.md`) to the GitHub release. It never bundles a ROM either.

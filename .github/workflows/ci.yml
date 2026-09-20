@@ -1,0 +1,318 @@
+name: CI
+
+# Fase 4 de PLAN_API_CI.md. Compila y prueba en cada push a main y en cada
+# pull request. No usa ni contiene la ROM en ningun paso: las pruebas
+# etiquetadas `rom` (registradas solo cuando build/roms/pokeyellow.gbc
+# existe localmente) se excluyen con `ctest -LE rom`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela ejecuciones obsoletas de la misma rama/PR cuando llegan commits
+# nuevos.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # bash tambien en windows-2022 (Git Bash viene preinstalado en el
+    # runner), asi el mismo `sed`/sintaxis de variables de entorno sirve
+    # para los tres sistemas operativos.
+    shell: bash
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Linux: matriz GCC / Clang, build 3D completo + ctest sin ROM.
+  # ---------------------------------------------------------------------
+  linux:
+    name: Linux (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          # Paquetes pedidos por PLAN_API_CI.md: ninja-build libsdl2-dev
+          # libcurl4-openssl-dev libgles2-mesa-dev libegl1-mesa-dev
+          # libgl1-mesa-dri xvfb.
+          #
+          # libgles2-mesa-dev / libegl1-mesa-dev son los nombres del
+          # paquete de transicion en 24.04 (los sucesores son libgles-dev
+          # / libegl-dev). Si Ubuntu los retira, este paso es el primero a
+          # arreglar. Proveen <GLES2/gl2.h>, que
+          # runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp incluye
+          # directamente cuando se compila con IMGUI_IMPL_OPENGL_ES2 (asi
+          # lo hace cmake/Pallet3D.cmake en todas las plataformas).
+          # libgl1-mesa-dri aporta el rasterizador software (llvmpipe)
+          # usado por el contexto GL sin cabeza en el runner.
+          #
+          # libgl-dev y ccache NO estan en la lista literal del plan; se
+          # anaden aqui porque runtime/CMakeLists.txt enlaza `-lGL` a
+          # pelo cuando find_package(OpenGL) no resuelve el target
+          # OpenGL::GL (rama Linux, ni APPLE ni WIN32), y solo libgl-dev
+          # (o el antiguo libgl1-mesa-dev) provee el enlace simbolico sin
+          # version libGL.so y las cabeceras GL/gl.h que FindOpenGL.cmake
+          # busca; sin el, el enlazado del ejecutable falla. ccache hace
+          # falta como binario para la cache de compilacion pedida en el
+          # plan.
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build libsdl2-dev libcurl4-openssl-dev \
+            libgles2-mesa-dev libegl1-mesa-dev libgl1-mesa-dri \
+            libgl-dev xvfb ccache
+
+      - name: Extract GBRT_REF
+        id: gbrt
+        run: |
+          ref=$(sed -n 's/.*set(GBRT_REF "\([0-9a-f]*\)".*/\1/p' CMakeLists.txt)
+          if [ -z "$ref" ]; then
+            echo "::error::No se pudo extraer GBRT_REF de CMakeLists.txt" >&2
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Cache FetchContent deps (gb-recompiled)
+        uses: actions/cache@v6
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-${{ matrix.compiler }}-deps-${{ steps.gbrt.outputs.ref }}
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-${{ matrix.compiler }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.compiler }}-ccache-
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPOKEYELLOW_3D=ON \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test (ctest -LE rom)
+        env:
+          SDL_VIDEODRIVER: offscreen
+          SDL_AUDIODRIVER: dummy
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          # Decision Fase 4 (documentada en PLAN_API_CI.md, decision 6-7):
+          # SDL_VIDEODRIVER=offscreen es el driver elegido porque es el
+          # que tests/pallet_render_smoke.cpp ya usa localmente para abrir
+          # un contexto GL real sin cabeza (ver "Punto de partida
+          # verificado" en PLAN_API_CI.md). Con SDL_VIDEODRIVER fijado,
+          # SDL NO reintenta con otro driver si offscreen falla: se limita
+          # a devolver error. `xvfb-run -a` no cambia eso ni hace de
+          # respaldo a nivel de driver; su valor real, mas estrecho, es
+          # garantizar un $DISPLAY (coste ~1s) para cualquier ruta de Mesa,
+          # ImGui o del propio SDL que asuma que existe uno, aunque el
+          # driver activo siga siendo offscreen. LIBGL_ALWAYS_SOFTWARE
+          # fuerza llvmpipe por si el runner expone un dispositivo DRI que
+          # Mesa intenta usar antes que el software renderer.
+          xvfb-run -a ctest --test-dir build -LE rom --output-on-failure
+
+  # ---------------------------------------------------------------------
+  # Linux: build con la capa 3D desactivada, para no romper el ejecutable
+  # 2D original. No registra pruebas (enable_testing()/add_test() viven
+  # dentro del bloque if(POKEYELLOW_3D) de CMakeLists.txt), asi que este
+  # job solo valida la compilacion.
+  # ---------------------------------------------------------------------
+  linux-2d:
+    name: Linux (2D, POKEYELLOW_3D=OFF)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build libsdl2-dev libcurl4-openssl-dev ccache
+
+      - name: Extract GBRT_REF
+        id: gbrt
+        run: |
+          ref=$(sed -n 's/.*set(GBRT_REF "\([0-9a-f]*\)".*/\1/p' CMakeLists.txt)
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Cache FetchContent deps (gb-recompiled)
+        uses: actions/cache@v6
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-2d-deps-${{ steps.gbrt.outputs.ref }}
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPOKEYELLOW_3D=OFF \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build build --parallel
+
+  # ---------------------------------------------------------------------
+  # Windows: MSVC + Ninja, dependencias via el vcpkg preinstalado en el
+  # runner (classic mode, sin vcpkg.json).
+  # ---------------------------------------------------------------------
+  windows:
+    name: Windows (MSVC)
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install dependencies via vcpkg
+        run: |
+          # sdl2 y curl son los pedidos por el plan. opengl-registry se
+          # anade porque runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp
+          # incluye <GLES2/gl2.h> directamente cuando se compila con
+          # IMGUI_IMPL_OPENGL_ES2 (ver comentario del job Linux); ese
+          # fichero no lo trae ni sdl2 ni curl. RIESGO no verificable sin
+          # ejecutar Actions: no se ha confirmado en un runner real que
+          # opengl-registry:x64-windows sea suficiente (solo aporta
+          # cabeceras Khronos; el enlazado sigue siendo contra
+          # opengl32.lib del SDK de Windows, igual que en
+          # runtime/CMakeLists.txt). Si el job falla en compilacion por
+          # una cabecera GLES2/EGL que falte, ese es el primer sitio a
+          # mirar.
+          vcpkg install sdl2:x64-windows curl:x64-windows opengl-registry:x64-windows
+          echo "$VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin" >> "$GITHUB_PATH"
+
+      - name: Extract GBRT_REF
+        id: gbrt
+        run: |
+          ref=$(sed -n 's/.*set(GBRT_REF "\([0-9a-f]*\)".*/\1/p' CMakeLists.txt)
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Cache FetchContent deps (gb-recompiled)
+        uses: actions/cache@v6
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-msvc-deps-${{ steps.gbrt.outputs.ref }}
+
+      - name: Set up sccache
+        # sccache-action instala el binario y, con SCCACHE_GHA_ENABLED,
+        # usa la propia cache de GitHub Actions como backend, sin
+        # necesitar un paso actions/cache aparte para su directorio local.
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Configure
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=x64-windows \
+            -DPOKEYELLOW_3D=ON \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: cmake --build build --parallel
+
+      - name: Test (ctest -LE rom)
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: ctest --test-dir build -LE rom --output-on-failure
+
+  # ---------------------------------------------------------------------
+  # macOS: no bloqueante. Ver PLAN_API_CI.md ("macOS depende de que el
+  # runtime ofrezca un backend GL compatible; hasta confirmarlo no
+  # bloquea"). Evidencia concreta encontrada al preparar este flujo:
+  # runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp incluye
+  # <GLES2/gl2.h> sin condicion de Apple desktop (solo excluye iOS/tvOS),
+  # y ni el SDK de macOS ni `brew install sdl2 curl` proveen esa cabecera
+  # Khronos (existe un formula `mesa` en homebrew-core, pero arrastra X11
+  # y LLVM y no forma parte de las dependencias pedidas). Es muy probable
+  # que este job falle en la fase de compilacion; continue-on-error deja
+  # que el resto del flujo termine en verde igualmente.
+  # ---------------------------------------------------------------------
+  macos:
+    name: macOS (best-effort, no bloqueante)
+    runs-on: macos-14
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies (brew)
+        run: brew install sdl2 curl ninja
+
+      - name: Extract GBRT_REF
+        id: gbrt
+        run: |
+          ref=$(sed -n 's/.*set(GBRT_REF "\([0-9a-f]*\)".*/\1/p' CMakeLists.txt)
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Cache FetchContent deps (gb-recompiled)
+        uses: actions/cache@v6
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-deps-${{ steps.gbrt.outputs.ref }}
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPOKEYELLOW_3D=ON \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test (ctest -LE rom)
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: ctest --test-dir build -LE rom --output-on-failure
+
+  # ---------------------------------------------------------------------
+  # Formato: comentado porque no existe un .clang-format en el repositorio
+  # todavia. En cuanto se añada uno en la raiz, descomentar este job para
+  # que src/ y tests/ pasen `clang-format --dry-run --Werror`.
+  # ---------------------------------------------------------------------
+  # format:
+  #   name: clang-format
+  #   runs-on: ubuntu-24.04
+  #   timeout-minutes: 10
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #     - name: Check formatting
+  #       run: |
+  #         find src tests \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
+  #           | xargs clang-format --dry-run --Werror

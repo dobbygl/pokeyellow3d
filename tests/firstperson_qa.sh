@@ -10,7 +10,7 @@ rom=$(realpath -- "$1")
 pallet=$(realpath -- "$2")
 house=$(realpath -- "$3")
 route=$(realpath -- "$4")
-cmake --build "$project/build" --target pokeyellow_launcher interior_test interior_audit battle_state_test pallet_render_smoke firstperson_test pallet_state_test kanto_rom_audit kanto_geometry_audit --parallel 4
+cmake --build "$project/build" --target pokeyellow_launcher interior_test interior_audit battle_state_test fade_state_test pallet_render_smoke firstperson_test pallet_state_test kanto_rom_audit kanto_geometry_audit --parallel 4
 ctest --test-dir "$project/build" --output-on-failure
 qa_dir=$(mktemp -d "$project/build/qa/firstperson-XXXXXX")
 mkdir -p "$qa_dir/roms" "$qa_dir/logs"

@@ -1,6 +1,9 @@
 #pragma once
 #include <chrono>
 #include "read_only_memory.h"
+#include "fade_state.h"
+#include "menu_state.h"
+inline void (*qa_frame_observer)(GBContext*,int)=nullptr;
 
 // Controlled integration fixtures, never linked into pokeyellow3d. Granting
 // field moves/items makes late-game features testable on a private early save.
@@ -41,15 +44,29 @@ struct QaWalk {
         }
         ReadOnlyMemory before{ctx};auto state=pallet::view(ctx);
         gb_platform_render_frame(gb_get_framebuffer(ctx));++frame;
+        if(const char* path=std::getenv("UI_TRACE")) {
+            static FILE* trace=nullptr;
+            if(!trace) {
+                trace=std::fopen(path,"w");require(trace,"UI frame trace");
+                std::fputs("frame,cycles,map,x,y,view,bgp,lcdc,font,sprites,battle,covered,active,dialogue,warp,hero_image,sp\n",trace);
+            }
+            std::fprintf(trace,"%d,%u,%d,%d,%d,%d,%u,%u,%d,%d,%d,%d,%d,%d,%d,%d,%u\n",frame,ctx->cycles,
+                read(pallet::Map),read(pallet::X),read(pallet::Y),int(state),ctx->io[0x47],ctx->io[0x40],
+                read(pallet::Font),read(pallet::UpdateSprites),read(pallet::Battle),pallet3d_covers_frame(ctx),pallet3d_active(),pallet3d_dialogue_overlay(),pallet3d_warp_overlay(),read(pallet::Sprite1+2),ctx->sp);
+        }
         require(glGetError()==GL_NO_ERROR,"OpenGL");
         require(before.unchanged(ctx),"read-only WRAM, VRAM and framebuffer");
-        require(pallet3d_active()==(render_enabled&&(state==pallet::View::Overworld || state==pallet::View::Battle || (pallet3d_firstperson()&&pallet::bottom_dialogue(ctx)))),"scene selection");
+        if(pallet3d_warp_overlay())require((fade::warp(ctx)||state==pallet::View::Transition)&&!read(pallet::Battle),"warp identified by a live ROM-validated CALL");
+        require(pallet3d_active()==(render_enabled&&(state==pallet::View::Overworld || state==pallet::View::Battle || pallet3d_warp_overlay() || pallet3d_menu().active || (state==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx)))),"scene selection");
+        if(pallet3d_menu().active)require(!read(pallet::Battle)&&pallet3d_world_frame().map==read(pallet::Map)&&
+            (menu_state::running(ctx)||state==pallet::View::Dialogue||state==pallet::View::Transition),"menu has a valid retained scene and positive lifetime");
         require(pallet3d_stats().resident_maps<=5,"bounded mesh cache");
         if(pallet3d_firstperson()&&state==pallet::View::Overworld&&pallet3d_active()&&!previous_3d)
             require(std::abs(firstperson::angle_delta(pallet3d_camera().yaw,firstperson::facing_yaw(read(0xc109))))<.0001f,"first frame returning to FP matches engine facing");
         // A composed dialogue keeps the FP camera alive; a battle has its own
         // camera and must count as leaving first person even when it is 3D.
         previous_3d=pallet3d_active()&&state!=pallet::View::Battle;
+        if(qa_frame_observer)qa_frame_observer(ctx,frame);
     }
     void wait(int count) {for(int i=0;i<count;i++)tick();}
     void press(const char* button,int count=4) {input(button);wait(count);input(nullptr);wait(30);}

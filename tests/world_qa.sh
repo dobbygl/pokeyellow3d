@@ -10,7 +10,7 @@ rom=$(realpath -- "$1")
 fixture=$(realpath -- "$2")
 route_fixture=""
 if (( $# > 2 )); then route_fixture=$(realpath -- "$3"); fi
-cmake --build "$project/build" --target pokeyellow_launcher interior_test interior_audit battle_state_test firstperson_test pallet_render_smoke pallet_state_test kanto_rom_audit kanto_geometry_audit --parallel 4
+cmake --build "$project/build" --target pokeyellow_launcher interior_test interior_audit battle_state_test fade_state_test firstperson_test pallet_render_smoke pallet_state_test kanto_rom_audit kanto_geometry_audit --parallel 4
 ctest --test-dir "$project/build" --output-on-failure
 mkdir -p "$project/build/qa"
 qa_dir=$(mktemp -d "$project/build/qa/kanto-XXXXXX")

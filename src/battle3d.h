@@ -203,15 +203,10 @@ void draw(GBContext* ctx,int w,int h,bool menu_open) {
         float target=(present||effect)&&m.hp>0?1:0;
         p.alpha+=std::clamp(target-p.alpha,-dt*7,dt*7);
     }
-    std::array<uint8_t,160*144*4> lcd{};const auto* framebuffer=gb_get_framebuffer(ctx);
-    for(int i=0;i<160*144;i++) {
-        uint32_t c=framebuffer[i];lcd[i*4]=c>>16;lcd[i*4+1]=c>>8;lcd[i*4+2]=c;lcd[i*4+3]=255;
-    }
-    glTexSubImage2D(GL_TEXTURE_2D,0,0,64,160,144,GL_RGBA,GL_UNSIGNED_BYTE,lcd.data());
     glViewport(0,h/3,w,h-h/3);glDisable(GL_SCISSOR_TEST);glDisable(GL_CULL_FACE);
     glClearColor(.10f,.17f,.19f,1);glDepthMask(GL_TRUE);glClearDepthf(1);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);
-    glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glUseProgram(program);
+    glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glUseProgram(program);glUniform2f(fade_loc,1,0);
     glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,texture);
     auto matrix=camera(float(w)/(h-h/3),double(ctx->cycles)/4194304);
     glUniformMatrix4fv(matrix_loc,1,GL_FALSE,matrix.data());glUniform1f(fog_loc,0);glUniform1f(sky_loc,0);glUniform1f(xray_loc,0);
@@ -255,14 +250,7 @@ void draw(GBContext* ctx,int w,int h,bool menu_open) {
         auto name=battle::text(ctx,0xd049);
         ImGui::GetForegroundDrawList()->AddText(nullptr,22,{24,24},IM_COL32(245,241,216,255),name.c_str());
     }
-    auto* dl=ImGui::GetForegroundDrawList();float scale=std::max(1.f,std::floor(std::min(w/160.f,h/144.f)));
-    float left=(w-160*scale)*.5f;
-    if(overlay_alpha>0) {
-        float top=(h-144*scale)*.5f;
-        dl->AddImage((ImTextureID)(intptr_t)texture,{left,top},{left+160*scale,top+144*scale},{0,64.f/AH},{160.f/AW,208.f/AH},IM_COL32(255,255,255,int(overlay_alpha*255)));
-    } else {
-        dl->AddImage((ImTextureID)(intptr_t)texture,{left,h-48*scale},{left+160*scale,float(h)},
-            {0,160.f/AH},{160.f/AW,208.f/AH});
-    }
+    lcd_overlay::draw(gb_get_framebuffer(ctx),overlay_alpha>0?lcd_overlay::Full:lcd_overlay::Bottom,
+        float(w),float(h),overlay_alpha>0?overlay_alpha:1,overlay_alpha==0);
 }
 } // namespace battle3d

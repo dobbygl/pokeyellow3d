@@ -29,6 +29,7 @@ static void capture_surface(const char* path) {
 
 #include "firstperson.h"
 #include "firstperson_integration.h"
+#include "menu_integration.h"
 #include "interior_integration.h"
 #include "battle_integration.h"
 #include "battle_swap.h"
@@ -36,6 +37,7 @@ static void capture_surface(const char* path) {
 #include "battle_effects.h"
 #include "town_integration.h"
 #include "interior_transitions.h"
+#include "ui_transitions.h"
 
 int main(int argc,char** argv) {
     if(argc<3) { std::fprintf(stderr,"Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");return 1; }
@@ -60,6 +62,41 @@ int main(int argc,char** argv) {
     }
     std::fprintf(stderr,"[SMOKE] view=%d map=%u xy=%u,%u\n",int(pallet::view(ctx)),pallet::read(ctx,pallet::Map),pallet::read(ctx,pallet::X),pallet::read(ctx,pallet::Y));
     std::fprintf(stderr,"[SMOKE] party=%u hp=%u level=%u script=%u/%u font=%u\n",pallet::read(ctx,0xd162),pallet::read(ctx,0xd16b)*256+pallet::read(ctx,0xd16c),pallet::read(ctx,0xd18b),pallet::read(ctx,0xd5f0),pallet::read(ctx,0xd5ef),pallet::read(ctx,pallet::Font));
+    if(argc>3&&std::strcmp(argv[3],"dialogue")==0) {
+        int result=dialogue_journey(ctx);gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"menus")||!std::strcmp(argv[3],"menus-fp"))) {
+        int result=menus_journey(ctx,!std::strcmp(argv[3],"menus-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"menus-center")||!std::strcmp(argv[3],"menus-center-fp"))) {
+        int result=menus_center(ctx,!std::strcmp(argv[3],"menus-center-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"menus-shop")||!std::strcmp(argv[3],"menus-shop-fp"))) {
+        int result=menus_shop(ctx,!std::strcmp(argv[3],"menus-shop-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"menus-name")||!std::strcmp(argv[3],"menus-name-fp"))) {
+        int result=menus_name(ctx,!std::strcmp(argv[3],"menus-name-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"transitions")||!std::strcmp(argv[3],"transitions-fp"))) {
+        int result=transition_qa::run(ctx,!std::strcmp(argv[3],"transitions-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>4&&(!std::strcmp(argv[3],"transition-reload")||!std::strcmp(argv[3],"transition-reload-fp"))) {
+        int result=transition_qa::reload(ctx,argv[4],!std::strcmp(argv[3],"transition-reload-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&!std::strcmp(argv[3],"transitions-white")) {
+        int result=transition_qa::run(ctx,false,true);gb_platform_shutdown();return result;
+    }
+    if(argc>3&&std::strcmp(argv[3],"ui-inspect")==0) {
+        std::printf("map=%d bgp=%02x lcdc=%02x font=%d sprites=%d bank=%d pc=%04x sp=%04x\n",
+            pallet::read(ctx,pallet::Map),ctx->io[0x47],ctx->io[0x40],pallet::read(ctx,pallet::Font),
+            pallet::read(ctx,pallet::UpdateSprites),ctx->hram[0x38],ctx->pc,ctx->sp);
+        for(int y=0;y<18;y++) {
+            std::printf("%02d:",y);
+            for(int x=0;x<20;x++)std::printf(" %02x",battle::tile(ctx,x,y));
+            std::puts("");
+        }
+        gb_platform_shutdown();return 0;
+    }
     if(argc>3&&(std::strcmp(argv[3],"interior")==0||std::strcmp(argv[3],"interior-fp")==0)) {
         int result=interior_journey(ctx,std::strcmp(argv[3],"interior-fp")==0);gb_platform_shutdown();return result;
     }
@@ -236,7 +273,10 @@ int main(int argc,char** argv) {
             auto view=pallet::view(ctx);
             gb_platform_render_frame(gb_get_framebuffer(ctx));
             if(glGetError()!=GL_NO_ERROR || std::memcmp(before.data(),ctx->wram,8192))return 16;
-            if(pallet3d_active()!=(view==pallet::View::Overworld||view==pallet::View::Battle))return 23;
+            if(pallet3d_active()!=(view==pallet::View::Overworld||view==pallet::View::Battle||pallet3d_warp_overlay()||pallet3d_menu().active||
+                (view==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx)))) {
+                std::fprintf(stderr,"[PLAY] wrong scene frame=%d view=%d map=%d active=%d bottom=%d\n",frame,int(view),pallet::read(ctx,pallet::Map),pallet3d_active(),pallet::bottom_dialogue(ctx));return 23;
+            }
             if(old_map!=pallet::read(ctx,pallet::Map))
                 std::fprintf(stderr,"[CROSSING] frame=%d %d -> %u xy=%u,%u\n",frame,old_map,pallet::read(ctx,pallet::Map),pallet::read(ctx,pallet::X),pallet::read(ctx,pallet::Y));
         }
@@ -282,7 +322,9 @@ int main(int argc,char** argv) {
             ev.type=SDL_MOUSEWHEEL;ev.wheel.y=4;pallet3d_event(&ev,false);
         }
         gb_platform_render_frame(gb_get_framebuffer(ctx));
-        if(pallet3d_active()!=(pallet::view(ctx)==pallet::View::Overworld||pallet::view(ctx)==pallet::View::Battle))return 23;
+        auto view=pallet::view(ctx);
+        if(pallet3d_active()!=(view==pallet::View::Overworld||view==pallet::View::Battle||pallet3d_warp_overlay()||pallet3d_menu().active||
+            (view==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx))))return 23;
         GLenum error=glGetError();
         if(error!=GL_NO_ERROR) {std::fprintf(stderr,"OpenGL error: %x\n",error);return 10;}
     }

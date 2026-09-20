@@ -3,6 +3,9 @@
 #include "firstperson.h"
 #include "interior_scene.h"
 #include "imgui.h"
+#include "lcd_overlay.h"
+#include "fade_state.h"
+#include "menu_state.h"
 #include <SDL_opengles2.h>
 #include <algorithm>
 #include <array>
@@ -23,14 +26,22 @@ struct UV { float x, y, w, h; };
 constexpr UV Solid{511, 511, 0, 0};
 constexpr Color White{1,1,1,1};
 GLuint program = 0, buffer = 0, atlas = 0;
-GLint matrix_loc=-1, eye_loc=-1, fog_loc=-1, sky_loc=-1, xray_loc=-1;
+GLint fade_loc=-1, matrix_loc=-1, eye_loc=-1, fog_loc=-1, sky_loc=-1, xray_loc=-1;
 bool first_person=false;
 firstperson::Camera eye;
 firstperson::Controls controls;
 GBContext* input_context=nullptr;
 bool relative_allowed=false,window_focused=true;
 uint8_t input_mask=0xff;
-bool dialogue_overlay=false;int last_overworld_map=-1,actors_drawn=0;bool hero_drawn=false;
+bool dialogue_overlay=false;int actors_drawn=0;bool hero_drawn=false;
+bool can_compose_dialogue(const GBContext* ctx) {
+    // A recognized dialogue still has an intact map behind its text box.
+    // Validate that state directly so loading a dialogue savestate works even
+    // before this renderer has presented an overworld frame.
+    const auto* scene=ctx?pallet::scene(pallet::read(ctx,pallet::Map)):nullptr;
+    return scene&&ctx&&
+        pallet::bottom_dialogue(ctx)&&pallet::valid_live_map(ctx,*scene);
+}
 bool enabled = true, active = false, failed = false, captured = false;
 float yaw = -.32f, zoom = 1.f;
 // Rooms share the outdoor default turn: an axis-aligned orthographic view hides every
@@ -47,6 +58,36 @@ std::map<int,Mesh> meshes;
 std::vector<int> visible_maps;
 int last_component=-1;
 int preview_map=-1;
+struct WorldFrame {
+    int map=-1,player_first=-1,hero_begin=0,hero_end=0;
+    firstperson::Matrix matrix{};
+    Vec eye{};
+    float fog=0;
+    bool fp=false;
+} world_frame;
+bool menu_overlay=false,menu_full=false,menu_blurred=false;
+menu_layout::Layout menu_regions;
+bool can_compose_menu(const GBContext* ctx) {
+    if(!ctx||!ctx->wram||!ctx->io||preview_map>=0||pallet::read(ctx,pallet::Battle))return false;
+    const auto state=pallet::view(ctx);
+    bool resident=world_frame.map>=0&&world_frame.map==pallet::read(ctx,pallet::Map);
+    if(!resident)return state==pallet::View::Dialogue&&can_compose_dialogue(ctx);
+    return state==pallet::View::Dialogue||menu_state::running(ctx)||
+        (menu_overlay&&state==pallet::View::Transition);
+}
+bool warp_overlay=false;
+int warp_destination=-1;
+bool load_fade=false,load_incoming=false;
+uint32_t load_started=0;
+float load_elapsed=0;
+bool can_compose_warp(const GBContext* ctx) {
+    return world_frame.map>=0 && preview_map<0 && ctx && ctx->io && ctx->wram &&
+        !pallet::read(ctx,pallet::Battle) && pallet::scene(pallet::read(ctx,pallet::Map)) &&
+        fade::palette(ctx->io[0x47]) && (fade::warp(ctx) ||
+        (warp_overlay && pallet::read(ctx,pallet::Map)==warp_destination &&
+         (ctx->io[0x47]==0xff||ctx->io[0x47]==0||!(ctx->io[0x40]&0x80)) &&
+         pallet::view(ctx)==pallet::View::Transition));
+}
 const pallet::Scene* presented_scene(const GBContext* ctx) {
     return pallet::scene(preview_map>=0?preview_map:pallet::read(ctx,pallet::Map));
 }
@@ -320,6 +361,8 @@ GLuint shader(GLenum type,const char* source) {
     return id;
 }
 
+#include "scene_filter.h"
+
 bool initialize(const GBContext* ctx) {
     const char* vs=R"(
         attribute vec3 position; attribute vec2 texcoord; attribute vec4 color;
@@ -337,6 +380,7 @@ bool initialize(const GBContext* ctx) {
         })";
     const char* fs=R"(
         precision mediump float;
+        uniform vec2 fade_tone;
         uniform sampler2D image; uniform float xray; uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
         void main() {
@@ -345,8 +389,8 @@ bool initialize(const GBContext* ctx) {
                 c=texture2D(image,uv)*tint;
             } else {
                 if(sky>0.5) {
-                    if(fog_enabled>1.5) {gl_FragColor=vec4(0.08,0.10,0.12,1.0);return;}
-                    gl_FragColor=vec4(mix(vec3(0.70,0.80,0.75),vec3(0.23,0.42,0.55),smoothstep(0.4,1.0,uv.y)),1.0);
+                    if(fog_enabled>1.5) {gl_FragColor=vec4(vec3(0.08,0.10,0.12)*fade_tone.x+fade_tone.y,1.0);return;}
+                    gl_FragColor=vec4(mix(vec3(0.70,0.80,0.75),vec3(0.23,0.42,0.55),smoothstep(0.4,1.0,uv.y))*fade_tone.x+fade_tone.y,1.0);
                     return;
                 }
                 if(tint.a>1.5) {
@@ -361,6 +405,7 @@ bool initialize(const GBContext* ctx) {
             }
             if(c.a<0.08) discard;
             if(xray>0.5) { c.rgb=vec3(0.98,0.80,0.29); c.a*=0.7; }
+            c.rgb=c.rgb*fade_tone.x+fade_tone.y;
             gl_FragColor=c;
         })";
     GLuint a=shader(GL_VERTEX_SHADER,vs),b=shader(GL_FRAGMENT_SHADER,fs);
@@ -373,6 +418,7 @@ bool initialize(const GBContext* ctx) {
     matrix_loc=glGetUniformLocation(program,"view_projection");eye_loc=glGetUniformLocation(program,"eye");
     fog_loc=glGetUniformLocation(program,"fog_enabled");sky_loc=glGetUniformLocation(program,"sky");
     xray_loc=glGetUniformLocation(program,"xray");
+    fade_loc=glGetUniformLocation(program,"fade_tone");
     glGenBuffers(1,&buffer);glGenTextures(1,&atlas);glBindTexture(GL_TEXTURE_2D,atlas);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
@@ -409,7 +455,9 @@ void sprite_image(const GBContext* ctx,const pallet::Actor& actor) {
     }
 }
 
-void world(GBContext* ctx,int w,int h) {
+void draw_world_frame(int w,int h,fade::Tone tone={},bool hide_hero=false,bool allow_xray=true);
+
+void world(GBContext* ctx,int w,int h,fade::Tone tone={}) {
     const auto& current=*presented_scene(ctx);
     int needed_atlas=current.interior?current.tileset:-1;
     if(atlas_tileset!=needed_atlas) {
@@ -423,8 +471,8 @@ void world(GBContext* ctx,int w,int h) {
     float jump=0;
     if((pallet::read(ctx,0xd735)&0x40) && pallet::read(ctx,0xd713)>0)
         jump=.14f*std::sin(std::clamp(int(pallet::read(ctx,0xd713)),0,15)*firstperson::Pi/15);
-    if(fp)eye.update(player_position[0],player_position[1],pallet::read(ctx,0xc109),ImGui::GetIO().DeltaTime,ctx->cycles,jump);
-    int player_first=-1;actors_drawn=0;hero_drawn=false;
+    if(fp&&(!dialogue_overlay||!eye.ready))eye.update(player_position[0],player_position[1],pallet::read(ctx,0xc109),ImGui::GetIO().DeltaTime,ctx->cycles,jump);
+    int player_first=-1,hero_begin=0,hero_end=0;actors_drawn=0;hero_drawn=false;
     float view_yaw=current.interior?room_yaw:yaw;
     float cs=std::cos(view_yaw),sn=std::sin(view_yaw);
     for(int slot=0;preview_map<0 && slot<16;slot++) {
@@ -434,6 +482,7 @@ void world(GBContext* ctx,int w,int h) {
         sprite_image(ctx,a);++actors_drawn;hero_drawn|=slot==0;
         const auto* scene=pallet::scene(pallet::read(ctx,pallet::Map));
         a.x+=scene->origin_x;a.z+=scene->origin_z;
+        if(slot==0)hero_begin=int(vertices.size());
         shadow(vertices,a.x,a.z,.32f,.20f);
         float half=.95f; // Transparent padding makes the visible sprite one tile wide.
         // Face the camera in both axes, preserving the original sprite aspect.
@@ -454,6 +503,7 @@ void world(GBContext* ctx,int w,int h) {
         }
         if(slot==0)player_first=int(vertices.size());
         quad(vertices,tl,tr,br,bl,White,{float(slot*32),384,32,32});
+        if(slot==0)hero_end=int(vertices.size());
     }
     if(fp&&current.interior) {
         // Close the room for the eye-level view; the orthographic camera keeps
@@ -467,11 +517,7 @@ void world(GBContext* ctx,int w,int h) {
         quad(vertices,{0,2.6f,0},{float(current.width),2.6f,0},
             {float(current.width),2.6f,float(current.height)},{0,2.6f,float(current.height)},shade(wall,.65f));
     }
-    glViewport(0,0,w,h);glDisable(GL_SCISSOR_TEST);glDisable(GL_CULL_FACE);
-    glClearColor(.075f,.12f,.135f,1);glDepthMask(GL_TRUE);glClearDepthf(1);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    glUseProgram(program);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlas);
+    glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlas);
     // Avoid a texture transfer (and its GPU synchronization) when sprites have
     // not changed. Compare actual decoded pixels so VRAM and state reloads count.
     const auto* sprites=pixels.data()+384*AW*4;
@@ -487,7 +533,7 @@ void world(GBContext* ctx,int w,int h) {
     }
     if(!camera_ready || std::abs(target[0]-focus_x)+std::abs(target[1]-focus_z)>8) {
         focus_x=target[0];focus_z=target[1];camera_ready=true;
-    } else {
+    } else if(!dialogue_overlay) {
         float amount=1-std::exp(-8.f*std::min(ImGui::GetIO().DeltaTime,.1f));
         focus_x+=(target[0]-focus_x)*amount;focus_z+=(target[1]-focus_z)*amount;
     }
@@ -497,8 +543,24 @@ void world(GBContext* ctx,int w,int h) {
         h/((current.width*std::abs(sn)+current.height*std::abs(cs))*.78f+6));
     if(current.interior&&preview_map<0)unit*=room_zoom;
     auto matrix=fp?eye.perspective(float(w)/h):firstperson::orthographic(focus_x,focus_z,view_yaw,2*unit/w,2*unit/h);
-    glUniformMatrix4fv(matrix_loc,1,GL_FALSE,matrix.data());
-    glUniform3f(eye_loc,eye.x,eye.y,eye.z);glUniform1f(fog_loc,fp?(current.interior&&interior::cave(current)?2:1):0);glUniform1f(sky_loc,0);
+    world_frame={current.id,player_first,hero_begin,hero_end,matrix,{eye.x,eye.y,eye.z},
+        float(fp?(current.interior&&interior::cave(current)?2:1):0),fp};
+    draw_world_frame(w,h,tone);
+}
+
+// Pure presentation of resident meshes/actors and the last valid camera.
+// In particular this never reads the incoming map's WRAM or decodes its VRAM.
+void draw_world_frame(int w,int h,fade::Tone tone,bool hide_hero,bool allow_xray) {
+    const auto& frame=world_frame;
+    glViewport(0,0,w,h);glDisable(GL_SCISSOR_TEST);glDisable(GL_CULL_FACE);
+    glClearColor(.075f*tone.multiply+tone.add,.12f*tone.multiply+tone.add,.135f*tone.multiply+tone.add,1);
+    glDepthMask(GL_TRUE);glClearDepthf(1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glUseProgram(program);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlas);
+    glUniform2f(fade_loc,tone.multiply,tone.add);
+    glUniformMatrix4fv(matrix_loc,1,GL_FALSE,frame.matrix.data());
+    glUniform3f(eye_loc,frame.eye.x,frame.eye.y,frame.eye.z);
+    glUniform1f(fog_loc,frame.fog);glUniform1f(sky_loc,0);
     glUniform1i(glGetUniformLocation(program,"image"),0);
     glUniform1f(xray_loc,0);
     for(int i=0;i<3;i++)glEnableVertexAttribArray(i);
@@ -508,7 +570,7 @@ void world(GBContext* ctx,int w,int h) {
         glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),(void*)offsetof(Vertex,u));
         glVertexAttribPointer(2,4,GL_FLOAT,GL_FALSE,sizeof(Vertex),(void*)offsetof(Vertex,c));
     };
-    if(fp) {
+    if(frame.fp) {
         std::vector<Vertex> sky;
         quad(sky,{-1,1,0},{1,1,0},{1,-1,0},{-1,-1,0});
         bind_vertices(buffer);glBufferData(GL_ARRAY_BUFFER,sky.size()*sizeof(Vertex),sky.data(),GL_STREAM_DRAW);
@@ -521,11 +583,14 @@ void world(GBContext* ctx,int w,int h) {
     }
     bind_vertices(buffer);
     glBufferData(GL_ARRAY_BUFFER,vertices.size()*sizeof(Vertex),vertices.data(),GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES,0,GLsizei(vertices.size()));
+    if(hide_hero&&frame.hero_end>frame.hero_begin) {
+        glDrawArrays(GL_TRIANGLES,0,frame.hero_begin);
+        glDrawArrays(GL_TRIANGLES,frame.hero_end,GLsizei(vertices.size())-frame.hero_end);
+    } else glDrawArrays(GL_TRIANGLES,0,GLsizei(vertices.size()));
     // Keep the player locatable when a roof obscures the camera's line of sight.
-    if(player_first>=0) {
+    if(frame.player_first>=0&&!hide_hero&&allow_xray) {
         glDepthFunc(GL_GREATER);glDepthMask(GL_FALSE);glUniform1f(xray_loc,1);
-        glDrawArrays(GL_TRIANGLES,player_first,6);
+        glDrawArrays(GL_TRIANGLES,frame.player_first,6);
         glDepthFunc(GL_LEQUAL);glDepthMask(GL_TRUE);glUniform1f(xray_loc,0);
     }
     for(int i=0;i<3;i++)glDisableVertexAttribArray(i);
@@ -559,36 +624,80 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
             last=int(state);lastx=x;lasty=y;
         }
     }
-    if(state==pallet::View::Overworld){last_overworld_map=pallet::read(ctx,pallet::Map);battle3d::remember_terrain(ctx);}
-    else if(state!=pallet::View::Dialogue)last_overworld_map=-1;
-    dialogue_overlay=first_person && state==pallet::View::Dialogue &&
-        last_overworld_map>=0 && pallet::read(ctx,pallet::Map)==last_overworld_map &&
-        pallet::bottom_dialogue(ctx) && pallet::valid_live_map(ctx,*pallet::scene(last_overworld_map));
-    active=enabled && ((preview_map>=0 && presented_scene(ctx)) || state==pallet::View::Overworld || state==pallet::View::Battle || dialogue_overlay) && width>0 && height>0;
+    if(state==pallet::View::Overworld)battle3d::remember_terrain(ctx);
+    bool was_menu=menu_overlay;
+    menu_overlay=can_compose_menu(ctx);menu_blurred=false;
+    menu_regions=menu_overlay?menu_layout::classify(ctx->wram+0x3a0):menu_layout::Layout{};
+    menu_full=menu_overlay&&menu_regions.kind==menu_layout::Kind::Full;
+    dialogue_overlay=menu_overlay&&pallet::bottom_dialogue(ctx);
+    warp_overlay=can_compose_warp(ctx);
+    if(warp_overlay)warp_destination=pallet::read(ctx,pallet::Map);
+    active=enabled && ((preview_map>=0 && presented_scene(ctx)) || state==pallet::View::Overworld || state==pallet::View::Battle || menu_overlay || warp_overlay || load_fade) && width>0 && height>0;
     if(!battle::normal(ctx))battle3d::reset();
     if(!active||failed) {eye.reset();return;}
     if(!program && !initialize(ctx)) { failed=true;std::fprintf(stderr,"[3D] Initialization failed; keeping the original 2D view.\n");return; }
+    if(load_fade) {
+        // A savestate has no guest fade. The explicit successful-load callback
+        // starts a short presentation-only fade; normal clock wrap is irrelevant.
+        uint32_t now=SDL_GetTicks();
+        // A GPU upload/driver stall cannot skip the whole cosmetic reveal.
+        // Guest-driven BGP fades above remain entirely frame-exact; this clock
+        // is used only for a savestate, which has no guest fade of its own.
+        load_elapsed+=std::min(25.f,float(uint32_t(now-load_started)));load_started=now;
+        float elapsed=load_elapsed;
+        bool entering=false;
+        if(!load_incoming&&elapsed>=90) {
+            load_incoming=true;load_started=SDL_GetTicks();load_elapsed=elapsed=0;
+            camera_ready=false;eye.reset();entering=true;
+        }
+        bool live=state==pallet::View::Overworld||dialogue_overlay;
+        if(!live) {
+            // Input can open a full-screen menu during these 180 ms. Its map
+            // buffers may already be repurposed; never feed them to world().
+            load_fade=false;draw_world_frame(width,height,{.4f,0});
+            lcd_overlay::draw(gb_get_framebuffer(ctx),lcd_overlay::Full,float(width),float(height));
+            ++active_frames;return;
+        }
+        else if(!load_incoming) {draw_world_frame(width,height,{1-elapsed/90,0});++active_frames;return;}
+        else if(elapsed<90) {
+            world(ctx,width,height,{elapsed/90,0});
+            // A cold tileset/mesh upload must not consume the reveal itself.
+            // Start its clock after the destination has been drawn in black.
+            if(entering)load_started=SDL_GetTicks();
+            ++active_frames;return;
+        }
+        else load_fade=false;
+    }
+    if(warp_overlay) {
+        auto tone=fade::tone(ctx->io[0x47]);
+        if(!(ctx->io[0x40]&0x80))tone={0,ctx->io[0x47]==0?1.f:0.f};
+        bool hidden=!pallet::read(ctx,pallet::Sprite1)||pallet::read(ctx,pallet::Sprite1+2)==255;
+        draw_world_frame(width,height,tone,hidden,false);++active_frames;return;
+    }
+    if(menu_overlay) {
+        // Only an initial recognized dialogue needs live preparation. Once a
+        // scene is resident, party/PC buffers and menu VRAM are never consulted.
+        bool prepare=world_frame.map<0 || (dialogue_overlay&&can_compose_dialogue(ctx));
+        if(prepare) {world(ctx,width,height);scene_filter::invalidate();}
+        else draw_world_frame(width,height);
+        if(!was_menu)scene_filter::invalidate();
+        if(menu_full) {
+            if(!scene_filter::valid||scene_filter::width!=width||scene_filter::height!=height)
+                scene_filter::capture(width,height);
+            menu_blurred=scene_filter::draw(width,height);
+            if(!menu_blurred)draw_world_frame(width,height,{.42f,0});
+            if(!menu_open)lcd_overlay::framed(gb_get_framebuffer(ctx),float(width),float(height));
+        } else if(!menu_open)lcd_overlay::regions(gb_get_framebuffer(ctx),menu_regions,float(width),float(height));
+        ++active_frames;return;
+    }
+    scene_filter::invalidate();
     if(state==pallet::View::Battle&&preview_map<0) {
         eye.reset();battle3d::draw(ctx,width,height,menu_open);++active_frames;return;
     }
     world(ctx,width,height);
-    if(!menu_open)hud(ctx);
+    if(!menu_open&&!dialogue_overlay)hud(ctx);
     if(dialogue_overlay && !menu_open) {
-        const auto* framebuffer=gb_get_framebuffer(ctx);
-        std::array<uint8_t,160*48*4> text_pixels{};
-        for(int i=0;i<160*48;i++) {
-            uint32_t c=framebuffer[96*160+i];
-            text_pixels[i*4]=uint8_t(c>>16);text_pixels[i*4+1]=uint8_t(c>>8);
-            text_pixels[i*4+2]=uint8_t(c);text_pixels[i*4+3]=255;
-        }
-        glBindTexture(GL_TEXTURE_2D,atlas);
-        glTexSubImage2D(GL_TEXTURE_2D,0,0,448,160,48,GL_RGBA,GL_UNSIGNED_BYTE,text_pixels.data());
-        glBindTexture(GL_TEXTURE_2D,0);
-        auto size=ImGui::GetIO().DisplaySize;
-        float scale=std::max(1.f,std::floor(std::min(size.x/160,size.y/144)));
-        float left=(size.x-160*scale)*.5f;
-        ImGui::GetForegroundDrawList()->AddImage((ImTextureID)(intptr_t)atlas,
-            {left,size.y-48*scale},{left+160*scale,size.y},{0,448.f/AH},{160.f/AW,496.f/AH});
+        lcd_overlay::draw(gb_get_framebuffer(ctx),lcd_overlay::Bottom,float(width),float(height),1,true);
     }
     ++active_frames;
 }
@@ -615,7 +724,7 @@ bool pallet3d_event(const SDL_Event* event,bool menu_open) {
             return true;
         }
     }
-    if(!active)return false;
+    if(!active||warp_overlay||menu_overlay||load_fade)return false;
     if(input_context&&pallet::view(input_context)==pallet::View::Battle)return false;
     if(first_person)return false;
     const auto* room=input_context?presented_scene(input_context):nullptr;
@@ -644,14 +753,16 @@ bool pallet3d_event(const SDL_Event* event,bool menu_open) {
 
 void pallet3d_shutdown() {
     battle3d::shutdown();
+    lcd_overlay::shutdown();scene_filter::shutdown();menu_overlay=menu_full=menu_blurred=false;
     for(auto& entry:meshes)glDeleteBuffers(1,&entry.second.buffer);
     meshes.clear();visible_maps.clear();last_component=-1;mesh_builds=0;preview_map=-1;
     if(buffer)glDeleteBuffers(1,&buffer);
     if(atlas)glDeleteTextures(1,&atlas);
     if(program)glDeleteProgram(program);
     buffer=atlas=program=0;active=false;failed=false;active_frames=0;captured=false;sprites_uploaded=false;atlas_tileset=-2;
+    world_frame={};warp_overlay=false;warp_destination=-1;load_fade=load_incoming=false;
     scenery.clear();vertices.clear();camera_ready=false;eye.reset();first_person=false;controls.reset();input_mask=0xff;
-    pallet3d_set_input_mask(0xff,false);input_context=nullptr;relative_allowed=false;window_focused=true;dialogue_overlay=false;last_overworld_map=-1;
+    pallet3d_set_input_mask(0xff,false);input_context=nullptr;relative_allowed=false;window_focused=true;dialogue_overlay=false;
 }
 
 void pallet3d_capture(int width,int height) {
@@ -670,7 +781,8 @@ bool pallet3d_active() { return active && program && !failed; }
 
 bool pallet3d_covers_frame(const GBContext* ctx) {
     auto state=pallet::view(ctx);
-    return enabled && program && !failed && (state==pallet::View::Overworld||state==pallet::View::Battle);
+    return enabled && program && !failed && (state==pallet::View::Overworld||state==pallet::View::Battle||load_fade||
+        can_compose_menu(ctx)||can_compose_warp(ctx));
 }
 
 Pallet3DStats pallet3d_stats() {
@@ -684,7 +796,7 @@ bool pallet3d_firstperson() {return first_person;}
 void pallet3d_poll_controls(GBContext* ctx,bool menu_open) {
     input_context=ctx;
     relative_allowed=first_person && enabled && !failed && window_focused && !menu_open && preview_map<0 &&
-        pallet::view(ctx)==pallet::View::Overworld;
+        pallet::view(ctx)==pallet::View::Overworld && !can_compose_warp(ctx) && !can_compose_menu(ctx) && !load_fade;
     int facing=relative_allowed?pallet::read(ctx,0xc109):0;
     bool idle=relative_allowed && !pallet::read(ctx,pallet::Walk) &&
         !pallet::read(ctx,0xd527) && pallet::read(ctx,0xcc4b)==1;
@@ -697,7 +809,28 @@ void pallet3d_poll_controls(GBContext* ctx,bool menu_open) {
 }
 uint8_t pallet3d_input_mask() {return input_mask;}
 
+void pallet3d_state_loaded(GBContext* ctx) {
+    warp_overlay=false;warp_destination=-1;menu_overlay=false;scene_filter::invalidate();controls.reset();
+    load_fade=enabled&&program&&!failed&&ctx&&world_frame.map>=0&&
+        world_frame.map!=pallet::read(ctx,pallet::Map)&&pallet::view(ctx)==pallet::View::Overworld;
+    load_incoming=false;load_started=SDL_GetTicks();load_elapsed=0;
+    if(!load_fade){camera_ready=false;eye.reset();}
+    pallet3d_poll_controls(ctx,false);
+}
+bool pallet3d_load_fade() {return load_fade;}
+
+bool pallet3d_warp_overlay() {return warp_overlay&&active;}
+PalletWorldFrameInfo pallet3d_world_frame() {
+    uint64_t hash=14695981039346656037ull;
+    const auto* bytes=reinterpret_cast<const uint8_t*>(world_frame.matrix.data());
+    for(size_t i=0;i<sizeof(world_frame.matrix);i++){hash^=bytes[i];hash*=1099511628211ull;}
+    return {world_frame.map,hash};
+}
+
+PalletMenuInfo pallet3d_menu() {return {menu_overlay&&active,menu_full,menu_blurred,int(menu_regions.count)};}
+
 bool pallet3d_dialogue_overlay() {return dialogue_overlay && active;}
+PalletOverlayInfo pallet3d_overlay_stats() {return {lcd_overlay::uploads,lcd_overlay::bytes};}
 PalletCameraInfo pallet3d_camera() {return {eye.x,eye.y,eye.z,eye.yaw,actors_drawn,hero_drawn};}
 PalletBattleInfo pallet3d_battle() {
     return {pallet3d_active()&&input_context&&pallet::view(input_context)==pallet::View::Battle,

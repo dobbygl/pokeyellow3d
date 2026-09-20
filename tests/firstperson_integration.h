@@ -52,10 +52,11 @@ inline int firstperson_controls(GBContext* ctx) {
     run.wait(15);run.require(pallet3d_input_mask()==255,"Esc settings mask relative input");
     key(SDL_SCANCODE_W,false);key(SDL_SCANCODE_ESCAPE,true);key(SDL_SCANCODE_ESCAPE,false);run.wait(20);
     run.require(pallet3d_input_mask()==255&&run.read(pallet::Y)==7,"closing settings does not resurrect held W");
-    // Original Start menu: W/A/S/D must take the native keyboard path in 2D.
+    // Original Start menu: W/A/S/D take the native menu keyboard path even
+    // though the retained 3D scene remains behind the original LCD regions.
     key(SDL_SCANCODE_W,true);key(SDL_SCANCODE_RETURN,true);run.wait(8);
     key(SDL_SCANCODE_RETURN,false);key(SDL_SCANCODE_W,false);run.wait(30);
-    run.require(pallet::view(ctx)==pallet::View::Dialogue&&pallet3d_input_mask()==255,"Start menu falls back with a neutral mask");
+    run.require(pallet::view(ctx)==pallet::View::Dialogue&&pallet3d_input_mask()==255&&pallet3d_active()&&pallet3d_menu().active,"Start menu retains 3D with a neutral mask");
     SDL_Event native{};native.type=SDL_KEYDOWN;native.key.keysym.scancode=SDL_SCANCODE_D;
     run.require(!pallet3d_event(&native,false),"WASD not consumed in dialogue");
     press(SDL_SCANCODE_X,12);run.require(pallet::view(ctx)==pallet::View::Overworld,"return from Start menu");
@@ -93,11 +94,17 @@ inline int firstperson_views(GBContext* ctx) {
         }
         run.require(run.read(0xc109)==direction,"cardinal view reached without patching RAM");
         run.require(run.read(pallet::X)==x&&run.read(pallet::Y)==y&&!run.read(pallet::Walk),"cardinal views preserve player position");
+        auto camera_start=SDL_GetTicks();
         for(int i=0;i<600;i++) {
             run.tick();
             if(std::abs(firstperson::angle_delta(pallet3d_camera().yaw,firstperson::facing_yaw(direction)))<.005f)break;
+            // Camera easing uses real ImGui time. Offscreen frames can run
+            // faster than 600 frames per second, so give the real clock room
+            // to advance instead of making this assertion GPU-speed dependent.
+            SDL_Delay(2);
         }
         auto camera=pallet3d_camera();
+        std::fprintf(stderr,"[FPVIEW] facing=%d yaw=%.5f target=%.5f elapsed_ms=%u\n",direction,camera.yaw,firstperson::facing_yaw(direction),SDL_GetTicks()-camera_start);
         run.require(std::abs(firstperson::angle_delta(camera.yaw,firstperson::facing_yaw(direction)))<.005f,"camera converges to cardinal orientation");
         run.require(!camera.player_drawn,"player omitted from perspective");saw_actor|=camera.actors>0;
         if(const char* dir=std::getenv("FP_CAPTURE_DIR")) {

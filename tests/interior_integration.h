@@ -24,6 +24,7 @@ inline int interior_journey(GBContext* ctx,bool fp=false) {
     run.move(37,2,6,"U");run.move(37,5,6,"R");run.move(37,5,5,"U");run.press("U",16);
     run.press("A",12);run.wait(80);
     run.require(pallet::view(ctx)==pallet::View::Dialogue,"mother conversation uses the game's text");
+    verify_bottom_overlay(run,"mother");
     run.require(pallet3d_input_mask()==255,"conversation neutralizes relative movement");capture("mother-dialogue");
     for(int i=0;i<12&&pallet::view(ctx)!=pallet::View::Overworld;i++)run.press("B",12);
     run.require(pallet::view(ctx)==pallet::View::Overworld,"conversation returns to the room");

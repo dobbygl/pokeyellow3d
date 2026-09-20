@@ -24,6 +24,16 @@ bool pallet3d_firstperson();
 void pallet3d_poll_controls(GBContext* ctx,bool menu_open);
 uint8_t pallet3d_input_mask();
 bool pallet3d_dialogue_overlay();
+struct PalletMenuInfo {bool active,full,blurred;int regions;};
+PalletMenuInfo pallet3d_menu();
+bool pallet3d_warp_overlay();
+// Called only after a successful SDL savestate load (also used by private QA).
+void pallet3d_state_loaded(GBContext* ctx);
+bool pallet3d_load_fade();
+struct PalletWorldFrameInfo {int map;uint64_t camera;};
+PalletWorldFrameInfo pallet3d_world_frame();
+struct PalletOverlayInfo {size_t uploads,bytes;};
+PalletOverlayInfo pallet3d_overlay_stats();
 struct PalletCameraInfo {float x,y,z,yaw;int actors;bool player_drawn;};
 PalletCameraInfo pallet3d_camera();
 struct PalletBattleInfo {

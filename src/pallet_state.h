@@ -61,8 +61,8 @@ struct Actor {
     uint8_t image;
 };
 
-// Only the full-width six-row overworld text box is composited. Start/party
-// menus, portraits and mixed layouts deliberately retain the original 2D view.
+// This predicate identifies the lower dialogue whose live map/sprites remain
+// usable. Other menus use menu_layout and the previously retained world frame.
 inline bool bottom_dialogue(const GBContext* ctx) {
     if(!ctx || !ctx->wram || !ctx->io || read(ctx,Battle) || ctx->io[0x47]!=0xe4)return false;
     auto tile=[&](int x,int y){return read(ctx,uint16_t(0xc3a0+y*20+x));};

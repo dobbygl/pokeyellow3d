@@ -49,7 +49,8 @@ inline int world_journey(GBContext* ctx,bool viridian=false) {
         require(glGetError()==GL_NO_ERROR,"No OpenGL error");
         require(pallet3d_stats().resident_maps<=5,"Mesh cache bounded to current plus four neighbors");
         require(before.unchanged(ctx),"Renderer leaves WRAM, VRAM and framebuffer unchanged");
-        require(pallet3d_active()==(state==pallet::View::Overworld||state==pallet::View::Battle),"Real renderer follows scene selection");
+        require(pallet3d_active()==(state==pallet::View::Overworld||state==pallet::View::Battle||pallet3d_warp_overlay()||pallet3d_menu().active||
+            (state==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx))),"Real renderer follows scene selection");
         if(state==pallet::View::Battle)++battle_3d;
         if(pallet3d_firstperson() && state==pallet::View::Overworld) {
             auto camera=pallet3d_camera();auto position=pallet::world_player(ctx);++fp_frames;
@@ -60,7 +61,7 @@ inline int world_journey(GBContext* ctx,bool viridian=false) {
             if(!previous_3d)require(std::abs(firstperson::angle_delta(camera.yaw,firstperson::facing_yaw(byte(0xc109))))<.0001f,"Return from 2D restores engine-facing camera immediately");
         }
         if(state!=pallet::View::Overworld)require(pallet3d_input_mask()==255,"Relative dpad is neutral outside overworld");
-        previous_3d=pallet3d_active()&&state==pallet::View::Overworld;
+        previous_3d=pallet3d_active()&&state!=pallet::View::Battle;
     };
     auto experience=[&](){return (byte(0xd178)<<16)|(byte(0xd179)<<8)|byte(0xd17a);};
     auto fight=[&]() {

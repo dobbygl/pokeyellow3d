@@ -24,7 +24,7 @@ int main(int argc,char** argv) {
     check(pallet::view(&ctx)==pallet::View::Overworld,"Recognize loaded Pallet Town");
     set(pallet::UpdateSprites,255);check(pallet::view(&ctx)==pallet::View::Overworld,"Do not flicker to 2D during walking updates");set(pallet::UpdateSprites,1);
     set(0xc3a0,0x79);check(pallet::view(&ctx)==pallet::View::Dialogue,"Detect visible menu border before font flag");set(0xc3a0,0);
-    set(pallet::Font,1);check(pallet::view(&ctx)==pallet::View::Dialogue,"Keep dialogue and Start menu in 2D");set(pallet::Font,0);
+    set(pallet::Font,1);check(pallet::view(&ctx)==pallet::View::Dialogue,"Distinguish dialogue and Start menu from an unobstructed world");set(pallet::Font,0);
     set(pallet::Battle,1);check(pallet::view(&ctx)==pallet::View::Unsupported,"Keep wild battle in 2D");set(pallet::Battle,0);
     set(pallet::Map,0x28);check(pallet::view(&ctx)==pallet::View::Unsupported,"Reject interior with old exterior dimensions");set(pallet::Map,0);
     io[0x47]=0;check(pallet::view(&ctx)==pallet::View::Transition,"Respect fades");io[0x47]=0xe4;

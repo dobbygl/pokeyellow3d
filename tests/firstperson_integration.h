@@ -19,7 +19,10 @@ inline int firstperson_controls(GBContext* ctx) {
     run.require(run.read(pallet::Map)==0&&run.read(pallet::X)==9&&run.read(pallet::Y)==7,"Pallet initial fixture");
     run.wait(30);press(SDL_SCANCODE_F3);
     run.require(pallet3d_firstperson(),"F3 enables first person");
-    if(const char* path=std::getenv("FP_RECORD"))gb_platform_set_input_record_file(path);
+    if(const char* path=std::getenv("FP_RECORD")) {
+        run.require(gb_context_save_state_file(ctx,(std::string(path)+".start.state").c_str()),"recording start state");
+        gb_platform_set_input_record_file(path);
+    }
     auto turn=[&](SDL_Scancode code,int amount,const char* name) {
         int before=run.read(0xc109),x=run.read(pallet::X),y=run.read(pallet::Y);
         press(code);
@@ -42,7 +45,10 @@ inline int firstperson_controls(GBContext* ctx) {
     int stop=run.read(pallet::Y)-(run.read(pallet::Walk)?1:0);
     key(SDL_SCANCODE_W,false);run.wait(35);
     run.require(run.read(pallet::Y)==stop&&!run.read(pallet::Walk),"W release finishes only current step");
-    if(std::getenv("FP_RECORD"))gb_platform_set_input_record_file(nullptr);
+    if(const char* path=std::getenv("FP_RECORD")) {
+        gb_platform_set_input_record_file(nullptr);
+        run.require(gb_context_save_state_file(ctx,(std::string(path)+".end.state").c_str()),"recording end state");
+    }
     key(SDL_SCANCODE_DOWN,true);
     for(int i=0;i<120;i++){run.tick();if(run.read(pallet::Y)==7&&!run.read(pallet::Walk))break;}
     key(SDL_SCANCODE_DOWN,false);run.wait(30);
@@ -151,5 +157,38 @@ inline int firstperson_benchmark(GBContext* ctx,bool fp) {
     std::sort(times.begin(),times.end());
     std::fprintf(stderr,"[FPBENCH] mode=%s maps=%zu vertices=%zu bytes=%zu min=%.3f median=%.3f max=%.3f ms GPU=%s\n",fp?"FP":"ortho",stats.resident_maps,stats.vertices,stats.bytes,times.front(),times[3],times.back(),glGetString(GL_RENDERER));
     if(const char* path=std::getenv("SMOKE_CAPTURE"))capture_surface(path);
+    return 0;
+}
+
+// Replay the exact cycle-anchored recording from its private start snapshot.
+// The expected snapshot comes from the real SDL relative-control journey.
+inline int firstperson_replay(GBContext* ctx,const char* input,const char* expected) {
+    QaWalk run{ctx};
+    FILE* f=std::fopen(input,"rb");run.require(f,"open recorded controls");
+    std::string script;char chunk[4096];size_t count;
+    while((count=std::fread(chunk,1,sizeof(chunk),f)))script.append(chunk,count);
+    std::fclose(f);run.require(!script.empty(),"nonempty recorded controls");
+    GBConfig config=*pokeyellow_default_config();
+    config.model=config.cartridge_supports_cgb?GB_MODEL_CGB:GB_MODEL_DMG;
+    config.cgb_compatibility_mode=false;
+    GBContext* target=gb_context_create(&config);
+    run.require(target&&gb_context_load_rom(target,ctx->rom,ctx->rom_size)&&
+        gb_context_load_state_file(target,expected),"load private replay target");
+    SDL_Event toggle{};toggle.type=SDL_KEYDOWN;toggle.key.keysym.scancode=SDL_SCANCODE_F3;
+    if(!pallet3d_firstperson())pallet3d_event(&toggle,false);
+    gb_platform_render_frame(gb_get_framebuffer(ctx));
+    gb_platform_set_input_script(script.c_str());gb_platform_poll_events(ctx);
+    for(int frames=0;ctx->cycles<target->cycles&&frames<5000;frames++)run.tick();
+    run.require(ctx->cycles==target->cycles&&ctx->pc==target->pc&&ctx->sp==target->sp&&
+        ctx->a==target->a&&ctx->f==target->f&&ctx->b==target->b&&ctx->c==target->c&&
+        ctx->d==target->d&&ctx->e==target->e&&ctx->h==target->h&&ctx->l==target->l,
+        "record/replay CPU and cycle parity");
+    ReadOnlyMemory memory{target};
+    run.require(memory.unchanged(ctx)&&!std::memcmp(ctx->oam,target->oam,160)&&
+        !std::memcmp(ctx->hram,target->hram,127)&&!std::memcmp(ctx->io,target->io,129),
+        "record/replay full guest memory and framebuffer parity");
+    // No battery callbacks are installed by this fixture.
+    gb_context_destroy(target);
+    std::puts("PASS: cycle-anchored relative recording replays to the identical CPU, RAM and framebuffer state");
     return 0;
 }

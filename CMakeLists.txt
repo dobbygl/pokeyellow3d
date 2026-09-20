@@ -38,9 +38,10 @@ endif()
 # parent is expected to provide `gbrt`. We detect that and skip the fetch.
 # ---------------------------------------------------------------------------
 if(NOT TARGET gbrt)
-    set(GBRT_REF "6581880fce60e6f139901a5942fc984e9c1db8ab" CACHE STRING "git ref of GB-Recomp/gb-recompiled to use")
+    set(GBRT_URL "https://github.com/dobbygl/gb-recompiled.git" CACHE STRING "Runtime repository URL")
+    set(GBRT_REF "presentation-api-v1" CACHE STRING "Runtime git ref with presentation API v1")
     FetchContent_Declare(gb_recompiled
-        GIT_REPOSITORY https://github.com/GB-Recomp/gb-recompiled.git
+        GIT_REPOSITORY ${GBRT_URL}
         GIT_TAG ${GBRT_REF}
         GIT_SHALLOW FALSE
     )
@@ -186,6 +187,7 @@ if(CMAKE_PROJECT_NAME STREQUAL "pokeyellow")
     add_executable(pokeyellow_launcher launcher_main.cpp)
     target_link_libraries(pokeyellow_launcher PRIVATE pokeyellow_cart gbrt)
     if(POKEYELLOW_3D)
+        target_compile_definitions(pokeyellow_launcher PRIVATE POKEYELLOW_3D=1)
         set_target_properties(pokeyellow_launcher PROPERTIES OUTPUT_NAME pokeyellow3d)
     else()
         set_target_properties(pokeyellow_launcher PROPERTIES OUTPUT_NAME pokeyellow)

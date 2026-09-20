@@ -4,6 +4,9 @@
 #include <SDL.h>
 #include <array>
 
+// Register before initializing the runtime SDL frontend.
+bool pallet3d_register();
+
 // Presentation only: these functions never write to the emulated machine.
 void pallet3d_draw(GBContext* ctx, int width, int height, bool menu_open);
 bool pallet3d_event(const SDL_Event* event, bool menu_open);

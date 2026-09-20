@@ -34,6 +34,7 @@ run journey-ortho pallet.state journey
 run journey-fp pallet.state firstperson
 diff <(rg 'final_wram=|PASS: Pallet' logs/journey-ortho.log) <(rg 'final_wram=|PASS: Pallet' logs/journey-fp.log)
 FP_RECORD=logs/relative-input.txt run controls pallet.state fp-controls
+run replay logs/relative-input.txt.start.state fp-replay logs/relative-input.txt logs/relative-input.txt.end.state
 for direction in U D L R; do
     rg -q "c[0-9]+:$direction:[0-9]+" logs/relative-input.txt
 done

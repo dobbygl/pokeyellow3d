@@ -1,6 +1,6 @@
 # Plan: Pokédex and PC in 3D
 
-Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 in progress; B3 pending. Goal paused at the user's request for commit and push.
+Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 completed and verified; B3 pending. Goal active after resuming the integrated objective.
 
 ## Goal and scope
 
@@ -170,9 +170,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] The nests for Pidgey, Zubat, and Magikarp match those shown by the original map.
-- [ ] The view opens and closes with no full 2D frames and respects the resident meshes on returning to the map.
-- [ ] A species with no nest shows the original message and a world with no markers.
+- [x] The nests for Pidgey, Zubat, and Magikarp match those shown by the original map.
+- [x] The view opens and closes with no full 2D frames and respects the resident meshes on returning to the map.
+- [x] A species with no nest shows the original message and a world with no markers.
 
 ## Block B: PC
 
@@ -583,7 +583,7 @@ phase audit. B3 and the combined PC smoke mode remain pending.
 Reproduce the focused checks with local, private fixtures:
 
 ```sh
-cmake --build build --target pokeyellow3d pallet_render_smoke dex_nests_test
+cmake --build build --target pokeyellow_launcher pallet_render_smoke dex_nests_test
 ctest --test-dir build --output-on-failure
 LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
 tests/dex_area_qa.sh build/roms/pokeyellow.gbc build/qa/ui-menus-R28lDE/pallet.state
@@ -592,3 +592,12 @@ bash build/qa/logs/run-dex-a3-regressions.sh
 
 The last command is the locally retained full fixture-based regression script;
 private ROMs, savestates, screenshots and logs are not committed.
+
+
+### A3 acceptance audit, 2026-09-20
+
+The three A3 criteria are now closed against the preceding checkpoint's
+completed evidence: the original-engine nest oracle, full `dex`/`dex-fp`
+journeys and cold loads, original unknown-area pixels, and preserved world
+caches. All thirteen QA suites and both CTest configurations completed before
+this audit. B3 remains open; no PC/Hall criteria are implied by A3 closure.

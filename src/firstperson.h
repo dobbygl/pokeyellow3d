@@ -83,5 +83,5 @@ struct Camera {
 };
 } // namespace firstperson
 
-// Implemented only in the generated SDL adapter; owns a separate input channel.
+// Implemented in pallet_presentation.cpp through the runtime input API.
 void pallet3d_set_input_mask(uint8_t mask,bool relative);

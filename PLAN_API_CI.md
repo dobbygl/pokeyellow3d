@@ -1,6 +1,6 @@
 # Plan: runtime extension API and CI on GitHub Actions
 
-Date: 2026-09-20. Status: partial implementation; goal paused for commit and push. Develops points 1 and 2
+Date: 2026-09-20. Status: phases 1–3 verified; phases 4–5 in progress; goal active. Develops points 1 and 2
 of `PLAN_MEJORAS.md`.
 
 ## Goal and scope
@@ -97,9 +97,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] The fork's runtime builds and runs a game with no registered presentation with identical behavior.
-- [ ] A test presentation in the fork itself receives frame, event, shutdown, and capture in the expected order.
-- [ ] The version constant is documented in the runtime's README.
+- [x] The fork's runtime builds and runs a game with no registered presentation with identical behavior.
+- [x] A test presentation in the fork itself receives frame, event, shutdown, and capture in the expected order.
+- [x] The version constant is documented in the runtime's README.
 
 ## Phase 2: migrating the 3D layer to the interface
 
@@ -113,15 +113,15 @@ Work:
 - `cmake/Pallet3D.cmake` is reduced to: checking the API version, adding
   `src/pallet3d.cpp` to the executable, and setting the depth buffer size
   through the attributes callback.
-- Remove the generated `pallet-runtime` directory and every reference to it
+- Remove the generated SDL source directory and every reference to it
   in documentation and scripts.
 
 Acceptance criteria:
 
-- [ ] `cmake/Pallet3D.cmake` contains no textual-replacement calls.
-- [ ] The full CTest suite and the three `world_qa.sh`, `firstperson_qa.sh`, and `interiors_qa.sh` suites pass locally.
-- [ ] The 38 outdoor captures and the interior captures are identical to those of the previous version.
-- [ ] Recording and replaying input with relative controls produces the same final state as before.
+- [x] `cmake/Pallet3D.cmake` contains no textual-replacement calls.
+- [x] The full CTest suite and the three `world_qa.sh`, `firstperson_qa.sh`, and `interiors_qa.sh` suites pass locally.
+- [x] The 38 outdoor captures and the interior captures are identical to those of the previous version.
+- [x] Recording and replaying input with relative controls produces the same final state as before.
 
 ## Phase 3: synthetic ROM and tests without the ROM
 
@@ -155,9 +155,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] `ctest -LE rom` passes in a build directory without `roms/`.
-- [ ] No synthetic test contains bytes copied from the real ROM; the generator is purely procedural.
-- [ ] `render_preview_synthetic` passes with `SDL_VIDEODRIVER=offscreen` over software Mesa.
+- [x] `ctest -LE rom` passes in a build directory without `roms/`.
+- [x] No synthetic test contains bytes copied from the real ROM; the generator is purely procedural.
+- [x] `render_preview_synthetic` passes with `SDL_VIDEODRIVER=offscreen` over software Mesa.
 
 ## Phase 4: CI workflow
 
@@ -189,9 +189,9 @@ Work:
 Acceptance criteria:
 
 - [x] A push to `main` and a test pull request show the workflow passing on Linux. Windows and macOS jobs are defined but disabled: the pinned runtime includes POSIX headers unconditionally and uses C++20 designated initializers under the project's C++17 standard; macOS lacks GLES2 headers.
-- [ ] A pull request that breaks the synthetic reader fails in CI with the test flagged.
+- [x] A pull request that breaks the synthetic reader fails in CI with the test flagged.
 - [ ] A `v0.1.0` tag produces a release with Linux binaries (Windows once the runtime is portable).
-- [ ] Total workflow time with a warm cache is under ten minutes.
+- [x] Total workflow time with a warm cache is under ten minutes.
 
 ## Phase 5: contribution to the original project
 
@@ -274,3 +274,145 @@ Acceptance criteria:
 - CI workflows already exist; the initial-state description above is
   historical. The remaining CI, test PR, release and upstream validation
   criteria are not claimed complete by this checkpoint.
+
+
+### Phase 3 acceptance audit and phase 1 validation, 2026-09-20
+
+Phase 3 is closed using `build/qa/logs/dex-a3-no-rom.log` (8/8, independent
+build directory without ROMs) and `dex-a3-software-render.log` (llvmpipe,
+30 preview frames plus three live frames). `tests/synthetic_rom.h` generates
+its graphics, map blocks and records procedurally; game-format addresses and
+IDs describe the protocol, not copied ROM assets. The procedural portrait
+bitstream covers all blend modes and mirroring. The same change passed all
+thirteen real-ROM QA suites and CTest 24/24, recorded in `PLAN_POKEDEX_PC.md`.
+
+The fork's `presentation-api-v1` tag adds `begin_frame` (skip prediction) and
+`state_loaded` (successful explicit loads) alongside the planned callbacks;
+these preserve existing integration behavior. Its contract CTest passes,
+including per-frame memory guards, failed-render recovery with letterboxing
+and perturbed GL state, recording, key release and savestate notifications.
+A procedural generated cartridge was regenerated and built against both
+runtimes; six captures from frames 1/30/60 are identical. Separate 480x320
+GL surface probes match SHA-256
+`8efb730749d0374bcdb00086127579af355c02e9c8042adba9f84cd20489b5dc`.
+Private fork logs: `logs/presentation-test.log`,
+`logs/presentation-game-comparison.txt`, `logs/presentation-surface-comparison.txt`.
+
+```sh
+# From the gb-recompiled fork, no commercial ROM required:
+cmake -S . -B build -G Ninja -DGBRT_PRESENTATION_TESTS=ON
+cmake --build build --target gb_presentation_test gbrecomp --parallel 4
+ctest --test-dir build -R presentation_api --output-on-failure
+```
+
+Phase 1/2 acceptance remains open until the game's post-migration regression
+gate completes. The last published game commit passed Linux CI:
+https://github.com/dobbygl/pokeyellow3d/actions/runs/35523876849 .
+
+
+### API migration: initial local checks, 2026-09-20
+
+`cmake/Pallet3D.cmake` now only verifies API version 1 and adds the renderer
+and adapter. `src/pallet_presentation.cpp` registers from the launcher and
+smoke harness, preserving depth attributes, composition, input and load hooks.
+The obsolete generated SDL copies have been removed. CI/release ref extraction
+accepts the version tag as well as commit hashes.
+
+- Build and CTest pass: **24/24** (`build/qa/logs/api-ctest.log`).
+- Separate ROM-free build: **8/8** (`api-no-rom.log`).
+- Complete first-person QA, including the new cycle-anchored replay: **PASS**
+  (`build/qa/firstperson-Bbkf91/`). Replay checks CPU registers/cycles, WRAM,
+  VRAM, ERAM, OAM, HRAM, I/O and the guest framebuffer.
+- The same harness was linked against the archived, unmodified pre-API runtime
+  library from the previous ROM-free build. Both the recording and its start
+  and end savestates are byte-identical to the API version; replay passes on
+  both. Evidence: `build/qa/logs/api-input-comparison.txt`,
+  `api-before-controls.log`, `api-before-replay.log`.
+- The complete post-migration gate is running via
+  `bash build/qa/logs/run-api-regressions.sh`; phase 1/2 checkboxes remain open
+  until its results and capture comparisons have been audited.
+
+
+### CI positive and negative evidence, 2026-09-20
+
+- Positive migration PR: https://github.com/dobbygl/pokeyellow3d/pull/1 .
+  Run https://github.com/dobbygl/pokeyellow3d/actions/runs/35524960932 passes
+  GCC, Clang and 2D, fetching the public runtime tag. Linux job durations:
+  GCC 67 seconds, Clang 48 seconds, 2D 157 seconds. Windows/macOS remain
+  explicitly disabled; their status is not presented as a pass.
+- Negative reader PR: https://github.com/dobbygl/pokeyellow3d/pull/2 .
+  Its isolated one-line mutation accepted oversized images. Run
+  https://github.com/dobbygl/pokeyellow3d/actions/runs/35525023315 fails
+  `rom_reader_synthetic` in both Linux compilers with
+  `FAIL: an oversized image must be refused`; the other seven tests pass.
+  The PR is closed, unmerged. Main and the integration branch keep the valid
+  reader. Logs: `build/qa/logs/ci-negative-reader.log`.
+- Formatting, warnings-as-errors, portability and release remain pending
+  before the complete CI/delivery work can close.
+
+
+Main branch protection is now enabled with strict, required GitHub Actions
+checks `Linux (gcc)`, `Linux (clang)` and `Linux (2D, POKEYELLOW_3D=OFF)`, also
+for administrators. Force pushes and deletion are disabled. Existing reviews
+were not required and no human-review gate was added. The API response is
+retained in `build/qa/logs/main-protection-after.json`.
+
+
+The second attempt of the positive CI run passes with restored FetchContent
+and ccache entries. It ran from 17:18:43 to 17:21:24 UTC (**2m41s total**),
+below ten minutes. Evidence: `build/qa/logs/api-ci-warm.json` and
+`api-ci-warm.log`; GitHub run 35524960932, attempt 2. Formatting and
+warnings-as-errors still remain before phase 4 can close.
+
+
+### Closure of phases 1–2, 2026-09-20
+
+The complete API regression batch exits 0 (`api-regressions.exit`): all
+thirteen `tests/*_qa.sh` suites pass, followed by CTest **24/24**. The separate
+build without ROMs passes **8/8**. Logs are under `build/qa/logs/api-*.log`.
+
+- All **38 exterior** captures match the pre-API AREA checkpoint exactly:
+  `kanto-OW0YIo` versus `kanto-pv52hf`; report `api-exterior-comparison.txt`.
+- All **179 interior catalog** captures match directly:
+  `interiors-NG0KR3` versus `interiors-lPijAF`; report
+  `api-interior-catalog-comparison.txt`.
+- The normal-clock journey captures again have five differences, exactly the
+  five already identified before migration: `pallet-return`, `lab-return`,
+  `mother-dialogue-fp`, `town-route1`, `mart-2f-camera`. Their real-time camera
+  easing prevents treating independent wall-clock runs as exact references.
+- For the complete comparison, the same current smoke harness was linked
+  against the archived pre-API library and the API library, using a **QA-only**
+  linker wrapper for `ImGui::NewFrame` that fixes `DeltaTime` to 1/60 second.
+  It does not change guest cycles, input, SDL time or the production binaries.
+  Both complete interior journeys pass. All **215 captures**, including the
+  five above, are now byte-identical: `interiors-pymvpu` versus
+  `interiors-Zo43uK`; report `api-fixed-interior-comparison.txt`.
+  No reference image was replaced to obtain this result.
+- Recording/replay parity is independently proven by identical recordings
+  and complete start/end savestate files, as recorded above.
+- The runtime tag resolves to commit
+  `813f689a42111112fdeb337f9f4fdb919a31bcc0`. Its contract test, no-extension
+  generated-game comparison and actual GL surface comparison pass.
+
+Reproducible local commands (private fixtures and archived libraries retained):
+
+```sh
+bash build/qa/logs/run-api-regressions.sh
+bash build/qa/logs/run-api-fixed-interiors.sh
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+```
+
+The fixed-time wrapper is `build/qa/api-reference/fixed_imgui_time.cpp`; both
+helpers use `-Wl,--wrap=_ZN5ImGui8NewFrameEv`. The pre-API helper links
+`libgbrt-before.a` and a no-op registration shim; the API helper links the
+current runtime and performs real API registration. Both link the same
+`pallet_render_smoke.cpp.o` and cartridge archive. This isolates the integration
+change while preserving per-frame memory checks in the journeys.
+
+The local build uses the clean fork worktree at the tag's exact commit;
+GitHub CI independently fetched and built the public tag with no source
+override. Upstream remains at the original pinned revision. Windows work is
+isolated on `windows-portability`; only the C++17 initializer issue has been
+fixed and checked on Linux so far. POSIX networking/directory access and the
+Windows GLES backend still need work and actual Windows validation.

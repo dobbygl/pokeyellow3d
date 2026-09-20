@@ -58,7 +58,7 @@ int main(int argc,char** argv) {
     config.model=config.cartridge_supports_cgb?GB_MODEL_CGB:GB_MODEL_DMG;
     config.cgb_compatibility_mode=false;
     GBContext* ctx=gb_context_create(&config);
-    if(!ctx||!gb_platform_init(5))return 4;
+    if(!ctx||!pallet3d_register()||!gb_platform_init(5))return 4;
     gb_platform_register_context(ctx);gb_platform_set_game_id(ctx,"pokeyellow");pokeyellow_init(ctx);
     if(!gb_context_load_state_file(ctx,argv[2]))return 5;
     if(argc>3 && (std::strcmp(argv[3],"firstperson")==0 || std::strcmp(argv[3],"fp-camera")==0)) {
@@ -203,6 +203,9 @@ int main(int argc,char** argv) {
     if(argc>3 && std::strcmp(argv[3],"fp-house")==0) {int result=firstperson_house(ctx);gb_platform_shutdown();return result;}
     if(argc>3 && std::strcmp(argv[3],"fp-controls")==0) {
         int result=firstperson_controls(ctx);gb_platform_shutdown();return result;
+    }
+    if(argc>5 && std::strcmp(argv[3],"fp-replay")==0) {
+        int result=firstperson_replay(ctx,argv[4],argv[5]);gb_platform_shutdown();return result;
     }
     if(argc>5 && std::strcmp(argv[3],"prepare")==0) {
         int result=extended_prepare(ctx,argv[4],argv[5]);gb_platform_shutdown();return result;

@@ -40,7 +40,7 @@ jobs:
       - name: Extract GBRT_REF
         id: gbrt
         run: |
-          ref=$(sed -n 's/.*set(GBRT_REF "\([0-9a-f]*\)".*/\1/p' CMakeLists.txt)
+          ref=$(sed -n 's/.*set(GBRT_REF "\([^"]*\)".*/\1/p' CMakeLists.txt)
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
       - name: Cache FetchContent deps (gb-recompiled)

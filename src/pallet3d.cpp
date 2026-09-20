@@ -33,7 +33,10 @@ uint8_t input_mask=0xff;
 bool dialogue_overlay=false;int last_overworld_map=-1,actors_drawn=0;bool hero_drawn=false;
 bool enabled = true, active = false, failed = false, captured = false;
 float yaw = -.32f, zoom = 1.f;
-float room_yaw=0,room_zoom=1;
+// Rooms share the outdoor default turn: an axis-aligned orthographic view hides every
+// side face and reads as the flat original tilemap (see DIAGNOSTICO_LAB_OAK.md).
+constexpr float RoomYaw=-.32f;
+float room_yaw=RoomYaw,room_zoom=1;
 int atlas_tileset=-2;
 float focus_x=10,focus_z=9;
 bool camera_ready=false;
@@ -274,7 +277,7 @@ void create_map(const GBContext* ctx,const pallet::Scene& scene,const std::vecto
 void update_meshes(const GBContext* ctx) {
     const auto& current=*presented_scene(ctx);
     visible_maps=preview_map>=0?std::vector<int>{current.id}:pallet::resident_maps(current);
-    if(last_component!=current.component) {camera_ready=false;eye.reset();room_yaw=0;room_zoom=1;}
+    if(last_component!=current.component) {camera_ready=false;eye.reset();room_yaw=RoomYaw;room_zoom=1;}
     last_component=current.component;
     for(auto it=meshes.begin();it!=meshes.end();) {
         if(std::find(visible_maps.begin(),visible_maps.end(),it->first)==visible_maps.end()) {
@@ -617,12 +620,12 @@ bool pallet3d_event(const SDL_Event* event,bool menu_open) {
     if(first_person)return false;
     const auto* room=input_context?presented_scene(input_context):nullptr;
     if(room&&room->interior) {
-        bool large=room->width>14||room->height>14;
-        if(event->type==SDL_MOUSEWHEEL) {if(large)room_zoom=std::clamp(room_zoom+event->wheel.y*.12f,.75f,1.8f);return true;}
+        // Every room may turn and zoom; small rooms are exactly the ones that need it.
+        if(event->type==SDL_MOUSEWHEEL) {room_zoom=std::clamp(room_zoom+event->wheel.y*.12f,.75f,1.8f);return true;}
         if(event->type==SDL_KEYDOWN) {
             auto key=event->key.keysym.scancode;
-            if(key==SDL_SCANCODE_Q||key==SDL_SCANCODE_E) {if(large)room_yaw=std::clamp(room_yaw+(key==SDL_SCANCODE_Q?-.08f:.08f),-.4f,.4f);return true;}
-            if(key==SDL_SCANCODE_R) {room_yaw=0;room_zoom=1;return true;}
+            if(key==SDL_SCANCODE_Q||key==SDL_SCANCODE_E) {room_yaw=std::clamp(room_yaw+(key==SDL_SCANCODE_Q?-.08f:.08f),-.4f,.4f);return true;}
+            if(key==SDL_SCANCODE_R) {room_yaw=RoomYaw;room_zoom=1;return true;}
         }
     }
     if(event->type==SDL_MOUSEWHEEL) {

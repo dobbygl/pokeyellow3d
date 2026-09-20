@@ -6,7 +6,7 @@ GLuint texture = 0;
 std::array<uint32_t, 160 * 144> lcd{};
 bool lcd_valid = false, presented = false, monitor_image = false;
 firstperson::Matrix matrix{};
-std::array<float, 8> screen{};
+std::array<float, 8> screen{}, counter_screen{};
 pc_details::Items stored_items;
 pc_details::Rating dex_rating;
 void reset() {
@@ -16,6 +16,7 @@ void reset() {
     pc_composed = false;
     presented = monitor_image = lcd_valid = false;
     pc_boxes::reset();
+    pc_hall3d::reset();
     stored_items = {};
     dex_rating = {};
 }
@@ -25,6 +26,7 @@ void shutdown() {
     texture = 0;
     reset();
     pc_boxes::shutdown();
+    pc_hall3d::shutdown();
 }
 void upload(const GBContext *ctx, const uint32_t *original) {
     if (!texture) {
@@ -69,6 +71,11 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
     dex_rating =
         pc_sample.mode == pc_state::Mode::Oak ? pc_details::rating(ctx) : pc_details::Rating{};
     bool counters = stored_items.valid || dex_rating.valid;
+    if (pc_sample.mode == pc_state::Mode::Hall && pc_hall3d::draw(ctx, w, h, menu_open)) {
+        monitor_image = false;
+        presented = true;
+        return;
+    }
     if (pc_sample.mode == pc_state::Mode::Bill && pc_boxes::draw(ctx, w, h, menu_open)) {
         monitor_image = false;
         presented = true;
@@ -84,7 +91,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
     close.z = center.z + std::max(.87f, .48f * 1.428148f / (float(w) / h * .76f));
     if (pc_sample.mode == pc_state::Mode::Items || pc_sample.mode == pc_state::Mode::Oak) {
         close.z = center.z + (close.z - center.z) * 1.16f;
-        close.y -= .04f;
+        close.y += .06f;
     }
     close.yaw = 0;
     auto target = close.perspective(float(w) / h);
@@ -125,7 +132,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
          // equal width here, including the first and last rows/columns.
          monitor_image ? UV{-.25f, -.25f, 160.5f, 144.5f} : Solid);
     if (counters) {
-        box(v, pc.x - .02f, pc.z + .04f, 1.04f, .15f, pc.height - .13f, pc.height + .04f,
+        box(v, pc.x - .02f, pc.z + .04f, 1.04f, .15f, pc.height + .94f, pc.height + 1.11f,
             {.18f, .25f, .23f, t});
         char text[32];
         if (stored_items.valid)
@@ -134,13 +141,29 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
             std::snprintf(text, sizeof(text), "SEEN %03d CAUGHT %03d", dex_rating.seen,
                           dex_rating.caught);
         float glyph_size = .035f, left = center.x - std::strlen(text) * glyph_size * .5f;
+        Vec label_corners[] = {
+            {left, pc.height + 1.055f, center.z + .001f},
+            {left + std::strlen(text) * glyph_size, pc.height + 1.055f, center.z + .001f},
+            {left + std::strlen(text) * glyph_size, pc.height + 1.055f - glyph_size,
+             center.z + .001f},
+            {left, pc.height + 1.055f - glyph_size, center.z + .001f}};
+        for (int i = 0; i < 4; ++i) {
+            auto p = label_corners[i];
+            float d = matrix[3] * p.x + matrix[7] * p.y + matrix[11] * p.z + matrix[15];
+            counter_screen[i * 2] =
+                ((matrix[0] * p.x + matrix[4] * p.y + matrix[8] * p.z + matrix[12]) / d + 1) * w /
+                2;
+            counter_screen[i * 2 + 1] =
+                (1 - (matrix[1] * p.x + matrix[5] * p.y + matrix[9] * p.z + matrix[13]) / d) * h /
+                2;
+        }
         for (size_t i = 0; text[i]; ++i) {
             int glyph = text[i] >= '0' && text[i] <= '9'   ? 0x76 + text[i] - '0'
                         : text[i] >= 'A' && text[i] <= 'Z' ? text[i] - 'A'
                                                            : -1;
             if (glyph < 0)
                 continue;
-            float x = left + i * glyph_size, y = pc.height - .04f, z = center.z + .001f;
+            float x = left + i * glyph_size, y = pc.height + 1.055f, z = center.z + .001f;
             quad(v, {x, y, z}, {x + glyph_size, y, z}, {x + glyph_size, y - glyph_size, z},
                  {x, y - glyph_size, z}, {.94f, .93f, .81f, t},
                  {float(glyph % 16 * 8) - .25f, float(256 + glyph / 16 * 8) - .25f, 8.5f, 8.5f});

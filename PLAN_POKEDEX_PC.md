@@ -1,6 +1,6 @@
 # Plan: Pokédex and PC in 3D
 
-Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 completed and verified; B3 pending. Goal active after resuming the integrated objective.
+Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 completed and verified; B3 implementation under final regression. Goal active after resuming the integrated objective.
 
 ## Goal and scope
 
@@ -601,3 +601,53 @@ completed evidence: the original-engine nest oracle, full `dex`/`dex-fp`
 journeys and cold loads, original unknown-area pixels, and preserved world
 caches. All thirteen QA suites and both CTest configurations completed before
 this audit. B3 remains open; no PC/Hall criteria are implied by A3 closure.
+
+### B3 implementation and focused evidence, 2026-09-20
+
+B3 is implemented on `pc-complete`; its acceptance remains open until the
+complete regression gate and PR have passed.
+
+- The item PC shows occupied slots out of 50; Oak shows the original
+  nineteen-byte seen/caught bit counts. The counters sit above the monitor:
+  visual review caught that the initial lower placement was hidden by the
+  desk. Main screens retain all 23,040 original LCD pixels; item lists and
+  confirmation screens retain the original full image over the dimmed room.
+- `pc_hall3d.h` owns a separate gallery, atlas and bounded portrait cache.
+  The bank-zero SRAM team supplies every pedestal's species, nickname and
+  level. Live ROM-validated calls and the original saved loop counter identify
+  each member, even for identical teammates. The current record must agree
+  with WRAM and its decoded portrait must match live VRAM. The camera follows
+  the original selection using guest time; repeated paused frames do not
+  rebuild the gallery, upload portraits or modify machine buffers.
+- The private champion fixture takes the actual Pikachu/Pidgey party and
+  executes the original `SaveHallOfFameTeams` at bank 1C:7E2E, then restores
+  the copied world with that SRAM record. It is an explicit test fixture,
+  not a claimed league playthrough. Subsequent PC selections, text, box
+  saves, item quantities and confirmations run in the original engine.
+- `tests/pc_details_qa.sh` passed all four modes in
+  `build/qa/pc-details-Zzu09h/`: `pc-details`, `pc-details-fp`, `pc`, `pc-fp`.
+  The complete modes deposit/withdraw a Pokémon, switch boxes 1/7/1,
+  deposit/withdraw/toss a Poké Ball, read Oak's evaluation and view the saved
+  Hall team. Hall checks include 13,568 exact original text pixels per
+  displayed member, live VRAM portraits, corrupted-SRAM fallback and state
+  reload. Every presented frame checks WRAM, VRAM, SRAM, framebuffer and GL.
+- Reviewed gallery and counter placement:
+  `build/qa/logs/pc-b3-gallery-review.png` and
+  `build/qa/logs/pc-b3-counter-position.png`. The newer counter-glyph pixel
+  assertion is included in the full regression run, rather than inferred
+  from the earlier focused result.
+- Current full CTest passes **25/25** in
+  `build/qa/logs/pc-b3-ctest-current.log`. The complete fourteen-script batch,
+  independent ROM-free CTest, formatting and 38-exterior comparison are
+  running through the retained private driver below; they are not yet
+  claimed as passed.
+
+Reproduce with private fixtures:
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 4
+ctest --test-dir build --output-on-failure
+tests/pc_details_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/pc-storage-4lUeyZ/center.state
+bash build/qa/logs/run-pc-b3-regressions.sh
+```

@@ -9,6 +9,7 @@
 #include "battle_transition_state.h"
 #include "mon_pic_cache.h"
 #include "pc_box_state.h"
+#include "pc_details.h"
 #include "dex_nests.h"
 #include <SDL_opengles2.h>
 #include <algorithm>
@@ -1496,6 +1497,15 @@ PalletPCInfo pallet3d_pc() {
             pc_motion.amount,
             pc3d::matrix,
             pc3d::screen};
+}
+PalletPCDetailsInfo pallet3d_pc_details() {
+    bool drawn = pc3d::presented && active;
+    return {drawn && pc3d::stored_items.valid,
+            drawn && pc3d::dex_rating.valid,
+            pc3d::stored_items.count,
+            pc3d::stored_items.quantity,
+            pc3d::dex_rating.seen,
+            pc3d::dex_rating.caught};
 }
 PalletStorageInfo pallet3d_storage() {
     PalletStorageInfo info{};

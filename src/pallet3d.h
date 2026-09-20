@@ -68,6 +68,11 @@ struct PalletPCInfo {
     std::array<float, 8> screen;
 };
 PalletPCInfo pallet3d_pc();
+struct PalletPCDetailsInfo {
+    bool items, oak;
+    int stored, quantity, seen, caught;
+};
+PalletPCDetailsInfo pallet3d_pc_details();
 struct PalletStorageInfo {
     bool active, party;
     int box, selected;

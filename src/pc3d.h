@@ -7,6 +7,8 @@ std::array<uint32_t, 160 * 144> lcd{};
 bool lcd_valid = false, presented = false, monitor_image = false;
 firstperson::Matrix matrix{};
 std::array<float, 8> screen{};
+pc_details::Items stored_items;
+pc_details::Rating dex_rating;
 void reset() {
     pc_motion = {};
     pc_sample = {};
@@ -14,6 +16,8 @@ void reset() {
     pc_composed = false;
     presented = monitor_image = lcd_valid = false;
     pc_boxes::reset();
+    stored_items = {};
+    dex_rating = {};
 }
 void shutdown() {
     if (texture)
@@ -22,9 +26,18 @@ void shutdown() {
     reset();
     pc_boxes::shutdown();
 }
-void upload(const uint32_t *original) {
+void upload(const GBContext *ctx, const uint32_t *original) {
     if (!texture) {
         std::vector<uint8_t> pixels(AW * AH * 4);
+        for (int glyph = 0; glyph < 128; glyph++)
+            for (int y = 0; y < 8; y++)
+                for (int x = 0; x < 8; x++) {
+                    size_t dest = ((256 + glyph / 16 * 8 + y) * AW + glyph % 16 * 8 + x) * 4;
+                    bool ink = ctx->rom[0x10600 + glyph * 8 + y] & (1 << (7 - x));
+                    for (int c = 0; c < 3; c++)
+                        pixels[dest + c] = 255;
+                    pixels[dest + 3] = ink ? 255 : 0;
+                }
         for (int i = 0; i < 4; i++)
             pixels[((AH - 1) * AW + AW - 1) * 4 + i] = 255;
         glGenTextures(1, &texture);
@@ -51,6 +64,11 @@ void upload(const uint32_t *original) {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 160, 144, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 }
 void draw(GBContext *ctx, int w, int h, bool menu_open) {
+    stored_items =
+        pc_sample.mode == pc_state::Mode::Items ? pc_details::items(ctx) : pc_details::Items{};
+    dex_rating =
+        pc_sample.mode == pc_state::Mode::Oak ? pc_details::rating(ctx) : pc_details::Rating{};
+    bool counters = stored_items.valid || dex_rating.valid;
     if (pc_sample.mode == pc_state::Mode::Bill && pc_boxes::draw(ctx, w, h, menu_open)) {
         monitor_image = false;
         presented = true;
@@ -64,6 +82,10 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
     close.x = center.x;
     close.y = center.y;
     close.z = center.z + std::max(.87f, .48f * 1.428148f / (float(w) / h * .76f));
+    if (pc_sample.mode == pc_state::Mode::Items || pc_sample.mode == pc_state::Mode::Oak) {
+        close.z = center.z + (close.z - center.z) * 1.16f;
+        close.y -= .04f;
+    }
     close.yaw = 0;
     auto target = close.perspective(float(w) / h);
     matrix = world_frame.matrix;
@@ -79,12 +101,12 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
         matrix[i] = matrix[i] * (1 - t) + target[i] * t;
     draw_world_frame(w, h, {}, t > 0, false, 0, &matrix);
     bool full = menu_regions.kind == menu_layout::Kind::Full;
-    bool main = open && pc_sample.main && full;
+    bool main = open && ((pc_sample.main && full) || pc_sample.mode == pc_state::Mode::Oak);
     if (main) {
-        upload(gb_get_framebuffer(ctx));
+        upload(ctx, gb_get_framebuffer(ctx));
         monitor_image = true;
     } else {
-        upload(nullptr);
+        upload(ctx, nullptr);
         if (open)
             monitor_image = false;
     }
@@ -102,6 +124,28 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
          // Cancel the atlas helper's quarter-texel inset: every LCD pixel has
          // equal width here, including the first and last rows/columns.
          monitor_image ? UV{-.25f, -.25f, 160.5f, 144.5f} : Solid);
+    if (counters) {
+        box(v, pc.x - .02f, pc.z + .04f, 1.04f, .15f, pc.height - .13f, pc.height + .04f,
+            {.18f, .25f, .23f, t});
+        char text[32];
+        if (stored_items.valid)
+            std::snprintf(text, sizeof(text), "ITEMS %02d OF 50", stored_items.count);
+        else
+            std::snprintf(text, sizeof(text), "SEEN %03d CAUGHT %03d", dex_rating.seen,
+                          dex_rating.caught);
+        float glyph_size = .035f, left = center.x - std::strlen(text) * glyph_size * .5f;
+        for (size_t i = 0; text[i]; ++i) {
+            int glyph = text[i] >= '0' && text[i] <= '9'   ? 0x76 + text[i] - '0'
+                        : text[i] >= 'A' && text[i] <= 'Z' ? text[i] - 'A'
+                                                           : -1;
+            if (glyph < 0)
+                continue;
+            float x = left + i * glyph_size, y = pc.height - .04f, z = center.z + .001f;
+            quad(v, {x, y, z}, {x + glyph_size, y, z}, {x + glyph_size, y - glyph_size, z},
+                 {x, y - glyph_size, z}, {.94f, .93f, .81f, t},
+                 {float(glyph % 16 * 8) - .25f, float(256 + glyph / 16 * 8) - .25f, 8.5f, 8.5f});
+        }
+    }
     for (int i = 0; i < 4; i++) {
         auto p = corners[i];
         float d = matrix[3] * p.x + matrix[7] * p.y + matrix[11] * p.z + matrix[15];

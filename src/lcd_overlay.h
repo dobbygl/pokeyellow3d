@@ -63,13 +63,14 @@ inline int framed_scale(float w,float h) {
     // At the default 800x720 window the original LCD remains crisp at 3x.
     return std::max(1,int(std::floor(std::min(w*.75f/160,h*.75f/144))));
 }
-inline void framed(const uint32_t* framebuffer,float w,float h) {
+inline void framed(const uint32_t* framebuffer,float w,float h,float alpha=1) {
     if(!upload(framebuffer,Full))return;
     int scale=framed_scale(w,h);float left=std::floor((w-160*scale)*.5f),top=std::floor((h-144*scale)*.5f);
     auto* dl=ImGui::GetForegroundDrawList();
-    dl->AddRectFilled({left-5,top-5},{left+160*scale+5,top+144*scale+5},IM_COL32(12,18,18,240));
-    dl->AddRect({left-2,top-2},{left+160*scale+2,top+144*scale+2},IM_COL32(163,181,167,220));
-    dl->AddImage((ImTextureID)(intptr_t)texture,{left,top},{left+160*scale,top+144*scale});
+    alpha=std::clamp(alpha,0.f,1.f);
+    dl->AddRectFilled({left-5,top-5},{left+160*scale+5,top+144*scale+5},IM_COL32(12,18,18,int(240*alpha)));
+    dl->AddRect({left-2,top-2},{left+160*scale+2,top+144*scale+2},IM_COL32(163,181,167,int(220*alpha)));
+    dl->AddImage((ImTextureID)(intptr_t)texture,{left,top},{left+160*scale,top+144*scale},{0,0},{1,1},IM_COL32(255,255,255,int(255*alpha)));
 }
 inline void regions(const uint32_t* framebuffer,const menu_layout::Layout& layout,float w,float h) {
     float scale=std::max(1.f,std::floor(std::min(w/160,h/144)));

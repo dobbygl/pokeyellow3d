@@ -6,6 +6,7 @@
 #include "lcd_overlay.h"
 #include "fade_state.h"
 #include "menu_state.h"
+#include "battle_transition_state.h"
 #include <SDL_opengles2.h>
 #include <algorithm>
 #include <array>
@@ -64,11 +65,23 @@ struct WorldFrame {
     Vec eye{};
     float fog=0;
     bool fp=false;
+    Vec hero{};
 } world_frame;
+bool battle_sequence=false,battle_arena=false,battle_fighters=false,battle_dark=false,battle_composed=false;
+battle_transition::Sample battle_phase;
+bool can_compose_battle(const GBContext* ctx) {
+    if(preview_map>=0||!battle_transition::supported(ctx))return false;
+    if(pallet::view(ctx)==pallet::View::Battle)return true;
+    if(world_frame.map<0&&!battle_sequence)return false;
+    if(battle_transition::entry(ctx)||battle::normal(ctx))return true;
+    return battle_sequence&&(pallet::read(ctx,pallet::Battle)==255||
+        (!battle_arena&&ctx->io[0x47]==255));
+}
 bool menu_overlay=false,menu_full=false,menu_blurred=false;
 menu_layout::Layout menu_regions;
 bool can_compose_menu(const GBContext* ctx) {
     if(!ctx||!ctx->wram||!ctx->io||preview_map>=0||pallet::read(ctx,pallet::Battle))return false;
+    if(can_compose_battle(ctx))return false;
     const auto state=pallet::view(ctx);
     bool resident=world_frame.map>=0&&world_frame.map==pallet::read(ctx,pallet::Map);
     if(!resident)return state==pallet::View::Dialogue&&can_compose_dialogue(ctx);
@@ -83,7 +96,7 @@ float load_elapsed=0;
 bool can_compose_warp(const GBContext* ctx) {
     return world_frame.map>=0 && preview_map<0 && ctx && ctx->io && ctx->wram &&
         !pallet::read(ctx,pallet::Battle) && pallet::scene(pallet::read(ctx,pallet::Map)) &&
-        fade::palette(ctx->io[0x47]) && (fade::warp(ctx) ||
+        fade::palette(ctx->io[0x47]) && (fade::warp(ctx) || battle_transition::ending(ctx) ||
         (warp_overlay && pallet::read(ctx,pallet::Map)==warp_destination &&
          (ctx->io[0x47]==0xff||ctx->io[0x47]==0||!(ctx->io[0x40]&0x80)) &&
          pallet::view(ctx)==pallet::View::Transition));
@@ -362,6 +375,22 @@ GLuint shader(GLenum type,const char* source) {
 }
 
 #include "scene_filter.h"
+#include "presentation_blend_gl.h"
+const uint32_t* presented_lcd=nullptr;
+bool wants_scene(const GBContext* ctx) {
+    if(!enabled||failed)return false;
+    auto state=pallet::view(ctx);
+    return (preview_map>=0&&presented_scene(ctx))||state==pallet::View::Overworld||state==pallet::View::Battle||
+        load_fade||can_compose_menu(ctx)||can_compose_warp(ctx)||can_compose_battle(ctx);
+}
+bool frozen_blend(const GBContext* ctx) {
+    return presentation::blend.paused&&presentation::history.valid&&
+        (presentation::blend.running||wants_scene(ctx)!=presentation::blend.target);
+}
+void original_frame(GBContext* ctx,int w,int h) {
+    glViewport(0,0,w,h);glDisable(GL_SCISSOR_TEST);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);
+    lcd_overlay::draw(presented_lcd?presented_lcd:gb_get_framebuffer(ctx),lcd_overlay::Full,float(w),float(h));
+}
 
 bool initialize(const GBContext* ctx) {
     const char* vs=R"(
@@ -455,7 +484,7 @@ void sprite_image(const GBContext* ctx,const pallet::Actor& actor) {
     }
 }
 
-void draw_world_frame(int w,int h,fade::Tone tone={},bool hide_hero=false,bool allow_xray=true);
+void draw_world_frame(int w,int h,fade::Tone tone={},bool hide_hero=false,bool allow_xray=true,float approach=0);
 
 void world(GBContext* ctx,int w,int h,fade::Tone tone={}) {
     const auto& current=*presented_scene(ctx);
@@ -544,13 +573,21 @@ void world(GBContext* ctx,int w,int h,fade::Tone tone={}) {
     if(current.interior&&preview_map<0)unit*=room_zoom;
     auto matrix=fp?eye.perspective(float(w)/h):firstperson::orthographic(focus_x,focus_z,view_yaw,2*unit/w,2*unit/h);
     world_frame={current.id,player_first,hero_begin,hero_end,matrix,{eye.x,eye.y,eye.z},
-        float(fp?(current.interior&&interior::cave(current)?2:1):0),fp};
+        float(fp?(current.interior&&interior::cave(current)?2:1):0),fp,{player_position[0],.6f,player_position[1]}};
     draw_world_frame(w,h,tone);
 }
 
 // Pure presentation of resident meshes/actors and the last valid camera.
 // In particular this never reads the incoming map's WRAM or decodes its VRAM.
-void draw_world_frame(int w,int h,fade::Tone tone,bool hide_hero,bool allow_xray) {
+std::array<float,2> battle_zoom_center() {
+    if(world_frame.fp)return {0,0};
+    const auto& m=world_frame.matrix;const auto p=world_frame.hero;
+    float denominator=m[3]*p.x+m[7]*p.y+m[11]*p.z+m[15];
+    if(std::abs(denominator)<.001f)return {0,0};
+    return {(m[0]*p.x+m[4]*p.y+m[8]*p.z+m[12])/denominator,
+        (m[1]*p.x+m[5]*p.y+m[9]*p.z+m[13])/denominator};
+}
+void draw_world_frame(int w,int h,fade::Tone tone,bool hide_hero,bool allow_xray,float approach) {
     const auto& frame=world_frame;
     glViewport(0,0,w,h);glDisable(GL_SCISSOR_TEST);glDisable(GL_CULL_FACE);
     glClearColor(.075f*tone.multiply+tone.add,.12f*tone.multiply+tone.add,.135f*tone.multiply+tone.add,1);
@@ -558,7 +595,13 @@ void draw_world_frame(int w,int h,fade::Tone tone,bool hide_hero,bool allow_xray
     glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(program);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlas);
     glUniform2f(fade_loc,tone.multiply,tone.add);
-    glUniformMatrix4fv(matrix_loc,1,GL_FALSE,frame.matrix.data());
+    auto matrix=frame.matrix;
+    if(approach>0) {
+        auto center=battle_zoom_center();float scale=1+approach*1.6f;
+        for(int col=0;col<4;col++)for(int row=0;row<2;row++)
+            matrix[col*4+row]=scale*frame.matrix[col*4+row]-(scale-1)*center[row]*frame.matrix[col*4+3];
+    }
+    glUniformMatrix4fv(matrix_loc,1,GL_FALSE,matrix.data());
     glUniform3f(eye_loc,frame.eye.x,frame.eye.y,frame.eye.z);
     glUniform1f(fog_loc,frame.fog);glUniform1f(sky_loc,0);
     glUniform1i(glGetUniformLocation(program,"image"),0);
@@ -615,7 +658,19 @@ void hud(const GBContext* ctx) {
 } // namespace
 
 void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
+    if(frozen_blend(ctx)) {
+        active=presentation::draw(presentation::history,width,height);return;
+    }
     auto state=pallet::view(ctx);
+    battle_composed=can_compose_battle(ctx);
+    battle_phase=battle_transition::sample(ctx,ctx?gb_get_framebuffer(ctx):nullptr);
+    if(battle_composed) {
+        if(!battle_sequence){battle_arena=battle_fighters=battle_dark=false;battle3d::reset();}
+        battle_sequence=true;
+        battle_arena|=battle_phase.hud||state==pallet::View::Battle;
+        battle_fighters|=state==pallet::View::Battle&&!battle::trainer_intro(ctx);
+        battle_dark|=battle_phase.phase==battle_transition::Phase::Loading;
+    } else {battle_sequence=battle_arena=battle_fighters=battle_dark=false;}
     if(std::getenv("PALLET3D_TRACE") && ctx && ctx->wram) {
         static int last=-1,lastx=-1,lasty=-1;
         int x=pallet::read(ctx,pallet::X),y=pallet::read(ctx,pallet::Y);
@@ -624,18 +679,26 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
             last=int(state);lastx=x;lasty=y;
         }
     }
-    if(state==pallet::View::Overworld)battle3d::remember_terrain(ctx);
+    if(state==pallet::View::Overworld&&!battle_composed)battle3d::remember_terrain(ctx);
     bool was_menu=menu_overlay;
     menu_overlay=can_compose_menu(ctx);menu_blurred=false;
     menu_regions=menu_overlay?menu_layout::classify(ctx->wram+0x3a0):menu_layout::Layout{};
     menu_full=menu_overlay&&menu_regions.kind==menu_layout::Kind::Full;
     dialogue_overlay=menu_overlay&&pallet::bottom_dialogue(ctx);
-    warp_overlay=can_compose_warp(ctx);
+    warp_overlay=!battle_composed&&can_compose_warp(ctx);
     if(warp_overlay)warp_destination=pallet::read(ctx,pallet::Map);
-    active=enabled && ((preview_map>=0 && presented_scene(ctx)) || state==pallet::View::Overworld || state==pallet::View::Battle || menu_overlay || warp_overlay || load_fade) && width>0 && height>0;
-    if(!battle::normal(ctx))battle3d::reset();
-    if(!active||failed) {eye.reset();return;}
-    if(!program && !initialize(ctx)) { failed=true;std::fprintf(stderr,"[3D] Initialization failed; keeping the original 2D view.\n");return; }
+    active=enabled && ((preview_map>=0 && presented_scene(ctx)) || state==pallet::View::Overworld || state==pallet::View::Battle || battle_composed || menu_overlay || warp_overlay || load_fade) && width>0 && height>0;
+    if(!battle::normal(ctx)&&!battle_composed)battle3d::reset();
+    if(!active||failed) {
+        eye.reset();
+        if(presentation::blend.running){active=true;original_frame(ctx,width,height);++active_frames;}
+        return;
+    }
+    if(!program && !initialize(ctx)) {
+        failed=true;std::fprintf(stderr,"[3D] Initialization failed; keeping the original 2D view.\n");
+        if(presentation::blend.running)original_frame(ctx,width,height);
+        return;
+    }
     if(load_fade) {
         // A savestate has no guest fade. The explicit successful-load callback
         // starts a short presentation-only fade; normal clock wrap is irrelevant.
@@ -643,7 +706,8 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
         // A GPU upload/driver stall cannot skip the whole cosmetic reveal.
         // Guest-driven BGP fades above remain entirely frame-exact; this clock
         // is used only for a savestate, which has no guest fade of its own.
-        load_elapsed+=std::min(25.f,float(uint32_t(now-load_started)));load_started=now;
+        if(!menu_open&&window_focused)load_elapsed+=std::min(25.f,float(uint32_t(now-load_started)));
+        load_started=now;
         float elapsed=load_elapsed;
         bool entering=false;
         if(!load_incoming&&elapsed>=90) {
@@ -654,8 +718,9 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
         if(!live) {
             // Input can open a full-screen menu during these 180 ms. Its map
             // buffers may already be repurposed; never feed them to world().
-            load_fade=false;draw_world_frame(width,height,{.4f,0});
-            lcd_overlay::draw(gb_get_framebuffer(ctx),lcd_overlay::Full,float(width),float(height));
+            load_fade=false;draw_world_frame(width,height);
+            scene_filter::capture(width,height);scene_filter::draw(width,height);
+            lcd_overlay::framed(gb_get_framebuffer(ctx),float(width),float(height));
             ++active_frames;return;
         }
         else if(!load_incoming) {draw_world_frame(width,height,{1-elapsed/90,0});++active_frames;return;}
@@ -667,6 +732,20 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
             ++active_frames;return;
         }
         else load_fade=false;
+    }
+    if(battle_composed) {
+        eye.reset();scene_filter::invalidate();
+        if(battle_arena)battle3d::draw(ctx,width,height,menu_open,!battle_fighters);
+        else {
+            auto tone=battle_dark?fade::Tone{0,0}:fade::tone(ctx->io[0x47]);
+            float progress=battle_phase.phase==battle_transition::Phase::Wipe?battle_phase.wipe:0;
+            draw_world_frame(width,height,tone,false,false,progress);
+            if(progress>0&&scene_filter::capture(width,height)) {
+                auto center=battle_zoom_center();
+                scene_filter::draw(width,height,1,0,progress*.16f,(center[0]+1)*.5f,(center[1]+1)*.5f);
+            }
+        }
+        ++active_frames;return;
     }
     if(warp_overlay) {
         auto tone=fade::tone(ctx->io[0x47]);
@@ -704,8 +783,9 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
 
 bool pallet3d_event(const SDL_Event* event,bool menu_open) {
     if(event->type==SDL_WINDOWEVENT) {
-        if(event->window.event==SDL_WINDOWEVENT_FOCUS_LOST)window_focused=false;
+        if(event->window.event==SDL_WINDOWEVENT_FOCUS_LOST){window_focused=false;presentation::blend.paused=true;}
         if(event->window.event==SDL_WINDOWEVENT_FOCUS_GAINED)window_focused=true;
+        if(load_fade&&(event->window.event==SDL_WINDOWEVENT_FOCUS_LOST||event->window.event==SDL_WINDOWEVENT_FOCUS_GAINED))load_started=SDL_GetTicks();
     }
     pallet3d_poll_controls(input_context,menu_open);
     if(menu_open)return false;
@@ -724,7 +804,7 @@ bool pallet3d_event(const SDL_Event* event,bool menu_open) {
             return true;
         }
     }
-    if(!active||warp_overlay||menu_overlay||load_fade)return false;
+    if(!active||warp_overlay||menu_overlay||load_fade||battle_composed)return false;
     if(input_context&&pallet::view(input_context)==pallet::View::Battle)return false;
     if(first_person)return false;
     const auto* room=input_context?presented_scene(input_context):nullptr;
@@ -752,6 +832,8 @@ bool pallet3d_event(const SDL_Event* event,bool menu_open) {
 }
 
 void pallet3d_shutdown() {
+    presentation::shutdown();presented_lcd=nullptr;
+    battle_sequence=battle_arena=battle_fighters=battle_dark=battle_composed=false;
     battle3d::shutdown();
     lcd_overlay::shutdown();scene_filter::shutdown();menu_overlay=menu_full=menu_blurred=false;
     for(auto& entry:meshes)glDeleteBuffers(1,&entry.second.buffer);
@@ -777,12 +859,22 @@ void pallet3d_capture(int width,int height) {
     std::fclose(f);captured=true;std::fprintf(stderr,"[3D] Captured %s\n",path);
 }
 
-bool pallet3d_active() { return active && program && !failed; }
+bool pallet3d_active() { return active && ((program&&!failed)||(presentation::blend.running&&presentation::program)); }
+
+void pallet3d_begin_frame(GBContext* ctx,bool menu_open,const uint32_t* framebuffer) {
+    presented_lcd=framebuffer;
+    presentation::begin(wants_scene(ctx),menu_open||!window_focused,SDL_GetTicks());
+    pallet3d_poll_controls(ctx,menu_open);
+}
+void pallet3d_finish_frame(int width,int height,bool menu_open) {
+    presentation::finish(width,height,menu_open||!window_focused);
+}
+PalletBlendInfo pallet3d_blend() {
+    return {presentation::blend.running,presentation::blend.target,presentation::blend.paused,presentation::blend.progress()};
+}
 
 bool pallet3d_covers_frame(const GBContext* ctx) {
-    auto state=pallet::view(ctx);
-    return enabled && program && !failed && (state==pallet::View::Overworld||state==pallet::View::Battle||load_fade||
-        can_compose_menu(ctx)||can_compose_warp(ctx));
+    return (presentation::blend.running&&presentation::source.valid)||frozen_blend(ctx)||(program&&wants_scene(ctx));
 }
 
 Pallet3DStats pallet3d_stats() {
@@ -795,7 +887,8 @@ bool pallet3d_firstperson() {return first_person;}
 
 void pallet3d_poll_controls(GBContext* ctx,bool menu_open) {
     input_context=ctx;
-    relative_allowed=first_person && enabled && !failed && window_focused && !menu_open && preview_map<0 &&
+    bool blending=presentation::blend.running||(presentation::history.valid&&wants_scene(ctx)!=presentation::blend.target);
+    relative_allowed=first_person && enabled && !failed && !blending && window_focused && !menu_open && preview_map<0 && !can_compose_battle(ctx) &&
         pallet::view(ctx)==pallet::View::Overworld && !can_compose_warp(ctx) && !can_compose_menu(ctx) && !load_fade;
     int facing=relative_allowed?pallet::read(ctx,0xc109):0;
     bool idle=relative_allowed && !pallet::read(ctx,pallet::Walk) &&
@@ -810,6 +903,7 @@ void pallet3d_poll_controls(GBContext* ctx,bool menu_open) {
 uint8_t pallet3d_input_mask() {return input_mask;}
 
 void pallet3d_state_loaded(GBContext* ctx) {
+    battle_sequence=battle_arena=battle_fighters=battle_dark=battle_composed=false;battle3d::reset();
     warp_overlay=false;warp_destination=-1;menu_overlay=false;scene_filter::invalidate();controls.reset();
     load_fade=enabled&&program&&!failed&&ctx&&world_frame.map>=0&&
         world_frame.map!=pallet::read(ctx,pallet::Map)&&pallet::view(ctx)==pallet::View::Overworld;
@@ -820,6 +914,9 @@ void pallet3d_state_loaded(GBContext* ctx) {
 bool pallet3d_load_fade() {return load_fade;}
 
 bool pallet3d_warp_overlay() {return warp_overlay&&active;}
+PalletBattleTransitionInfo pallet3d_battle_transition() {
+    return {battle_composed&&active,battle_composed&&active&&battle_arena,int(battle_phase.phase),battle_phase.wipe};
+}
 PalletWorldFrameInfo pallet3d_world_frame() {
     uint64_t hash=14695981039346656037ull;
     const auto* bytes=reinterpret_cast<const uint8_t*>(world_frame.matrix.data());
@@ -833,7 +930,7 @@ bool pallet3d_dialogue_overlay() {return dialogue_overlay && active;}
 PalletOverlayInfo pallet3d_overlay_stats() {return {lcd_overlay::uploads,lcd_overlay::bytes};}
 PalletCameraInfo pallet3d_camera() {return {eye.x,eye.y,eye.z,eye.yaw,actors_drawn,hero_drawn};}
 PalletBattleInfo pallet3d_battle() {
-    return {pallet3d_active()&&input_context&&pallet::view(input_context)==pallet::View::Battle,
+    return {pallet3d_active()&&input_context&&(battle_composed?battle_arena:pallet::view(input_context)==pallet::View::Battle),
         battle3d::full_overlay||battle3d::overlay_alpha>0,battle3d::terrain,battle3d::portraits[0].species,battle3d::portraits[1].species,
         battle3d::portraits[0].alpha,battle3d::portraits[1].alpha,
         battle3d::portraits[0].fingerprint,battle3d::portraits[1].fingerprint,

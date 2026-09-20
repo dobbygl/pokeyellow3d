@@ -23,8 +23,14 @@ inline bool initialize() {
     const char* fs=R"(
         precision mediump float;
         uniform sampler2D image; uniform vec2 step_size; uniform float dim;
+        uniform float radial; uniform vec2 radial_center;
         varying vec2 uv;
         void main() {
+            if(radial>0.0) {
+                vec3 c=vec3(0.0);vec2 ray=(radial_center-uv)*radial;
+                for(int i=0;i<8;i++)c+=texture2D(image,uv+ray*(float(i)/7.0)).rgb;
+                gl_FragColor=vec4(c*(dim/8.0),1.0);return;
+            }
             vec3 c=texture2D(image,uv).rgb*4.0;
             c+=(texture2D(image,uv+vec2(step_size.x,0.0)).rgb+
                 texture2D(image,uv-vec2(step_size.x,0.0)).rgb+
@@ -59,13 +65,15 @@ inline bool capture(int w,int h) {
     glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,w,h);
     glBindTexture(GL_TEXTURE_2D,0);valid=true;return true;
 }
-inline bool draw(int w,int h,float dim=.42f,float radius=4.f) {
+inline bool draw(int w,int h,float dim=.42f,float radius=4.f,float radial=0,float center_x=.5f,float center_y=.5f) {
     if(!valid||!program||width!=w||height!=h)return false;
     glViewport(0,0,w,h);glDisable(GL_DEPTH_TEST);glDisable(GL_BLEND);glDisable(GL_SCISSOR_TEST);glDisable(GL_CULL_FACE);
     glUseProgram(program);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,texture);
     glUniform1i(glGetUniformLocation(program,"image"),0);
     glUniform2f(glGetUniformLocation(program,"step_size"),radius/w,radius/h);
     glUniform1f(glGetUniformLocation(program,"dim"),dim);
+    glUniform1f(glGetUniformLocation(program,"radial"),radial);
+    glUniform2f(glGetUniformLocation(program,"radial_center"),center_x,center_y);
     glBindBuffer(GL_ARRAY_BUFFER,buffer);glEnableVertexAttribArray(0);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,2*sizeof(float),nullptr);glDrawArrays(GL_TRIANGLE_STRIP,0,4);
     glDisableVertexAttribArray(0);glBindBuffer(GL_ARRAY_BUFFER,0);glBindTexture(GL_TEXTURE_2D,0);glUseProgram(0);

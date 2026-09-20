@@ -39,6 +39,7 @@ static void capture_surface(const char* path) {
 #include "interior_transitions.h"
 #include "ui_transitions.h"
 #include "battle_transition_trace.h"
+#include "presentation_integration.h"
 
 int main(int argc,char** argv) {
     if(argc<3) { std::fprintf(stderr,"Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");return 1; }
@@ -63,6 +64,12 @@ int main(int argc,char** argv) {
     }
     std::fprintf(stderr,"[SMOKE] view=%d map=%u xy=%u,%u\n",int(pallet::view(ctx)),pallet::read(ctx,pallet::Map),pallet::read(ctx,pallet::X),pallet::read(ctx,pallet::Y));
     std::fprintf(stderr,"[SMOKE] party=%u hp=%u level=%u script=%u/%u font=%u\n",pallet::read(ctx,0xd162),pallet::read(ctx,0xd16b)*256+pallet::read(ctx,0xd16c),pallet::read(ctx,0xd18b),pallet::read(ctx,0xd5f0),pallet::read(ctx,0xd5ef),pallet::read(ctx,pallet::Font));
+    if(argc>3&&(!std::strcmp(argv[3],"crossfade")||!std::strcmp(argv[3],"crossfade-fp"))) {
+        int result=presentation_qa::run(ctx,!std::strcmp(argv[3],"crossfade-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"crossfade-warp")||!std::strcmp(argv[3],"crossfade-warp-fp"))) {
+        int result=presentation_qa::warp(ctx,!std::strcmp(argv[3],"crossfade-warp-fp"));gb_platform_shutdown();return result;
+    }
     if(argc>3&&std::strcmp(argv[3],"dialogue")==0) {
         int result=dialogue_journey(ctx);gb_platform_shutdown();return result;
     }
@@ -104,8 +111,9 @@ int main(int argc,char** argv) {
     if(argc>3&&std::strcmp(argv[3],"battle-probe")==0) {
         int result=battle_probe(ctx);gb_platform_shutdown();return result;
     }
-    if(argc>3&&(!std::strcmp(argv[3],"battle-timing")||!std::strcmp(argv[3],"trainer-timing"))) {
-        int result=battle_transition_trace::run(ctx,!std::strcmp(argv[3],"trainer-timing"));gb_platform_shutdown();return result;
+    if(argc>3&&(!std::strcmp(argv[3],"battle-timing")||!std::strcmp(argv[3],"trainer-timing")||
+               !std::strcmp(argv[3],"battle-timing-fp")||!std::strcmp(argv[3],"trainer-timing-fp"))) {
+        int result=battle_transition_trace::run(ctx,!std::strncmp(argv[3],"trainer-",8),std::strstr(argv[3],"-fp"));gb_platform_shutdown();return result;
     }
     if(argc>3&&std::strcmp(argv[3],"battle-menus")==0) {
         int result=battle_menus(ctx);gb_platform_shutdown();return result;
@@ -277,7 +285,7 @@ int main(int argc,char** argv) {
             auto view=pallet::view(ctx);
             gb_platform_render_frame(gb_get_framebuffer(ctx));
             if(glGetError()!=GL_NO_ERROR || std::memcmp(before.data(),ctx->wram,8192))return 16;
-            if(pallet3d_active()!=(view==pallet::View::Overworld||view==pallet::View::Battle||pallet3d_warp_overlay()||pallet3d_menu().active||
+            if(pallet3d_active()!=(pallet3d_blend().active||view==pallet::View::Overworld||view==pallet::View::Battle||pallet3d_warp_overlay()||pallet3d_battle_transition().active||pallet3d_menu().active||
                 (view==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx)))) {
                 std::fprintf(stderr,"[PLAY] wrong scene frame=%d view=%d map=%d active=%d bottom=%d\n",frame,int(view),pallet::read(ctx,pallet::Map),pallet3d_active(),pallet::bottom_dialogue(ctx));return 23;
             }
@@ -327,7 +335,7 @@ int main(int argc,char** argv) {
         }
         gb_platform_render_frame(gb_get_framebuffer(ctx));
         auto view=pallet::view(ctx);
-        if(pallet3d_active()!=(view==pallet::View::Overworld||view==pallet::View::Battle||pallet3d_warp_overlay()||pallet3d_menu().active||
+        if(pallet3d_active()!=(pallet3d_blend().active||view==pallet::View::Overworld||view==pallet::View::Battle||pallet3d_warp_overlay()||pallet3d_battle_transition().active||pallet3d_menu().active||
             (view==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx))))return 23;
         GLenum error=glGetError();
         if(error!=GL_NO_ERROR) {std::fprintf(stderr,"OpenGL error: %x\n",error);return 10;}

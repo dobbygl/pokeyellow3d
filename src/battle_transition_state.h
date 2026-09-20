@@ -6,7 +6,7 @@
 // its wipe runs, so the positive lifetime is the caller of the transition,
 // not that flag, a timer, or leftover tile IDs.
 namespace battle_transition {
-enum class Phase { None, Preparing, Flash, Wipe, Loading, Introduction, Battle };
+enum class Phase { None, Preparing, Flash, Wipe, Loading, Introduction, Battle, Exit };
 struct Sample {Phase phase=Phase::None;float wipe=0;bool hud=false;};
 inline bool supported(const GBContext* ctx) {
     return ctx&&ctx->rom&&ctx->rom_size==1048576&&ctx->wram&&ctx->vram&&ctx->io&&
@@ -27,6 +27,9 @@ inline bool introduction(const GBContext* ctx) {
 }
 inline bool loop(const GBContext* ctx) {
     return battle::normal(ctx)&&far_call(ctx,0xf613f,0x4127,0x0f);
+}
+inline bool ending(const GBContext* ctx) {
+    return far_call(ctx,0xf6147,0x7765,0x04);
 }
 inline bool visible_hud(const GBContext* ctx,const uint32_t* lcd) {
     if(!lcd||!introduction(ctx)||!(ctx->io[0x40]&0x80)||ctx->io[0x47]!=0xe4)return false;
@@ -59,6 +62,7 @@ inline Sample sample(const GBContext* ctx,const uint32_t* lcd=nullptr) {
     }
     if(introduction(ctx))return {Phase::Introduction,0,visible_hud(ctx,lcd)};
     if(loop(ctx))return {Phase::Battle};
+    if(ending(ctx))return {Phase::Exit};
     return {};
 }
 } // namespace battle_transition

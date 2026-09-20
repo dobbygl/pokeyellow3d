@@ -15,14 +15,14 @@ pallet_hook("SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);" "SDL_GL_SetAttribute(SD
 pallet_hook("    ImGui::NewFrame();" "    ImGui::NewFrame();\n    pallet3d_draw(g_registered_ctx, draw_w, draw_h, g_show_menu);")
 pallet_hook("    const uint8_t joyp = ctx ? ctx->io[0x00] : 0xFF;" "    if (pallet3d_event(event, g_show_menu)) return true;\n    const uint8_t joyp = ctx ? ctx->io[0x00] : 0xFF;")
 pallet_hook("    /* Tear down GL-owned objects before the context goes away. */" "    pallet3d_shutdown();\n    /* Tear down GL-owned objects before the context goes away. */")
-pallet_hook("    SDL_GL_SwapWindow(g_window);" "    pallet3d_capture(draw_w, draw_h);\n    SDL_GL_SwapWindow(g_window);")
+pallet_hook("    SDL_GL_SwapWindow(g_window);" "    pallet3d_finish_frame(draw_w, draw_h, g_show_menu);\n    pallet3d_capture(draw_w, draw_h);\n    SDL_GL_SwapWindow(g_window);")
 pallet_hook("    const bool success = gb_context_load_state_file(ctx, filename);"
     "    const bool success = gb_context_load_state_file(ctx, filename);\n    if (success) pallet3d_state_loaded(ctx);")
 # The 3D view clears and covers the whole drawable. Avoid uploading/drawing a
 # discarded 2D frame, while retaining the original path on first initialization,
 # F2, dialogue, transitions, interiors, battles or an initialization failure.
 pallet_hook("    static uint32_t s_upload_buf[GB_FRAMEBUFFER_SIZE];"
-    "    const bool pallet_covers_frame = pallet3d_covers_frame(g_registered_ctx);\n    if (!pallet_covers_frame) {\n    static uint32_t s_upload_buf[GB_FRAMEBUFFER_SIZE];")
+    "    pallet3d_begin_frame(g_registered_ctx, g_show_menu, framebuffer);\n    const bool pallet_covers_frame = pallet3d_covers_frame(g_registered_ctx);\n    if (!pallet_covers_frame) {\n    static uint32_t s_upload_buf[GB_FRAMEBUFFER_SIZE];")
 pallet_hook("    g_last_timing.upload_ms = sdl_now_ms() - upload_start_ms;"
     "    }\n    g_last_timing.upload_ms = sdl_now_ms() - upload_start_ms;")
 pallet_hook("    if (g_shader_pipeline) {\n        const int active_shader = gb_shader_pipeline_active(g_shader_pipeline);"

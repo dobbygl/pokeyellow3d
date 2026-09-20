@@ -71,9 +71,11 @@ inline int firstperson_controls(GBContext* ctx) {
     for(int i=0;i<6&&pallet::view(ctx)==pallet::View::Dialogue;i++)press(SDL_SCANCODE_X,12);
     run.require(pallet::view(ctx)==pallet::View::Overworld,"dialogue returns to FP");
     key(SDL_SCANCODE_W,true);run.render_enabled=false;press(SDL_SCANCODE_F2);
+    for(int i=0;i<150&&pallet3d_blend().active;i++){SDL_Delay(4);run.tick();}
     run.require(!pallet3d_active()&&pallet3d_input_mask()==255,"F2 neutralizes relative controls in 2D");
     capture("f2-original");
     key(SDL_SCANCODE_W,false);run.render_enabled=true;press(SDL_SCANCODE_F2);
+    for(int i=0;i<150&&pallet3d_blend().active;i++){SDL_Delay(4);run.tick();}
     run.require(pallet3d_active()&&pallet3d_firstperson(),"F2 restores the first-person preference");
     capture("sign-after");
     std::puts("PASS: SDL relative controls, repeated turns, W release, absolute arrows, Esc, Start and centered sign interaction");

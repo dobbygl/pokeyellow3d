@@ -8,6 +8,11 @@ void pallet3d_draw(GBContext* ctx, int width, int height, bool menu_open);
 bool pallet3d_event(const SDL_Event* event, bool menu_open);
 void pallet3d_shutdown();
 void pallet3d_capture(int width, int height);
+// Frame boundaries surround both the game scene and its ImGui composition.
+void pallet3d_begin_frame(GBContext* ctx,bool menu_open,const uint32_t* framebuffer=nullptr);
+void pallet3d_finish_frame(int width,int height,bool menu_open);
+struct PalletBlendInfo {bool active,target_3d,paused;float progress;};
+PalletBlendInfo pallet3d_blend();
 
 // Read-only diagnostic of the last presented frame.
 bool pallet3d_active();
@@ -27,6 +32,8 @@ bool pallet3d_dialogue_overlay();
 struct PalletMenuInfo {bool active,full,blurred;int regions;};
 PalletMenuInfo pallet3d_menu();
 bool pallet3d_warp_overlay();
+struct PalletBattleTransitionInfo {bool active,arena;int phase;float wipe;};
+PalletBattleTransitionInfo pallet3d_battle_transition();
 // Called only after a successful SDL savestate load (also used by private QA).
 void pallet3d_state_loaded(GBContext* ctx);
 bool pallet3d_load_fade();

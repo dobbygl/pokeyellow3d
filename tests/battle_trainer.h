@@ -65,7 +65,9 @@ inline int battle_trainer(GBContext* ctx) {
             }
         }
         auto info=pallet3d_battle();
-        if(info.active&&!info.full_overlay&&!info.trainer_class&&!battle::animation_running(ctx)) {
+        // Opening now has its own arena before either fighter's HUD exists.
+        // Exact fighter comparisons apply once the original battle is ready.
+        if(info.active&&battle::ready(ctx)&&!info.full_overlay&&!info.trainer_class&&!battle::animation_running(ctx)) {
             ++frames;
             run.require(info.enemy_image==battle::fingerprint(battle::portrait(ctx,battle::Enemy,info.enemy_species)),"enemy portrait tracks trainer replacement");
             run.require(info.player_image==battle::fingerprint(battle::portrait(ctx,battle::Player,info.player_species)),"player portrait tracks current fighter");

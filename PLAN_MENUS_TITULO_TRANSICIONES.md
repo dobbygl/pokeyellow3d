@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: A1, A2, A3 y C1 completadas y verificadas. B1, B2, C2 y C3 pendientes.
+Fecha: 2026-09-20. Estado: goal pausado por petición del usuario. A1, A2, A3, C1 y C2 completadas y verificadas; C3 parcialmente implementada; B1 y B2 pendientes.
 
 ## Análisis del estado actual
 
@@ -235,8 +235,8 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Un encuentro salvaje en Ruta 1 y un combate de entrenador en Ruta 22 se graban sin frames 2D entre mundo y arena.
-- [ ] La sincronía con la música de combate se conserva: el primer frame de arena coincide con el primer frame original de HUD.
+- [x] Un encuentro salvaje en Ruta 1 y un combate de entrenador en Ruta 22 se graban sin frames 2D entre mundo y arena.
+- [x] La sincronía con la música de combate se conserva: el primer frame de arena coincide con el primer frame original de HUD.
 
 ### Fase C3: fundido cruzado 3D y 2D y casos especiales
 
@@ -556,3 +556,93 @@ Criterios de aceptación:
 - Esto cierra los menús del mundo. El título/nueva partida, entrada/salida de
   combate y los fundidos generales de 3D/2D siguen pendientes en B1/B2 y C2/C3.
   El objetivo completo permanece activo.
+
+### Integración de C2, 2026-09-20
+
+- `battle_transition_state.h` reconoce las llamadas originales de entrada,
+  barrido, presentación, bucle y salida; verifica también destino y banco de
+  las llamadas lejanas. El entrenador mantiene `wIsInBattle=0` durante su
+  barrido: el flag por sí solo no puede identificarlo.
+- Trazas originales en `build/qa/ui-c2/probe/`: Ruta 1 usa 108 frames de
+  destellos y 30 de barrido; el rival de Ruta 22 usa 153 frames de espiral sin
+  esos destellos. Los 571 frames hasta el antiguo `ready()` no son la duración
+  del barrido. La escritura de E4 precede en un frame al primer cuadro visible.
+- La cámara se acerca sobre las mallas retenidas, con desenfoque radial y
+  progreso derivado de las escrituras de tiles del barrido original. La arena
+  arranca al aparecer el cuadro original y permanece durante la presentación
+  y los menús completos. Las pantallas de equipo y mochila se enmarcan sobre
+  la arena atenuada. El retorno vivo de `EndOfBattle` cubre el frame en que el
+  flag ya está borrado y todavía no ha comenzado el warp de regreso.
+- Primer pase completo aprobado en `build/qa/ui-battles-ghqoTa/`, con encuentro
+  salvaje y entrenador en ambas cámaras: primer HUD/arena en los frames 224
+  y 250 respectivamente, sin huecos de cobertura ni escrituras de memoria.
+  Capturas de desarrollo revisadas en `trainer-ortho/logs/review.png` y
+  `build/qa/ui-c2/composed/wild/logs/review.png`.
+- `tests/ui_battles_qa.sh ROM ROUTE1_10_28 ROUTE22_30_5` graba ambos encuentros
+  en ambas cámaras. Comprueba memoria, GL, controles neutros y mallas/cámara
+  residentes; `check_battle_timing.py` comprueba sincronía, duraciones y paridad
+  exacta de las trazas del motor entre cámaras. La prueba `battle_transition`
+  cubre las llamadas de los ocho barridos, pila, bancos y latencia del LCD.
+- C2 aún no se da por cerrada: falta terminar la repetición con el último
+  ajuste del desvanecimiento de los menús y las regresiones generales.
+
+### Cierre de C2, 2026-09-20
+
+- Batería final **PASS** en `build/qa/ui-battles-0luMpy/`; resumen en
+  `build/qa/logs/ui-c2-battles-final.log`. Los cuatro recorridos suman **20.514
+  frames cubiertos**, con GL, memoria y controles comprobados por frame.
+  La cámara base y las mallas del mundo permanecen intactas durante el combate.
+- `logs/timing.txt`: 30 frames de barrido y 108 de destellos en Ruta 1;
+  153 de barrido y ninguno de esos destellos en Ruta 22. Primer cuadro/arena
+  exactamente en 224 y 250, respectivamente, en ambas cámaras. Se conservan
+  las trazas originales del motor, pila y tiles entre las dos cámaras y frente
+  al renderer anterior (`logs/original-comparison.txt`). No se altera el reloj
+  del juego ni sus acciones para obtener la presentación.
+- Grabaciones `original-intro.mp4` y `composed.mp4` en los cuatro subdirectorios
+  de la batería. Capturas de entrada, presentación, menú y regreso revisadas en
+  `logs/{wild,trainer}-{ortho,fp}-review.png`, también copiadas a
+  `build/qa/logs/ui-c2-{wild,trainer}-{ortho,fp}.png`.
+- El cierre de los menús completos mantiene su marco durante todo el
+  desvanecimiento. La información pública de la arena ya refleja también su
+  presentación temprana, antes de que estén listos ambos combatientes; las
+  comprobaciones exactas de retratos siguen esperando los HUD originales.
+- Regresiones completas aprobadas:
+  - Mundo: `build/qa/kanto-DYkIsY/`; las 38 capturas exteriores son idénticas
+    a A2/A3, según `logs/exterior-comparison.txt` de la batería de C2.
+  - Primera persona: `build/qa/firstperson-KiQzeG/`, incluidos controles,
+    paridad, regreso al mundo, vistas y benchmark.
+  - Interiores: `build/qa/interiors-OKLjRa/`, recorridos y 179 mallas.
+  - Combates: `build/qa/battles-tPhG0a/`, captura, cambios, entrenador,
+    debilitamiento, efectos y respaldo LCD original.
+  - Menús: `build/qa/ui-menus-R28lDE/`, las ocho variantes y comparación
+    exacta de los píxeles originales.
+  - C1: `build/qa/ui-transitions-3a8Gs1/`, puertas, escaleras, ascensor,
+    regreso desde blanco y cargas, con las cinco trazas de duración aprobadas.
+  - CTest 15/15. Runtime descargado sin cambios; `git diff --check` limpio.
+- `build/pokeyellow3d` y la documentación están actualizados. C2 queda cerrada.
+  El goal completo sigue activo: faltan C3 (fundidos generales y viajes) y
+  B1/B2 (título, menú principal, nueva partida e intro).
+
+### Punto de pausa: avance de C3, 2026-09-20
+
+- Goal pausado por petición del usuario; este registro permite retomar el
+  trabajo sin dar por cerrada C3 ni el objetivo completo.
+- Compositor de fundidos de 200 ms entre frames completos 3D/2D, después del
+  dibujo de ImGui. Conserva la imagen mezclada al invertir F2 y congela el
+  progreso al perder foco o abrir Esc, sin copiar el menú de ajustes al fondo.
+  Los controles relativos permanecen neutros durante el fundido.
+- Compilación y CTest **16/16 aprobados**. La batería
+  `tests/ui_crossfade_qa.sh` termina con **PASS** en
+  `build/qa/ui-crossfade-5bOG41/`; registro:
+  `build/qa/logs/ui-c3-crossfade.log`. Cubre mundo, combate y puerta en ambas
+  cámaras, menús, comparación de píxeles, inversión de F2 y pausa por foco/Esc.
+  Los modos no soportados se comprueban mediante flags controlados en fixtures
+  privadas: no equivalen a recorridos reales de link, tutorial o Safari.
+- Pendiente al reanudar: revisar visualmente las capturas de esta batería;
+  comprobar Vuelo Ciudad Verde→Paleta, Teletransporte y Excavar mediante el
+  motor original; verificar bicicleta/surf y pausa durante carga de estado;
+  ejecutar la regresión completa posterior a C3 y documentar sus resultados.
+  Revisar también la validez del mapa retenido al entrar en combate tras
+  desplazarse con F2 desactivado. Después quedan B1/B2 y la validación final.
+- Las regresiones completas anotadas en el cierre de C2 preceden a estos
+  cambios de C3; no se presentan como validación de la implementación parcial.

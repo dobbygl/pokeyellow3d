@@ -12,6 +12,7 @@ float overlay_alpha=0,effect_time=0;
 int effect_id=0,effect_actor=0;
 battle::Effect effect_kind=battle::Effect::Original;
 bool capture_effect=false;
+bool framed_overlay=false;
 int trainer_class=0;
 int terrain=0; // dirt, grass, water, cave, gym
 bool terrain_known=false;
@@ -32,7 +33,7 @@ void remember_terrain(const GBContext* ctx) {
     terrain_known=true;
 }
 void reset() {
-    portraits={};last_cycles=0;shown=false;full_overlay=false;
+    portraits={};last_cycles=0;shown=false;full_overlay=framed_overlay=false;
     overlay_alpha=effect_time=0;effect_id=effect_actor=0;effect_started=0;
     effect_kind=battle::Effect::Original;capture_effect=false;trainer_class=0;
 }
@@ -147,7 +148,7 @@ void panel(const GBContext* ctx,bool enemy,float w,float h) {
         }
     }
 }
-void draw(GBContext* ctx,int w,int h,bool menu_open) {
+void draw(GBContext* ctx,int w,int h,bool menu_open,bool opening=false) {
     if(!terrain_known||terrain_map!=pallet::read(ctx,pallet::Map)||terrain_x!=pallet::read(ctx,pallet::X)||
        terrain_z!=pallet::read(ctx,pallet::Y)||(last_cycles&&ctx->cycles<last_cycles))remember_terrain(ctx);
     initialize_texture();glBindTexture(GL_TEXTURE_2D,texture);
@@ -157,7 +158,8 @@ void draw(GBContext* ctx,int w,int h,bool menu_open) {
         effect_started=ctx->cycles;effect_kind=battle::Effect::Original;capture_effect=false;
     }
     last_cycles=ctx->cycles;shown=true;
-    bool intro=battle::trainer_intro(ctx);trainer_class=intro?battle::read(ctx,0xd030):0;
+    bool intro=battle::trainer_intro(ctx)||(opening&&battle::normal(ctx)&&battle::read(ctx,battle::IsInBattle)==2&&battle::read(ctx,0xcfe7)==255);
+    trainer_class=intro?battle::read(ctx,0xd030):0;
     bool animation=battle::animation_running(ctx);
     bool cached=portraits[0].fingerprint&&portraits[1].fingerprint&&
         portraits[0].species==battle::read(ctx,0xd013)&&portraits[1].species==battle::read(ctx,0xcfe4);
@@ -174,10 +176,13 @@ void draw(GBContext* ctx,int w,int h,bool menu_open) {
     capture_effect=cached&&battle::capture_running(ctx);
     effect_kind=tail?battle::Effect::Self:animation&&cached&&!(battle::read(ctx,0xd354)&0x80)?battle::move(ctx,id).presentation:battle::Effect::Original;
     bool effect=capture_effect||effect_kind!=battle::Effect::Original;
-    full_overlay=!intro&&!effect&&(animation||!battle::rectangle(ctx,battle::Enemy,true)||!battle::rectangle(ctx,battle::Player,true));
+    full_overlay=!opening&&!intro&&!effect&&(animation||!battle::rectangle(ctx,battle::Enemy,true)||!battle::rectangle(ctx,battle::Player,true));
     overlay_alpha+=std::clamp((full_overlay?1.f:0.f)-overlay_alpha,-dt*12,dt*12);
+    if(full_overlay)framed_overlay=!animation;
+    if(overlay_alpha==0)framed_overlay=false;
     for(int i=0;i<2;i++) {
         auto m=battle::mon(ctx,i==1);auto& p=portraits[i];
+        if(opening&&!intro&&!i&&!battle::name_matches(ctx,0xd008,10,7)){p={};continue;}
         if(intro) {
             if(!i){p={};continue;}
             if(p.species!=-trainer_class){p={};p.species=-trainer_class;}
@@ -245,10 +250,17 @@ void draw(GBContext* ctx,int w,int h,bool menu_open) {
     for(int i=0;i<3;i++)glDisableVertexAttribArray(i);
     glBindBuffer(GL_ARRAY_BUFFER,0);glBindTexture(GL_TEXTURE_2D,0);glUseProgram(0);glDisable(GL_DEPTH_TEST);glViewport(0,0,w,h);
     if(menu_open)return;
-    if(overlay_alpha==0&&!intro){panel(ctx,true,float(w),float(h));panel(ctx,false,float(w),float(h));}
+    if(overlay_alpha==0&&!intro) {
+        if(!opening||battle::name_matches(ctx,0xcfd9,1,0))panel(ctx,true,float(w),float(h));
+        if(!opening||battle::name_matches(ctx,0xd008,10,7))panel(ctx,false,float(w),float(h));
+    }
     if(intro) {
         auto name=battle::text(ctx,0xd049);
         ImGui::GetForegroundDrawList()->AddText(nullptr,22,{24,24},IM_COL32(245,241,216,255),name.c_str());
+    }
+    if(framed_overlay&&overlay_alpha>0) {
+        scene_filter::capture(w,h);scene_filter::draw(w,h);
+        lcd_overlay::framed(gb_get_framebuffer(ctx),float(w),float(h),overlay_alpha);return;
     }
     lcd_overlay::draw(gb_get_framebuffer(ctx),overlay_alpha>0?lcd_overlay::Full:lcd_overlay::Bottom,
         float(w),float(h),overlay_alpha>0?overlay_alpha:1,overlay_alpha==0);

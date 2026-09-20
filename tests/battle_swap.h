@@ -10,7 +10,7 @@ inline int battle_swap(GBContext* ctx) {
     int checked=0;
     auto tick=[&]() {
         run.tick();auto info=pallet3d_battle();
-        if(info.active&&!info.full_overlay&&!battle::animation_running(ctx)) {
+        if(info.active&&battle::ready(ctx)&&!info.full_overlay&&!battle::animation_running(ctx)) {
             run.require(info.player_species==run.read(0xd013)&&info.enemy_species==run.read(0xcfe4),"billboard species agrees with live engine");
             run.require(info.player_image==battle::fingerprint(battle::portrait(ctx,battle::Player,info.player_species)),"uploaded player portrait agrees with VRAM");
             run.require(info.enemy_image==battle::fingerprint(battle::portrait(ctx,battle::Enemy,info.enemy_species)),"uploaded enemy portrait agrees with VRAM");++checked;

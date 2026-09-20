@@ -395,8 +395,9 @@ tests/ui_transitions_qa.sh build/roms/pokeyellow.gbc \
 El script copia las entradas a una carpeta nueva, graba vídeos con `ffmpeg`,
 compara el brillo de los píxeles y comprueba cámara, mallas, GL, cobertura y
 memoria por frame. `check_ui_traces.py` comprueba las duraciones medidas.
-Esto cubre fundidos de mapa y la vuelta desde blanco; el efecto de entrada en
-combate, el fundido F2 y los viajes de Vuelo siguen en las fases C2/C3.
+Esto cubre fundidos de mapa y la vuelta desde blanco. La entrada en combate
+se describe en C2 más abajo. El fundido F2 está implementado en el avance de
+C3; los viajes de Vuelo siguen pendientes de validación.
 
 ### Menús del mundo (A2/A3)
 
@@ -436,4 +437,43 @@ desarrollo de la validación final y sus regresiones.
 | Puertas, escaleras y ascensor reconocidos | Fundido 3D derivado del BGP del motor |
 | Cargar un savestate de otro mapa | Fundido breve a negro de la presentación |
 | Intro, título, link, tutorial y Safari | LCD original; fases B y C pendientes |
-| F2 manual y huecos de detección de combate | Cambio inmediato; C2/C3 pendientes |
+| Entrada en combate normal | Destellos BGP y acercamiento con desenfoque radial; arena desde el primer cuadro original |
+| Equipo y mochila durante el combate | LCD enmarcado sobre la arena atenuada y desenfocada |
+| Salida de combate normal | Fin de combate y fundido del mundo compuestos sin hueco 2D |
+| F2 manual | Fundido de 200 ms entre frames completos; C3 parcialmente implementada |
+
+### Entrada y salida de combate (C2)
+
+El detector verifica las llamadas originales de entrada y fin de combate en
+ROM y en la pila. Contra entrenadores empieza antes de `wIsInBattle`, que el
+juego activa después del barrido. El zoom modifica una copia de la proyección;
+la cámara y las mallas del mapa quedan retenidas para el regreso. El progreso
+del barrido sigue los tiles que escribe el motor, sin un temporizador externo.
+
+La primera arena coincide con el primer cuadro de texto visible del LCD,
+incluido el frame de latencia después de la escritura de BGP. Los dos Pokémon
+no tienen que estar listos para presentar esa arena. La mochila y el equipo
+usan el mismo marco que los menús del mundo, también mientras se desvanecen.
+
+```sh
+tests/ui_battles_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/battles-LojUdN/logs/route22-trainer.state
+```
+
+Las fixtures privadas sitúan al jugador en Ruta 1 `(10,28)` y ante el rival
+en Ruta 22 `(30,5)`. El script copia sus entradas, graba ambos encuentros en
+ambas cámaras y contrasta cobertura, tiempos, memoria, GL, controles y paridad
+del motor. Conserva `original-intro.mp4`, `composed.mp4`, capturas y CSV dentro
+de cada carpeta de prueba. La batería específica pasa en
+`build/qa/ui-battles-0luMpy/`, junto a las regresiones generales y CTest 15/15
+registrados en el cierre de C2 de `PLAN_MENUS_TITULO_TRANSICIONES.md`.
+
+### Fundidos generales (C3, trabajo pausado)
+
+F2 mezcla el frame completo, incluidos los menús del juego. Invertir el cambio
+conserva la imagen intermedia; Esc y la pérdida de foco congelan su progreso.
+La batería `tests/ui_crossfade_qa.sh ROM PALLET_9_7 READY_BATTLE` pasa en
+`build/qa/ui-crossfade-5bOG41/`, con seis escenarios en ambas cámaras y CTest
+16/16. C3 sigue abierta: faltan viajes reales, revisión visual y regresión
+completa. El punto de reanudación está registrado en el plan.

@@ -57,15 +57,16 @@ struct QaWalk {
         require(glGetError()==GL_NO_ERROR,"OpenGL");
         require(before.unchanged(ctx),"read-only WRAM, VRAM and framebuffer");
         if(pallet3d_warp_overlay())require((fade::warp(ctx)||state==pallet::View::Transition)&&!read(pallet::Battle),"warp identified by a live ROM-validated CALL");
-        require(pallet3d_active()==(render_enabled&&(state==pallet::View::Overworld || state==pallet::View::Battle || pallet3d_warp_overlay() || pallet3d_menu().active || (state==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx)))),"scene selection");
+        auto blend=pallet3d_blend();
+        require(pallet3d_active()==(blend.active||(render_enabled&&(state==pallet::View::Overworld || state==pallet::View::Battle || pallet3d_battle_transition().active || pallet3d_warp_overlay() || pallet3d_menu().active || (state==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx))))),"scene selection");
         if(pallet3d_menu().active)require(!read(pallet::Battle)&&pallet3d_world_frame().map==read(pallet::Map)&&
             (menu_state::running(ctx)||state==pallet::View::Dialogue||state==pallet::View::Transition),"menu has a valid retained scene and positive lifetime");
         require(pallet3d_stats().resident_maps<=5,"bounded mesh cache");
-        if(pallet3d_firstperson()&&state==pallet::View::Overworld&&pallet3d_active()&&!previous_3d)
+        if(pallet3d_firstperson()&&state==pallet::View::Overworld&&pallet3d_active()&&(!blend.active||blend.target_3d)&&!previous_3d)
             require(std::abs(firstperson::angle_delta(pallet3d_camera().yaw,firstperson::facing_yaw(read(0xc109))))<.0001f,"first frame returning to FP matches engine facing");
         // A composed dialogue keeps the FP camera alive; a battle has its own
         // camera and must count as leaving first person even when it is 3D.
-        previous_3d=pallet3d_active()&&state!=pallet::View::Battle;
+        previous_3d=pallet3d_active()&&(!blend.active||blend.target_3d)&&state!=pallet::View::Battle&&!pallet3d_battle_transition().active;
         if(qa_frame_observer)qa_frame_observer(ctx,frame);
     }
     void wait(int count) {for(int i=0;i<count;i++)tick();}

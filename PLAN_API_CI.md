@@ -1,6 +1,6 @@
 # Plan: runtime extension API and CI on GitHub Actions
 
-Date: 2026-09-20. Status: partial implementation; goal active; runtime API migration in progress. Develops points 1 and 2
+Date: 2026-09-20. Status: phases 1–3 verified; phases 4–5 in progress; goal active. Develops points 1 and 2
 of `PLAN_MEJORAS.md`.
 
 ## Goal and scope
@@ -97,9 +97,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] The fork's runtime builds and runs a game with no registered presentation with identical behavior.
-- [ ] A test presentation in the fork itself receives frame, event, shutdown, and capture in the expected order.
-- [ ] The version constant is documented in the runtime's README.
+- [x] The fork's runtime builds and runs a game with no registered presentation with identical behavior.
+- [x] A test presentation in the fork itself receives frame, event, shutdown, and capture in the expected order.
+- [x] The version constant is documented in the runtime's README.
 
 ## Phase 2: migrating the 3D layer to the interface
 
@@ -118,10 +118,10 @@ Work:
 
 Acceptance criteria:
 
-- [ ] `cmake/Pallet3D.cmake` contains no textual-replacement calls.
-- [ ] The full CTest suite and the three `world_qa.sh`, `firstperson_qa.sh`, and `interiors_qa.sh` suites pass locally.
-- [ ] The 38 outdoor captures and the interior captures are identical to those of the previous version.
-- [ ] Recording and replaying input with relative controls produces the same final state as before.
+- [x] `cmake/Pallet3D.cmake` contains no textual-replacement calls.
+- [x] The full CTest suite and the three `world_qa.sh`, `firstperson_qa.sh`, and `interiors_qa.sh` suites pass locally.
+- [x] The 38 outdoor captures and the interior captures are identical to those of the previous version.
+- [x] Recording and replaying input with relative controls produces the same final state as before.
 
 ## Phase 3: synthetic ROM and tests without the ROM
 
@@ -189,9 +189,9 @@ Work:
 Acceptance criteria:
 
 - [x] A push to `main` and a test pull request show the workflow passing on Linux. Windows and macOS jobs are defined but disabled: the pinned runtime includes POSIX headers unconditionally and uses C++20 designated initializers under the project's C++17 standard; macOS lacks GLES2 headers.
-- [ ] A pull request that breaks the synthetic reader fails in CI with the test flagged.
+- [x] A pull request that breaks the synthetic reader fails in CI with the test flagged.
 - [ ] A `v0.1.0` tag produces a release with Linux binaries (Windows once the runtime is portable).
-- [ ] Total workflow time with a warm cache is under ten minutes.
+- [x] Total workflow time with a warm cache is under ten minutes.
 
 ## Phase 5: contribution to the original project
 
@@ -331,3 +331,88 @@ accepts the version tag as well as commit hashes.
 - The complete post-migration gate is running via
   `bash build/qa/logs/run-api-regressions.sh`; phase 1/2 checkboxes remain open
   until its results and capture comparisons have been audited.
+
+
+### CI positive and negative evidence, 2026-09-20
+
+- Positive migration PR: https://github.com/dobbygl/pokeyellow3d/pull/1 .
+  Run https://github.com/dobbygl/pokeyellow3d/actions/runs/35524960932 passes
+  GCC, Clang and 2D, fetching the public runtime tag. Linux job durations:
+  GCC 67 seconds, Clang 48 seconds, 2D 157 seconds. Windows/macOS remain
+  explicitly disabled; their status is not presented as a pass.
+- Negative reader PR: https://github.com/dobbygl/pokeyellow3d/pull/2 .
+  Its isolated one-line mutation accepted oversized images. Run
+  https://github.com/dobbygl/pokeyellow3d/actions/runs/35525023315 fails
+  `rom_reader_synthetic` in both Linux compilers with
+  `FAIL: an oversized image must be refused`; the other seven tests pass.
+  The PR is closed, unmerged. Main and the integration branch keep the valid
+  reader. Logs: `build/qa/logs/ci-negative-reader.log`.
+- Formatting, warnings-as-errors, portability and release remain pending
+  before the complete CI/delivery work can close.
+
+
+Main branch protection is now enabled with strict, required GitHub Actions
+checks `Linux (gcc)`, `Linux (clang)` and `Linux (2D, POKEYELLOW_3D=OFF)`, also
+for administrators. Force pushes and deletion are disabled. Existing reviews
+were not required and no human-review gate was added. The API response is
+retained in `build/qa/logs/main-protection-after.json`.
+
+
+The second attempt of the positive CI run passes with restored FetchContent
+and ccache entries. It ran from 17:18:43 to 17:21:24 UTC (**2m41s total**),
+below ten minutes. Evidence: `build/qa/logs/api-ci-warm.json` and
+`api-ci-warm.log`; GitHub run 35524960932, attempt 2. Formatting and
+warnings-as-errors still remain before phase 4 can close.
+
+
+### Closure of phases 1–2, 2026-09-20
+
+The complete API regression batch exits 0 (`api-regressions.exit`): all
+thirteen `tests/*_qa.sh` suites pass, followed by CTest **24/24**. The separate
+build without ROMs passes **8/8**. Logs are under `build/qa/logs/api-*.log`.
+
+- All **38 exterior** captures match the pre-API AREA checkpoint exactly:
+  `kanto-OW0YIo` versus `kanto-pv52hf`; report `api-exterior-comparison.txt`.
+- All **179 interior catalog** captures match directly:
+  `interiors-NG0KR3` versus `interiors-lPijAF`; report
+  `api-interior-catalog-comparison.txt`.
+- The normal-clock journey captures again have five differences, exactly the
+  five already identified before migration: `pallet-return`, `lab-return`,
+  `mother-dialogue-fp`, `town-route1`, `mart-2f-camera`. Their real-time camera
+  easing prevents treating independent wall-clock runs as exact references.
+- For the complete comparison, the same current smoke harness was linked
+  against the archived pre-API library and the API library, using a **QA-only**
+  linker wrapper for `ImGui::NewFrame` that fixes `DeltaTime` to 1/60 second.
+  It does not change guest cycles, input, SDL time or the production binaries.
+  Both complete interior journeys pass. All **215 captures**, including the
+  five above, are now byte-identical: `interiors-pymvpu` versus
+  `interiors-Zo43uK`; report `api-fixed-interior-comparison.txt`.
+  No reference image was replaced to obtain this result.
+- Recording/replay parity is independently proven by identical recordings
+  and complete start/end savestate files, as recorded above.
+- The runtime tag resolves to commit
+  `813f689a42111112fdeb337f9f4fdb919a31bcc0`. Its contract test, no-extension
+  generated-game comparison and actual GL surface comparison pass.
+
+Reproducible local commands (private fixtures and archived libraries retained):
+
+```sh
+bash build/qa/logs/run-api-regressions.sh
+bash build/qa/logs/run-api-fixed-interiors.sh
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+```
+
+The fixed-time wrapper is `build/qa/api-reference/fixed_imgui_time.cpp`; both
+helpers use `-Wl,--wrap=_ZN5ImGui8NewFrameEv`. The pre-API helper links
+`libgbrt-before.a` and a no-op registration shim; the API helper links the
+current runtime and performs real API registration. Both link the same
+`pallet_render_smoke.cpp.o` and cartridge archive. This isolates the integration
+change while preserving per-frame memory checks in the journeys.
+
+The local build uses the clean fork worktree at the tag's exact commit;
+GitHub CI independently fetched and built the public tag with no source
+override. Upstream remains at the original pinned revision. Windows work is
+isolated on `windows-portability`; only the C++17 initializer issue has been
+fixed and checked on Linux so far. POSIX networking/directory access and the
+Windows GLES backend still need work and actual Windows validation.

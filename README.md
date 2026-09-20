@@ -1,5 +1,17 @@
 # pokeyellow
 
+**Local Kanto 3D prototype:** 36 connected outdoor maps, Viridian Forest and
+Vermilion Dock, with ROM-derived terrain, buildings and a bounded mesh cache.
+Press **F3** for first-person view: **W** moves forward, **A/D** turn and **S**
+turns around. All 179 reachable interiors load on demand, with real house,
+healing, shopping, stairs, elevator and cave journeys verified. Unclassified
+interior art keeps its original flat texture. Normal battles have an initial
+3D arena with the original portraits and menus; party-change validation and
+battle effects are still in progress in [PLAN_INTERIORES_COMBATES.md](PLAN_INTERIORES_COMBATES.md).
+The default local build produces
+`build/pokeyellow3d`. See [PALLET3D.md](PALLET3D.md) for scope, controls and tests.
+Build with `-DPOKEYELLOW_3D=OFF` for the original `pokeyellow` executable below.
+
 Static recompilation of Pokemon Yellow into portable C, built with
 [GB-Recomp/gb-recompiled](https://github.com/GB-Recomp/gb-recompiled).
 
@@ -18,7 +30,7 @@ cmake ..
 cmake --build . -j$(nproc)
 ```
 
-This produces a `pokeyellow` executable.
+This produces `pokeyellow3d` by default (`pokeyellow` with `-DPOKEYELLOW_3D=OFF`).
 
 ## Run
 
@@ -30,7 +42,7 @@ Drop a Pokemon Yellow ROM at `roms/pokeyellow.gbc` next to the executable:
 ```sh
 mkdir -p roms
 cp /path/to/pokeyellow.gb roms/pokeyellow.gbc
-./pokeyellow
+./pokeyellow3d
 ```
 
 The launcher auto-starts when only one game is registered, so you go

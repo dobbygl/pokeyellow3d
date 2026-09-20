@@ -221,9 +221,10 @@ Esto no equivale a haber jugado 165 combates distintos.
   produciendo ese framebuffer. Los diálogos, combates y warps soportados se
   componen en el renderer; inicialización, F2 y pantallas aún no reconocidas
   conservan la ruta original.
-- `cmake/Pallet3D.cmake` genera una copia adaptada del frontend SDL dentro de
-  `build/`. No edita el runtime descargado ni el C generado del juego. Los
-  puntos de inserción se comprueban y fallan explícitamente si cambian.
+- `cmake/Pallet3D.cmake` comprueba la versión de `gb_presentation.h` y añade
+  el renderer y su adaptador. El launcher registra los callbacks antes de
+  arrancar SDL. No genera copias del frontend ni modifica fuentes descargadas.
+  El runtime se fija al tag `presentation-api-v1` de `dobbygl/gb-recompiled`.
 
 Las listas de colisión, hierba, cornisas y pares de tiles se leen de la ROM.
 La colisión del juego sigue siendo la única autoridad. Las cornisas originales
@@ -339,9 +340,8 @@ activa la medición. `PALLET3D_TRACE=1` registra cambios de vista y coordenadas;
   activos usan su posición/orientación disponibles y la animación que actualice
   el motor. No se ha jugado toda la historia de principio a fin: hay auditoría
   completa de geometría y recorridos representativos del motor.
-- El hook SDL depende del commit fijado. Una interfaz formal de renderizado
-  upstream sería preferible para futuras actualizaciones; cambiar de fork no
-  es necesario para esta entrega.
+- La integración SDL usa la API versionada del fork. La contribución upstream
+  y la validación de portabilidad siguen en `PLAN_API_CI.md`.
 
 Véanse [PLAN_KANTO_3D.md](PLAN_KANTO_3D.md),
 [PLAN_PRIMERA_PERSONA.md](PLAN_PRIMERA_PERSONA.md) y

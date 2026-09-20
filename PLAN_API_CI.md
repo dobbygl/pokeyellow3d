@@ -1,6 +1,6 @@
 # Plan: runtime extension API and CI on GitHub Actions
 
-Date: 2026-09-20. Status: partial implementation; goal paused for commit and push. Develops points 1 and 2
+Date: 2026-09-20. Status: partial implementation; goal active; runtime API migration in progress. Develops points 1 and 2
 of `PLAN_MEJORAS.md`.
 
 ## Goal and scope
@@ -113,7 +113,7 @@ Work:
 - `cmake/Pallet3D.cmake` is reduced to: checking the API version, adding
   `src/pallet3d.cpp` to the executable, and setting the depth buffer size
   through the attributes callback.
-- Remove the generated `pallet-runtime` directory and every reference to it
+- Remove the generated SDL source directory and every reference to it
   in documentation and scripts.
 
 Acceptance criteria:
@@ -155,9 +155,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] `ctest -LE rom` passes in a build directory without `roms/`.
-- [ ] No synthetic test contains bytes copied from the real ROM; the generator is purely procedural.
-- [ ] `render_preview_synthetic` passes with `SDL_VIDEODRIVER=offscreen` over software Mesa.
+- [x] `ctest -LE rom` passes in a build directory without `roms/`.
+- [x] No synthetic test contains bytes copied from the real ROM; the generator is purely procedural.
+- [x] `render_preview_synthetic` passes with `SDL_VIDEODRIVER=offscreen` over software Mesa.
 
 ## Phase 4: CI workflow
 
@@ -274,3 +274,60 @@ Acceptance criteria:
 - CI workflows already exist; the initial-state description above is
   historical. The remaining CI, test PR, release and upstream validation
   criteria are not claimed complete by this checkpoint.
+
+
+### Phase 3 acceptance audit and phase 1 validation, 2026-09-20
+
+Phase 3 is closed using `build/qa/logs/dex-a3-no-rom.log` (8/8, independent
+build directory without ROMs) and `dex-a3-software-render.log` (llvmpipe,
+30 preview frames plus three live frames). `tests/synthetic_rom.h` generates
+its graphics, map blocks and records procedurally; game-format addresses and
+IDs describe the protocol, not copied ROM assets. The procedural portrait
+bitstream covers all blend modes and mirroring. The same change passed all
+thirteen real-ROM QA suites and CTest 24/24, recorded in `PLAN_POKEDEX_PC.md`.
+
+The fork's `presentation-api-v1` tag adds `begin_frame` (skip prediction) and
+`state_loaded` (successful explicit loads) alongside the planned callbacks;
+these preserve existing integration behavior. Its contract CTest passes,
+including per-frame memory guards, failed-render recovery with letterboxing
+and perturbed GL state, recording, key release and savestate notifications.
+A procedural generated cartridge was regenerated and built against both
+runtimes; six captures from frames 1/30/60 are identical. Separate 480x320
+GL surface probes match SHA-256
+`8efb730749d0374bcdb00086127579af355c02e9c8042adba9f84cd20489b5dc`.
+Private fork logs: `logs/presentation-test.log`,
+`logs/presentation-game-comparison.txt`, `logs/presentation-surface-comparison.txt`.
+
+```sh
+# From the gb-recompiled fork, no commercial ROM required:
+cmake -S . -B build -G Ninja -DGBRT_PRESENTATION_TESTS=ON
+cmake --build build --target gb_presentation_test gbrecomp --parallel 4
+ctest --test-dir build -R presentation_api --output-on-failure
+```
+
+Phase 1/2 acceptance remains open until the game's post-migration regression
+gate completes. The last published game commit passed Linux CI:
+https://github.com/dobbygl/pokeyellow3d/actions/runs/35523876849 .
+
+
+### API migration: initial local checks, 2026-09-20
+
+`cmake/Pallet3D.cmake` now only verifies API version 1 and adds the renderer
+and adapter. `src/pallet_presentation.cpp` registers from the launcher and
+smoke harness, preserving depth attributes, composition, input and load hooks.
+The obsolete generated SDL copies have been removed. CI/release ref extraction
+accepts the version tag as well as commit hashes.
+
+- Build and CTest pass: **24/24** (`build/qa/logs/api-ctest.log`).
+- Separate ROM-free build: **8/8** (`api-no-rom.log`).
+- Complete first-person QA, including the new cycle-anchored replay: **PASS**
+  (`build/qa/firstperson-Bbkf91/`). Replay checks CPU registers/cycles, WRAM,
+  VRAM, ERAM, OAM, HRAM, I/O and the guest framebuffer.
+- The same harness was linked against the archived, unmodified pre-API runtime
+  library from the previous ROM-free build. Both the recording and its start
+  and end savestates are byte-identical to the API version; replay passes on
+  both. Evidence: `build/qa/logs/api-input-comparison.txt`,
+  `api-before-controls.log`, `api-before-replay.log`.
+- The complete post-migration gate is running via
+  `bash build/qa/logs/run-api-regressions.sh`; phase 1/2 checkboxes remain open
+  until its results and capture comparisons have been audited.

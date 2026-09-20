@@ -55,7 +55,7 @@ int main() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    // pallet3d clears and tests depth; the runtime patches the same value in.
+    // pallet3d clears and tests depth; the runtime attributes callback requests the same value.
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_Window* window = SDL_CreateWindow("pallet3d synthetic preview", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, Width, Height,

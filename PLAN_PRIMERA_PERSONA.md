@@ -225,7 +225,7 @@ five-map cache. No concurrent edits were made to the renderer.
   matrix, smoothing and the short path, perpendiculars, duration, engine
   confirmation, W, and a neutral mask outside the overworld and after
   stepping cycles back.
-- The SDL adaptation generates `build/pallet-runtime/platform_sdl.cpp`; it
+- The original SDL adaptation generated a private frontend copy; it
   does not change the downloaded sources or the game's C. The hooks check
   their anchor. The relative mask is independent of the scripts and is
   folded into manual recording the same way real controller directions are.

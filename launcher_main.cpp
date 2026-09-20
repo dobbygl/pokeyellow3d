@@ -15,6 +15,9 @@ extern "C" {
 #include <sys/stat.h>
 
 #include "platform_sdl.h"
+#ifdef POKEYELLOW_3D
+#include "src/pallet3d.h"
+#endif
 #include "imgui.h"
 #include "backends/imgui_impl_sdl2.h"
 #define IMGUI_IMPL_OPENGL_ES2
@@ -34,6 +37,12 @@ typedef struct {
 } GBLauncherGame;
 
 static int launch_pokeyellow(int argc, char* argv[]) {
+#ifdef POKEYELLOW_3D
+    if (!pallet3d_register()) {
+        fprintf(stderr, "Unsupported runtime presentation API\n");
+        return 1;
+    }
+#endif
     return pokeyellow_main(argc, argv);
 }
 

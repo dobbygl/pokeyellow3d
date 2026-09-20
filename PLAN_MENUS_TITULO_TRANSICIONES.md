@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: goal pausado por petición del usuario para commit y push. A1, A2, A3, C1 y C2 completadas y verificadas; C3 parcialmente implementada; B1 y B2 pendientes.
+Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, C1 y C2 completadas y verificadas; C3 parcialmente implementada; B1 y B2 pendientes.
 
 ## Análisis del estado actual
 

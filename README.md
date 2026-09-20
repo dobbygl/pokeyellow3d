@@ -135,7 +135,7 @@ The renderer interprets building heights and furniture visually. Unclassified in
 
 ## Development and validation
 
-The 3D layer reads the game state to draw the scene; it does not run a second gameplay simulation. The SDL integration is generated into the build directory by [`cmake/Pallet3D.cmake`](cmake/Pallet3D.cmake), leaving fetched runtime sources and generated game C untouched.
+The 3D layer reads the game state to draw the scene; it does not run a second gameplay simulation. The SDL integration registers the versioned runtime presentation API through [`src/pallet_presentation.cpp`](src/pallet_presentation.cpp). [`cmake/Pallet3D.cmake`](cmake/Pallet3D.cmake) checks API compatibility and adds the renderer without rewriting runtime sources or generated game C. The default runtime is the `presentation-api-v1` tag of `dobbygl/gb-recompiled`; `GBRT_URL` and `GBRT_REF` are configurable.
 
 | Location | Purpose |
 | --- | --- |

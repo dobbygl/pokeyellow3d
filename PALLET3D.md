@@ -34,8 +34,12 @@ barra de vida interpola las lecturas del motor. Texto y menús conservan el
 framebuffer original. Los movimientos complejos conservan su animación completa
 mediante una composición con fundido, sin duplicar los retratos. Link, tutorial,
 Safari y estados no reconocidos siguen en
-2D. En primera persona los cuadros de diálogo inferiores reconocidos se
-superponen al mundo 3D.
+2D. Los cuadros de diálogo inferiores reconocidos se superponen al mundo
+3D en ambas cámaras, con el HUD oculto mientras se lee. Los warps reconocidos
+conservan la escena saliente y siguen el fundido BGP del motor; la carga de un
+savestate en otro mapa hace un fundido breve a negro. El resto de la
+ampliación de menús, título y transiciones está en curso en
+`PLAN_MENUS_TITULO_TRANSICIONES.md`.
 
 | Tecla | Acción |
 | --- | --- |
@@ -65,8 +69,11 @@ ctest --test-dir build --output-on-failure
 
 Se necesitan las dependencias habituales del proyecto, SDL2 y OpenGL ES 2.
 `POKEYELLOW_3D=OFF` produce el ejecutable original `pokeyellow`.
-Las siete pruebas CTest se registran al configurar CMake con la ROM local en
-`build/roms/pokeyellow.gbc`; no se distribuye esa ROM.
+CTest registra siete pruebas sin ROM: controles, disposiciones de menús y
+cinco pruebas sintéticas. Al configurar con la ROM local en
+`build/roms/pokeyellow.gbc` añade siete pruebas, para un total de catorce.
+`ctest --test-dir build -LE rom --output-on-failure` ejecuta el grupo sin ROM;
+no se distribuye esa ROM.
 
 Para repetir la integración completa con las fixtures locales verificadas:
 
@@ -210,8 +217,9 @@ Esto no equivale a haber jugado 165 combates distintos.
 - Los píxeles de sprites solo se transfieren a GPU cuando cambian. Cuando el
   renderer 3D ya está inicializado y va a cubrir un exterior, la adaptación SDL
   evita subir y dibujar el framebuffer 2D que se descartaría. El juego sigue
-  produciendo ese framebuffer; inicialización, F2, menús, transiciones y combate
-  conservan su ruta de presentación original.
+  produciendo ese framebuffer. Los diálogos, combates y warps soportados se
+  componen en el renderer; inicialización, F2 y pantallas aún no reconocidas
+  conservan la ruta original.
 - `cmake/Pallet3D.cmake` genera una copia adaptada del frontend SDL dentro de
   `build/`. No edita el runtime descargado ni el C generado del juego. Los
   puntos de inserción se comprueban y fallan explícitamente si cambian.
@@ -311,8 +319,12 @@ activa la medición. `PALLET3D_TRACE=1` registra cambios de vista y coordenadas;
   evidencias de `PLAN_INTERIORES_COMBATES.md`. No incluye cámara libre ni alturas transitables nuevas. Primera persona conserva movimiento por
   casillas y cuatro direcciones de interacción; el ratón no gira al jugador.
 - Los cuadros inferiores con borde completo y mapa visible detrás conservan
-  el 3D en primera persona: se copian las filas 96–143 del framebuffer original.
-  Start, pantallas completas y disposiciones de texto no reconocidas pasan a 2D.
+  el 3D en ambas cámaras: `lcd_overlay.h` compone las filas 96–143 del
+  framebuffer original, con escala entera y caché de las regiones subidas.
+  Con una escena residente, Start y las ventanas reconocidas se superponen
+  al mundo. Equipo, mochila, PC, ficha, opciones, Pokédex y disposiciones no
+  reconocidas se enmarcan sobre esa escena atenuada y desenfocada. Cargar
+  directamente un estado de menú completo sin escena previa conserva el LCD.
   Las teclas son las originales mientras hay texto. Volver al exterior restaura
   la preferencia de cámara, sin pulsaciones relativas retenidas.
 - Pikachu puede ocupar gran parte de la vista al estar justo al lado del jugador.
@@ -338,3 +350,90 @@ Véanse [PLAN_KANTO_3D.md](PLAN_KANTO_3D.md),
 [Corte](https://github.com/pret/pokeyellow/blob/master/engine/overworld/cut.asm),
 [movimiento](https://github.com/pret/pokeyellow/blob/master/home/overworld.asm),
 [sprites](https://github.com/pret/pokeyellow/blob/master/engine/gfx/sprite_oam.asm).
+
+### Fundidos de mapa (C1)
+
+`src/fade_state.h` identifica las llamadas vivas de warp/carga en la pila y
+comprueba sus instrucciones en la ROM. `WorldFrame` conserva la matriz de
+cámara; las mallas residentes, los actores y su textura se dibujan sin releer
+los bloques o sprites del destino mientras se carga. El HUD y el contorno del
+jugador a través del tejado se ocultan durante la transición.
+
+El shader aplica `color × multiplicador + suma`, también al cielo y al fondo.
+Se usa la luminancia media de los cuatro tonos BGP, con peso 1/4 para cada uno:
+
+| BGP | Multiplicador | Suma | Presentación |
+| --- | ---: | ---: | --- |
+| E4 | 1 | 0 | Escena normal |
+| F9 | 1/2 | 0 | Fundido a negro |
+| FE | 1/6 | 0 | Fundido a negro |
+| FF | 0 | 0 | Negro completo |
+| 90 | 1/2 | 1/2 | Fundido a blanco |
+| 40 | 1/6 | 5/6 | Fundido a blanco |
+| 00 | 0 | 1 | Blanco completo |
+
+Los pasos F9/FE de las puertas y 40/90 de la vuelta desde blanco duran nueve
+frames en las trazas del runtime. Se lee BGP en cada frame; no se programa
+esa duración en el renderer. En puertas el motor restaura directamente E4
+tras el negro. La carga de un savestate es distinta: no tiene una curva del
+motor, por lo que el callback de carga correcta inicia dos mitades nominales
+de 90 ms y cambia la escena en un frame completamente negro. La preparación
+de texturas/mallas se añade a ese tiempo; el avance de la animación se limita
+por presentación para que una espera del driver no suprima los pasos visibles
+de la entrada. Las pruebas con caché fría tardan aproximadamente 300–350 ms.
+
+Reproducir con fixtures privadas (Paleta 9,8; centro comercial 1F 2,7; Ruta 1
+10,28 con equipo):
+
+```sh
+tests/ui_transitions_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/house.state \
+  build/qa/interiors-wt5ABt/mart-start.state \
+  build/qa/firstperson-9cB3FJ/route.state
+```
+
+El script copia las entradas a una carpeta nueva, graba vídeos con `ffmpeg`,
+compara el brillo de los píxeles y comprueba cámara, mallas, GL, cobertura y
+memoria por frame. `check_ui_traces.py` comprueba las duraciones medidas.
+Esto cubre fundidos de mapa y la vuelta desde blanco; el efecto de entrada en
+combate, el fundido F2 y los viajes de Vuelo siguen en las fases C2/C3.
+
+### Menús del mundo (A2/A3)
+
+`menu_state.h` mantiene la escena mediante llamadas de texto vivas verificadas
+en la ROM. `menu_layout.h` clasifica los bordes visibles, incluidos sus
+solapamientos; lo desconocido conserva el framebuffer completo dentro del
+marco. `scene_filter.h` aplica desenfoque y atenuación al fondo sin reconstruir
+la malla ni leer los buffers de mapa que usan las pantallas de equipo y PC.
+La escala del LCD es entera; a 800×720, las pantallas enmarcadas usan 3×.
+
+La batería privada de menús se reproduce con:
+
+```sh
+tests/ui_menus_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state
+```
+
+Requiere un estado del mundo con Pokédex, encargo entregado, Pikachu y otro
+Pokémon capturado, y al menos 200 de dinero. Comprueba Start, resumen y orden
+del equipo, mochila, ficha, opciones, Pokédex, guardado, curación, PC y compra
+en ambas cámaras, además de renombrar un Pokémon mediante el inspector de
+motes. Verifica cada píxel de las regiones compuestas y la ausencia
+de escrituras en WRAM/VRAM/framebuffer, errores GL y reconstrucciones durante
+pantallas completas. La partida original no se guarda ni sobrescribe.
+El registro de `PLAN_MENUS_TITULO_TRANSICIONES.md` distingue las pruebas de
+desarrollo de la validación final y sus regresiones.
+
+| Situación | Presentación |
+| --- | --- |
+| Mundo exterior e interiores compatibles | 3D, ortográfica o primera persona |
+| Texto inferior, Start, guardar, curar y comprar | Ventanas originales sobre el mundo 3D |
+| Equipo, resumen, mochila, PC, ficha, opciones, Pokédex y nombres desde el mundo | LCD original enmarcado sobre la última escena atenuada y desenfocada |
+| Disposición de menú desconocida con escena residente | Mismo encuadre completo; no se descarta texto |
+| Savestate de menú completo cargado sin escena previa | LCD original hasta disponer de una escena válida |
+| Combate normal y presentación del entrenador | Arena 3D y compositor de combate existente |
+| Animación compleja de combate | Animación LCD original sobre la arena |
+| Puertas, escaleras y ascensor reconocidos | Fundido 3D derivado del BGP del motor |
+| Cargar un savestate de otro mapa | Fundido breve a negro de la presentación |
+| Intro, título, link, tutorial y Safari | LCD original; fases B y C pendientes |
+| F2 manual y huecos de detección de combate | Cambio inmediato; C2/C3 pendientes |

@@ -28,7 +28,7 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
 - **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
-- **Original 2D at a keypress.** Press `F2` to switch presentation. Unsupported scenes and full-screen interfaces use the original framebuffer automatically.
+- **Original interfaces over a 3D world.** Dialogues and recognized windows retain the scene behind them; full-screen menus frame the original LCD over a dimmed, blurred background. Press `F2` for original 2D presentation.
 - **Bounded rendering work.** Outdoor meshes are cached for the current map and its immediate neighbors, with at most five resident maps.
 
 ## Screenshots
@@ -127,8 +127,8 @@ First person follows the original movement grid; it does not provide free moveme
 | First person | Movement, turning, transitions, dialogue overlays, and camera parity have dedicated checks. |
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
 | Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
-| Menus and transitions | Original 2D interfaces remain available; broader presentation work is planned. |
-| Pokédex and PC | Original interfaces remain in use; dedicated presentation work is planned. |
+| Menus and transitions | A1/A2/A3 and C1 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, and save-state transitions. Title-screen and additional transition work is pending. |
+| Pokédex and PC | Original screens can appear over a retained 3D background. Dedicated redesigned interfaces remain planned. |
 
 The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, water and vegetation are static, and neighboring-map NPCs are not simulated. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
 
@@ -143,12 +143,15 @@ The 3D layer reads the game state to draw the scene; it does not run a second ga
 | [`src/world_scene.h`](src/world_scene.h) / [`src/interior_scene.h`](src/interior_scene.h) | Outdoor geometry and interior classification |
 | [`src/firstperson.h`](src/firstperson.h) | Camera math and relative controls |
 | [`src/battle_state.h`](src/battle_state.h) / [`src/battle3d.h`](src/battle3d.h) | Battle state, portraits, arena, and effects |
+| [`src/lcd_overlay.h`](src/lcd_overlay.h) / [`src/menu_layout.h`](src/menu_layout.h) | Cached LCD uploads and original window layout classification |
+| [`src/menu_state.h`](src/menu_state.h) / [`src/scene_filter.h`](src/scene_filter.h) | Menu lifetime detection and retained background blur |
+| [`src/fade_state.h`](src/fade_state.h) | Palette tones and ROM-validated map transition detection |
 | [`tests/`](tests/) | State tests, map audits, rendering checks, and scripted journeys |
 | `pokeyellow_*.c` | Pre-generated game sources |
 
 ### Tests
 
-With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, CMake registers seven CTest checks: first-person controls, interior state, interior catalog, battle state, world state, outdoor geometry, and ROM data. Without that file, only the ROM-independent first-person test is registered. Reconfigure after adding the ROM.
+CMake always registers seven ROM-independent checks: first-person controls, menu layouts, and five synthetic-ROM tests, including a headless rendering check. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, seven additional tests cover interiors, battles, fades, world state, geometry, and ROM data, for 14 in total. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON
@@ -202,7 +205,7 @@ Link `pokeyellow_cart` into your launcher and register `pokeyellow_main(argc, ar
 | CMake cannot find SDL2, CURL, or GLES | Install the corresponding development packages, then reconfigure. |
 | `Pallet 3D: runtime integration point changed` | Use the pinned `GBRT_REF` below; a cached override may select an incompatible runtime. |
 | A menu or scene appears in 2D | Original interfaces and unsupported states intentionally use the 2D framebuffer. Press `F2` to check your presentation preference. |
-| CTest runs only one test | Add the matching ROM to `build/roms/`, then rerun CMake configuration. |
+| CTest omits the cartridge-backed tests | Add the matching ROM to `build/roms/`, then rerun CMake configuration. |
 
 The current runtime pin is `6581880fce60e6f139901a5942fc984e9c1db8ab`. Restore it with:
 

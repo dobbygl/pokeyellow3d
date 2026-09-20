@@ -18,7 +18,10 @@ ampliaciones posteriores. La arquitectura debe admitirlos sin exigir que se
 implementen para terminar este plan. El traslado a otro runtime tampoco es
 requisito de finalización.
 
-## Punto de partida verificado
+## Punto de partida verificado (antes de ejecutar las fases)
+
+Esta sección describe el prototipo original. El estado posterior y sus pruebas
+están en el registro de ejecución al final del documento.
 
 - Ejecutable actual: `build/pokeyellow3d`, SDL2 y OpenGL ES 2.
 - ROM inglesa UE, SHA-1 `cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1`.

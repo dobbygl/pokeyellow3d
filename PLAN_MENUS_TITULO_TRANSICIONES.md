@@ -1,12 +1,12 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: propuesta; ninguna fase iniciada.
+Fecha: 2026-09-20. Estado: A1, A2, A3 y C1 completadas y verificadas. B1, B2, C2 y C3 pendientes.
 
 ## Análisis del estado actual
 
-Lo que el ejecutable `build/pokeyellow3d` presenta hoy en 3D y lo que devuelve
-a la imagen original, según `src/pallet_state.h`, `src/pallet3d.cpp` y los
-registros de los tres planes anteriores:
+Punto de partida de la propuesta, antes de implementar este plan, según
+`src/pallet_state.h`, `src/pallet3d.cpp` y los registros de los tres planes
+anteriores. Los cambios posteriores se documentan en el registro de ejecución:
 
 | Situación | Presentación actual | Mecanismo |
 | --- | --- | --- |
@@ -44,9 +44,9 @@ Hechos verificados que condicionan el diseño:
   retorno viva en la pila, ya usada en `battle_state.h`, sirve para detectarlo.
 - El runtime conserva `g_last_guest_framebuffer` y `g_lcd_off_framebuffer`, así
   que hay imagen válida incluso con el LCD apagado durante una carga de mapa.
-- Codex está ejecutando B2 de `PLAN_INTERIORES_COMBATES.md` y edita
-  `src/battle_state.h`, `src/battle3d.h` y `src/pallet3d.cpp`. Este plan debe
-  empezar cuando B2 cierre o en una ventana acordada.
+- Al redactar la propuesta estaba en curso B2 de `PLAN_INTERIORES_COMBATES.md`.
+  Ese plan quedó cerrado antes de iniciar este, con sus cuatro baterías de
+  validación aprobadas; véase el registro al final de este documento.
 
 ## Objetivo y alcance
 
@@ -108,10 +108,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Hablar con un NPC en Paleta y en la casa del jugador mantiene el 3D en ortográfica y en primera persona.
-- [ ] El texto se lee con la misma nitidez y escala que en 2D.
-- [ ] Las regresiones `route`, `interior` y `journey` pasan con el compositor nuevo.
-- [ ] Cero errores OpenGL y WRAM, VRAM y framebuffer intactos por frame.
+- [x] Hablar con un NPC en Paleta y en la casa del jugador mantiene el 3D en ortográfica y en primera persona.
+- [x] El texto se lee con la misma nitidez y escala que en 2D.
+- [x] Las regresiones `route`, `interior` y `journey` pasan con el compositor nuevo.
+- [x] Cero errores OpenGL y WRAM, VRAM y framebuffer intactos por frame.
 
 ### Fase A2: menú Start, sí/no, tienda y disposiciones parciales
 
@@ -128,10 +128,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Abrir Start, recorrer sus entradas y cerrarlo no abandona el 3D.
-- [ ] Guardar la partida con su pregunta de confirmación se hace sobre el 3D.
-- [ ] Comprar en la tienda de Ciudad Verde y curar en el centro mantienen la escena.
-- [ ] Toda disposición no reconocida sigue cayendo a la conducta de la fase A3, nunca a un frame en blanco.
+- [x] Abrir Start, recorrer sus entradas y cerrarlo no abandona el 3D.
+- [x] Guardar la partida con su pregunta de confirmación se hace sobre el 3D.
+- [x] Comprar en la tienda de Ciudad Verde y curar en el centro mantienen la escena.
+- [x] Toda disposición no reconocida sigue cayendo a la conducta de la fase A3, nunca a un frame en blanco.
 
 ### Fase A3: pantallas completas sobre fondo atenuado
 
@@ -148,9 +148,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Abrir el equipo, cambiar el orden, ver el resumen de un Pokémon y volver no produce ningún frame 2D a pantalla completa.
-- [ ] Usar el PC de Bill en el centro Pokémon, depositar y retirar, mantiene el fondo.
-- [ ] Las capturas de cada pantalla completa se revisan en ortográfica y primera persona.
+- [x] Abrir el equipo, cambiar el orden, ver el resumen de un Pokémon y volver no produce ningún frame 2D a pantalla completa.
+- [x] Usar el PC de Bill en el centro Pokémon, depositar y retirar, mantiene el fondo.
+- [x] Las capturas de cada pantalla completa se revisan en ortográfica y primera persona.
 
 ## Bloque B: intro, título y menú principal
 
@@ -214,10 +214,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Entrar y salir de la casa del jugador es un fundido continuo sin ningún frame 2D.
-- [ ] Bajar y subir escaleras del centro comercial y usar el ascensor conservan el fundido.
-- [ ] Cargar un savestate en otro mapa produce un fundido corto en lugar de un corte.
-- [ ] La duración medida del fundido coincide con la del juego original con margen de un frame.
+- [x] Entrar y salir de la casa del jugador es un fundido continuo sin ningún frame 2D.
+- [x] Bajar y subir escaleras del centro comercial y usar el ascensor conservan el fundido.
+- [x] Cargar un savestate en otro mapa produce un fundido corto en lugar de un corte.
+- [x] La duración medida del fundido coincide con la del juego original con margen de un frame.
 
 ### Fase C2: entrada y salida de combate
 
@@ -297,12 +297,262 @@ Criterios de aceptación:
 
 ## Referencias técnicas
 
-- [Fundidos de paleta](https://github.com/pret/pokeyellow/blob/master/engine/gfx/palettes.asm).
+- [Fundidos de paleta](https://github.com/pret/pokeyellow/blob/master/home/fade.asm).
 - [Transiciones de combate](https://github.com/pret/pokeyellow/blob/master/engine/battle/battle_transitions.asm).
 - [Pantalla de título](https://github.com/pret/pokeyellow/blob/master/engine/movie/title.asm).
 - [Intro de Amarillo](https://github.com/pret/pokeyellow/blob/master/engine/movie/intro_yellow.asm).
 - [Menú principal](https://github.com/pret/pokeyellow/blob/master/engine/menus/main_menu.asm).
-- [Menú Start y cuadros de texto](https://github.com/pret/pokeyellow/blob/master/engine/menus/start_menu.asm).
+- [Menú Start](https://github.com/pret/pokeyellow/blob/master/home/start_menu.asm) y [disposición de su cuadro](https://github.com/pret/pokeyellow/blob/master/engine/menus/draw_start_menu.asm).
 - [Carga de mapa y warps](https://github.com/pret/pokeyellow/blob/master/home/overworld.asm).
 - `src/battle_state.h`, función `live_return`: técnica de detección por pila.
 - `cmake/Pallet3D.cmake`: hook de `pallet3d_covers_frame` que omite la subida del framebuffer.
+
+## Registro de ejecución
+
+### Inicio y fase A1, 2026-09-20
+
+- Base previa: CTest 7/7 y baterías completas del plan de interiores/combates:
+  `build/qa/kanto-PW04nG/`, `firstperson-uorAnd/`, `interiors-VfIUU4/` y
+  `battles-xtPavN/`. El ejecutable y las evidencias se verificaron al cerrar
+  `PLAN_INTERIORES_COMBATES.md` antes de empezar este plan.
+- `src/lcd_overlay.h` concentra la subida y composición de regiones en tiles.
+  Usa textura propia con filtrado nearest y escala entera; conserva una caché
+  de píxeles por región y solo vuelve a subir las regiones que cambian.
+  `pallet3d.cpp` y `battle3d.h` usan este mismo compositor.
+- Los cuadros inferiores reconocidos mantienen el mundo tanto en ortográfica
+  como en primera persona. El HUD se oculta y se congela la cámara durante el
+  texto. La detección valida la escena y los bloques vivos; también admite
+  cargar directamente un savestate con diálogo abierto. No depende de haber
+  visto previamente un frame del mapa ni de volver primero al mapa al salir
+  de la lista de equipo (Corte y bicicleta cubren ambos casos).
+- `dialogue` en `pallet_render_smoke` conversa con la NPC real de Paleta en
+  ambas cámaras, siguiendo su posición viva. `interior` e `interior-fp`
+  comprueban también la conversación con la madre.
+- Las cuatro capturas están revisadas en
+  `build/qa/ui-a1/logs/dialogue-review.png`. Por conversación se contrastan
+  **los 7.680 píxeles del cuadro original, con cero diferencias**. Tres
+  presentaciones de un estado fijo no cambian la cámara ni la imagen y no
+  causan subidas de textura. Se verifican GL, controles neutros y las regiones
+  completas WRAM/VRAM/framebuffer sin escrituras del renderer.
+- Primer pase de interiores aprobado en `build/qa/interiors-NKNKjp/`.
+  Las regresiones de Corte y bicicleta detectaron los casos de retorno desde
+  menú y carga directa descritos arriba; ambos se corrigieron y sus pruebas
+  aisladas pasan en `build/qa/ui-a1/logs/{cut-action,bike-use}.log`.
+  La repetición final de las cuatro baterías queda aprobada:
+  - Kanto: `build/qa/kanto-zkqJ2N/`, incluidos `route`, `journey`, Corte,
+    bicicleta, surf y escenarios separados. Las 38 capturas siguen idénticas
+    a `kanto-Jth3Ld`, según `build/qa/ui-a1/logs/exterior-comparison.txt`.
+  - Primera persona: `build/qa/firstperson-flW7ij/`, controles, paridad del
+    motor, ocho orientaciones y rendimiento. Se corrigió una prueba cuyo
+    límite de 600 frames podía agotarse antes de que transcurrieran los
+    aproximadamente 815 ms reales de interpolación. Ahora cede 2 ms entre
+    frames hasta converger; no se alteró la interpolación de producción.
+  - Combates: `build/qa/battles-X2ZVET/`, captura, cambios, entrenador y
+    efectos. El nuevo compositor conserva la igualdad exacta de los 23.040
+    píxeles del respaldo LCD de Vuelo.
+  - Interiores: `build/qa/interiors-wt5ABt/`, incluidos los dos recorridos
+    por la casa con comparación de píxeles del diálogo, `town`, ascensor,
+    cueva y las 179 mallas.
+- CTest 7/7 en las cuatro baterías. Comandos y resúmenes:
+  `build/qa/logs/ui-a1-{world,firstperson,battles,interiors-final}.log`.
+  `build/pokeyellow3d` compilado. Estas evidencias cierran solo A1;
+  el objetivo completo sigue activo y no se acredita aún el resto del plan.
+
+### Medición inicial de C1, 2026-09-20
+
+- `UI_TRACE` permite al helper registrar por frame ciclos, mapa, posición,
+  vista, BGP, LCDC, fuente, sprites, combate y modo presentado, sin modificar
+  el motor. Traza de 2.007 frames:
+  `build/qa/ui-a1/logs/house-bgp.csv`; resumen por tramos:
+  `house-bgp-runs.csv` en la misma carpeta.
+- En los seis cruces casa/escaleras/laboratorio se observa **E4 → F9 → FE →
+  FF → E4**. Los escalones F9 y FE duran nueve frames cada uno en este runtime;
+  FF dura 21. El ID de mapa de destino cambia ocho frames antes de F9,
+  cuando sus demás datos todavía no forman una escena válida. Por tanto, el
+  renderer deberá conservar explícitamente la escena saliente durante el
+  fundido, sin deducirla del nuevo ID de mapa.
+- `home/fade.asm` de pret confirma los valores y un `DelayFrames` de ocho por
+  escalón; las llamadas y el muestreo de este runtime añaden el frame observado.
+  No basta con programar ocho frames por temporizador. En este recorrido no
+  se observa una rampa de entrada independiente: el motor restaura E4.
+- Las rutinas fuente consultadas están en `build/qa/ui-a1/references/`.
+  Falta medir también fundido a blanco y transiciones de combate, derivar y
+  probar la tabla de brillo e integrar su aplicación. C1 sigue pendiente.
+
+### Implementación de C1, 2026-09-20
+
+- `src/fade_state.h` deriva el brillo de BGP con cuatro pesos iguales. La tabla
+  completa y la fórmula están documentadas en `PALLET3D.md`. La detección de
+  warp valida siete instrucciones CALL de la ROM y busca sus retornos en la
+  pila viva, incluido el CALL condicional de `MapEntryAfterBattle`. Las
+  variables de warp persistentes no bastan para activar el renderer.
+- `WorldFrame` separa la preparación del mundo de su presentación. Conserva
+  cámara, mallas residentes, vértices de actores y atlas durante el cambio de
+  header, sin leer bloques o sprites del mapa a medio cargar. El HUD y el
+  contorno a través del tejado se ocultan; la puerta puede ocultar al jugador.
+- La primera prueba detectó dos frames entre el retorno de `LoadMapData` y la
+  restauración de BGP. Se mantiene el extremo negro/blanco de la transición
+  reconocida en ese intervalo, sin retener indefinidamente otras paletas de
+  mapas oscuros. La escena nueva se prepara al volver a un mapa válido.
+- La vuelta desde blanco mide **00 → 40 → 90 → E4**. La rutina espera nueve
+  frames en cada uno de 40, 90 **y E4** antes de retornar. El comprobador de
+  trazas se corrigió al medir ese último escalón, que inicialmente omitía.
+  La entrada en combate también registra destellos de tres frames por paleta;
+  su composición corresponde a C2, que continúa pendiente.
+- La adaptación SDL llama a `pallet3d_state_loaded` solo después de una carga
+  correcta. Un cambio de mapa hace dos mitades nominales de 90 ms, con cambio
+  de malla y cámara en negro. La espera de texturas/mallas se añade al tiempo,
+  y un salto del reloj de presentación no puede consumir todo el fundido.
+  Las pruebas exigen varios frames intermedios visibles en ambas cámaras,
+  la orientación original en primera persona y ausencia de escrituras del
+  renderer. No se usa el retroceso del contador de ciclos para detectar cargas.
+- Nuevos modos `transitions`, `transitions-fp`, `transitions-white`,
+  `transition-reload` y `transition-reload-fp`. El observador verifica por frame
+  la cobertura, memoria, GL, cámara y caché; compara el brillo de los píxeles
+  y comprueba todos los píxeles de los extremos negro/blanco. `UI_VIDEO=1`
+  graba los recorridos con `ffmpeg` y `UI_TRACE` conserva sus registros.
+- Evidencia inicial revisada en `build/qa/ui-transitions-U2qSg6/`: 21
+  transiciones y 977 frames compuestos; casa, centro comercial/ascensor en
+  ambas cámaras y regreso desde blanco. `logs/fades-reviewed.png` contiene
+  los escalones revisados. La traza de la casa reproduce exactamente los
+  2.007 frames/ciclos/posiciones/BGP previos a C1, según
+  `logs/original-comparison.txt`. El verificador final aprueba las cinco
+  trazas en `logs/traces.txt`; sus primeras ejecuciones habían detectado el
+  escalón E4 descrito arriba. Las cargas se volvieron a comprobar tras mejorar
+  el avance con caché fría: 12 y 13 frames intermedios, respectivamente.
+- Regresiones completas aprobadas:
+  - Kanto: `build/qa/kanto-4e8Kfd/`. Sus 38 capturas son idénticas, byte a
+    byte, a A1 (`kanto-zkqJ2N`), según `logs/exterior-comparison.txt` de la
+    carpeta de transiciones.
+  - Primera persona: `build/qa/firstperson-EXo8ha/`. Paridad del motor,
+    controles, ocho vistas y cinco mapas residentes; medianas 3,94 ms en
+    primera persona y 3,39 ms en ortográfica sobre Intel UHD 620.
+  - Interiores: `build/qa/interiors-dcy8uU/`, incluidos casa, ciudad,
+    escaleras, ascensor, cueva y las 179 mallas.
+  - Combates: `build/qa/battles-eovzS8/`, incluidos captura, cambios,
+    entrenador, efectos y cero diferencias en el respaldo LCD de Vuelo.
+  - CTest final: 10/10, incluido `fade_state` y las dos pruebas sintéticas
+    incorporadas al workspace durante esta fase. El último ajuste se limita
+    al reloj del callback de carga, vuelto a probar en ambas cámaras.
+- Comando reproducible de C1:
+
+  ```sh
+  tests/ui_transitions_qa.sh build/roms/pokeyellow.gbc \
+    build/qa/interiors-fJDbZk/house.state \
+    build/qa/interiors-wt5ABt/mart-start.state \
+    build/qa/firstperson-9cB3FJ/route.state
+  ```
+
+- `build/pokeyellow3d` está compilado y el runtime descargado sigue sin cambios.
+  La repetición final del script de C1 pasa íntegra en
+  `build/qa/ui-transitions-jpxO1N/`, incluida la carga en ambas cámaras y el
+  verificador de trazas corregido. Resumen:
+  `build/qa/logs/ui-c1-transitions-final.log`. Esto cierra C1; A2/A3, B1/B2
+  y C2/C3 aún no cumplen sus criterios y el objetivo completo sigue activo.
+
+### Observaciones para las siguientes fases
+
+- La tienda necesita validar bordes con solapamientos: Buy/Sell/Quit ocupa
+  `(0,0,11,7)`, dinero `(11,0,9,3)` con título MONEY en el borde, stock
+  `(4,2,16,11)` y cantidad `(7,9,13,3)`. La lista pisa el borde superior del
+  diálogo inferior; al confirmar, el diálogo vuelve a pisar la lista. No
+  basta con exigir que cada rectángulo conserve cuatro bordes completos.
+  Las disposiciones privadas inspeccionadas están en
+  `build/qa/ui-a1/logs/layout-mart-*.txt`.
+- En la traza del encuentro de Ruta 1 de
+  `build/qa/ui-c1/white/logs/bgp.csv`, el flag de combate aparece en el frame
+  2669 y el detector actual `ready()` acepta la arena en el 3240. Esos 571
+  frames incluyen presentación/texto, no solo el barrido. C2 deberá medir
+  por separado el barrido y el primer HUD real; usar ese intervalo completo
+  como duración del zoom sería incorrecto.
+
+### Inicio de A2: clasificación aislada, 2026-09-20
+
+- `src/menu_layout.h` reconoce bordes visibles de ventanas superpuestas en
+  posiciones fijas y exige que no haya texto fuera de la unión de regiones.
+  Una esquina rota o texto exterior obliga a tratar la imagen como pantalla
+  completa. El clasificador aún no está conectado a la presentación.
+- `tests/menu_layout_test.cpp` prueba ese rechazo y admite mapas de tiles
+  privados exportados desde savestates. Se comprobaron compra, stock y
+  confirmación reales de la tienda (3, 4 y 5 regiones, respectivamente), y
+  equipo de combate como pantalla completa. Entradas y resultados locales:
+  `build/qa/ui-a2/layouts/`.
+- Pendiente en A2: validar Start/guardar/sí-no/centro con fixtures reales,
+  integrar la composición con sombras y cámara congelada, y comprobar todos
+  los criterios de la fase. Las disposiciones completas necesitan A3 para
+  mantener el fondo atenuado y desenfocado.
+
+### Integración de A2/A3, 2026-09-20
+
+- El clasificador ya está conectado al renderer. Start y las ventanas parciales
+  conservan la escena y añaden una sombra suave. Las pantallas completas usan
+  las mallas residentes, un pase de desenfoque de nueve muestras y atenuación,
+  y el framebuffer original centrado a escala entera con marco. Se reserva
+  margen suficiente para que también se vean los interiores pequeños detrás.
+- `menu_state.h` verifica las llamadas vivas de `DisplayTextID` desde el bucle
+  del mundo y los eventos de texto predefinido. Así se conserva el fondo mientras
+  equipo y PC reutilizan los bloques de WRAM. El renderer no los reconstruye
+  durante esas pantallas; neutraliza el movimiento relativo y oculta su HUD.
+- Las pruebas reales descubrieron una colisión del detector de C1: un registro
+  guardado con valor `0200` en la segunda página del resumen parecía un retorno
+  de `MapEntryAfterBattle`. Esa detección ahora excluye la vida de un menú de
+  texto, incompatible con la llamada exterior de entrada al mapa. Se añadió una
+  regresión junto a las pruebas de instrucciones ROM y retornos desapilados.
+- Se verificaron Start, cambio de orden, ambas páginas de resumen, mochila,
+  ficha, opciones, Pokédex y guardado en ambas cámaras, con cero diferencias
+  en los píxeles originales compuestos: `build/qa/ui-a2/menus-{ortho,fp}/`.
+  Curación y depósito/retirada real de Rattata pasan en ortográfica en
+  `build/qa/ui-a2/center-ortho/`. Son evidencias de desarrollo; la batería final
+  debe repetirlas después de los últimos ajustes de margen y clasificación.
+- Las disposiciones reales añaden tarjeta de guardado `(4,0,16,10)`, sí/no de
+  guardado `(0,7,6,5)` y Heal/Cancel del centro `(11,6,9,6)`. La cantidad de
+  compra requiere conservar el orden en que la lista pisa el diálogo.
+- `tests/ui_menus_qa.sh ROM TWO_POKEMON_WORLD_STATE` prepara copias privadas y
+  recorre menús, centro/PC y compra en ambas cámaras. La fixture requiere
+  Pokédex, encargo entregado, Pikachu y otro Pokémon capturado, y dinero para
+  una Poké Ball. El guardado se exporta solo dentro de la carpeta QA.
+- CTest pasa 14/14 en este punto, incluidas las pruebas sintéticas añadidas al
+  workspace. A2/A3 aún no están cerradas: falta completar la batería final,
+  las regresiones generales y la pantalla de nombres en ambas cámaras.
+
+### Cierre de A2/A3, 2026-09-20
+
+- Batería final **PASS** en `build/qa/ui-menus-P4sFEq/`; resumen en
+  `build/qa/logs/ui-a2-menus-final.log`. Ocho recorridos: Start y pantallas
+  completas, centro/PC, tienda e inspector de motes, cada uno en ambas cámaras.
+  La escena permanece cubierta durante todos los frames observados. Se verifica
+  la memoria completa WRAM/VRAM/framebuffer por frame, GL, controles neutros,
+  cámara y mallas estables, y ausencia de nuevas subidas del LCD sin cambios.
+- Las 60 capturas comparadas comprueban **1.238.016 píxeles originales con
+  cero diferencias**, incluyendo 23.040 píxeles por pantalla completa. Registro
+  desglosado: `logs/pixels.json`. `logs/layouts.txt` vuelve a clasificar todos
+  los mapas de tiles privados con su resultado esperado.
+- Las acciones se ejecutan con los controles originales: intercambio de
+  Pikachu/Rattata, guardado en SRAM privada, compra de una Poké Ball, curación,
+  depósito y retirada de Rattata. El inspector de motes abre la pantalla de
+  nombres, se escribe `ABC` y se comprueba el nombre almacenado por el motor.
+  No se cambian inventario, equipo o nombres para simular esos resultados.
+- Capturas revisadas en `logs/full-{ortho,fp}.png`,
+  `logs/partial-reviewed.png` y `logs/returns-reviewed.png`. La comprobación
+  adicional de primera persona en `build/qa/ui-a2/return-fp/` conserva imágenes
+  antes/después y el estado privado de regreso para repetir la inspección.
+- La preparación de Paleta pasa primero por su casa y sale por la puerta real:
+  los warps exteriores conservan coordenadas y los interiores con `LAST_MAP`
+  dependen del mapa de procedencia. Esto evita empezar en una casilla inválida.
+  Los hashes de ROM y estado de entrada permanecen intactos.
+- Regresiones aprobadas, sobre el ejecutable compilado:
+  - Mundo: `build/qa/kanto-cLFlTA/`. Las 38 capturas exteriores son idénticas
+    a C1 (`kanto-4e8Kfd`); comparación en `logs/exterior-comparison.txt` de la
+    batería de menús.
+  - Primera persona: `build/qa/firstperson-v94zRL/`, incluidos controles SDL,
+    paridad del motor, vistas y benchmark. Start mantiene 3D y máscara neutra.
+  - Interiores: `build/qa/interiors-CyDCiu/`, recorridos reales y 179 mallas.
+  - Combates: `build/qa/battles-LojUdN/`, captura, cambio, entrenador y efectos.
+  - C1: `build/qa/ui-transitions-8eBpGD/`, puertas, escaleras, ascensor, vuelta
+    desde blanco y carga de estado. Las cinco trazas conservan las duraciones
+    originales y cobertura; la corrección de pila no altera estos fundidos.
+  - CTest final 14/14. Runtime descargado sin modificaciones y `git diff --check`
+    sin errores. `build/pokeyellow3d` actualizado.
+- Esto cierra los menús del mundo. El título/nueva partida, entrada/salida de
+  combate y los fundidos generales de 3D/2D siguen pendientes en B1/B2 y C2/C3.
+  El objetivo completo permanece activo.

@@ -4,6 +4,10 @@
 #include <SDL.h>
 #include <array>
 
+// The same callback table is used by the playable frontend and QA adapters.
+struct GBPresentationHooks;
+GBPresentationHooks pallet3d_presentation_hooks();
+
 // Register before initializing the runtime SDL frontend.
 bool pallet3d_register();
 

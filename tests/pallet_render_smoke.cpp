@@ -17,6 +17,7 @@ extern "C" {
 extern "C" uint8_t pokeyellow__rom_data[];
 #include "world_journey.h"
 #include "world_extended.h"
+#include "qa_presentation_clock.h"
 
 static void capture_surface(const char *path) {
     GLint viewport[4];
@@ -32,6 +33,7 @@ static void capture_surface(const char *path) {
         for (int x = 0; x < w; x++)
             std::fwrite(&rgba[(y * w + x) * 4], 1, 3, f);
     std::fclose(f);
+    qa_clock::capture_state(path);
 }
 
 #include "firstperson.h"
@@ -74,7 +76,7 @@ int main(int argc, char **argv) {
     config.model = config.cartridge_supports_cgb ? GB_MODEL_CGB : GB_MODEL_DMG;
     config.cgb_compatibility_mode = false;
     GBContext *ctx = gb_context_create(&config);
-    if (!ctx || !pallet3d_register() || !gb_platform_init(5))
+    if (!ctx || !qa_clock::install() || !gb_platform_init(5))
         return 4;
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");

@@ -1,5 +1,6 @@
 #pragma once
 #include "menu_layout.h"
+#include "pc_storage.h"
 
 inline bool start_visible(const GBContext* ctx) {
     auto layout=menu_layout::classify(ctx->wram+0x3a0);
@@ -10,10 +11,23 @@ inline void observe_menu_frame(GBContext* c,int frame) {
     if(!pallet3d_active()||!pallet3d_covers_frame(c)) {
         std::fprintf(stderr,"[MENU] FAIL: 2D gap frame=%d view=%d bgp=%02x font=%d live=%d\n",frame,int(pallet::view(c)),c->io[0x47],pallet::read(c,pallet::Font),menu_state::running(c));std::exit(42);
     }
+    auto storage=pallet3d_storage();
+    if(pallet3d_pc().mode==int(pc_state::Mode::Bill)&&pc_storage::read(c).valid) {
+        if(!storage.active||storage.box!=(pallet::read(c,0xd59f)&0x7f)||
+           storage.counts[storage.box]!=pallet::read(c,0xda7f)||storage.cached>32) {
+            std::fprintf(stderr,"[PC] FAIL stale shelf frame=%d\n",frame);std::exit(49);
+        }
+        for(int i=0;i<storage.counts[storage.box];i++)if(storage.species[i]!=pallet::read(c,uint16_t(0xda80+i))) {
+            std::fprintf(stderr,"[PC] FAIL stale box portrait frame=%d index=%d\n",frame,i);std::exit(49);
+        }
+        for(int i=0;i<pallet::read(c,0xd162);i++)if(storage.species[20+i]!=pallet::read(c,uint16_t(0xd163+i))) {
+            std::fprintf(stderr,"[PC] FAIL stale party portrait frame=%d index=%d\n",frame,i);std::exit(49);
+        }
+    }
 }
 
 inline void verify_menu_overlay(QaWalk& run,const char* label,int expected=-1) {
-    auto* ctx=run.ctx;auto info=pallet3d_menu();auto layout=menu_layout::classify(ctx->wram+0x3a0);
+    auto* ctx=run.ctx;auto info=pallet3d_menu();auto pc=pallet3d_pc();auto layout=menu_layout::classify(ctx->wram+0x3a0);
     std::string path=std::string("logs/")+label;
     capture_surface((path+".ppm").c_str());
     run.require(gb_context_save_state_file(ctx,(path+".state").c_str()),"private menu fixture");
@@ -21,25 +35,26 @@ inline void verify_menu_overlay(QaWalk& run,const char* label,int expected=-1) {
     std::fwrite(ctx->wram+0x3a0,1,360,tiles);std::fclose(tiles);
     std::fprintf(stderr,"[MENU] %s view=%d kind=%d regions=%d full=%d blur=%d live=%d sp=%04x cursor=%d max=%d\n",label,
         int(pallet::view(ctx)),int(layout.kind),info.regions,info.full,info.blurred,menu_state::running(ctx),ctx->sp,run.read(0xcc26),run.read(0xcc28));
-    if(info.full&&!info.blurred) {
+    if(info.full&&!info.blurred&&!pc.monitor) {
         std::fprintf(stderr,"[MENU] unexpected fade=%d bgp=%02x lcdc=%02x live warp=%d\n",pallet3d_warp_overlay(),ctx->io[0x47],ctx->io[0x40],fade::warp(ctx));
         for(int a=ctx->sp;a<0xdfff;a+=2)std::fprintf(stderr," %04x:%04x",a,run.read(a)|(run.read(a+1)<<8));
         std::fputc('\n',stderr);
     }
-    run.require(info.active&&pallet3d_active()&&pallet3d_covers_frame(ctx),"menu retains a 3D background");
+    run.require((info.active||pc.active)&&pallet3d_active()&&pallet3d_covers_frame(ctx),"menu retains a 3D background");
     if(expected>=0)run.require(int(layout.kind)==expected,"expected original menu layout");
-    run.require(!info.full||info.blurred,"full screen has the shader blur pass");
+    run.require(!info.full||info.blurred||(pc.active&&pc.monitor&&pc.progress==1),"full screen has blur or is on the focused PC monitor");
     run.require(pallet3d_input_mask()==255,"menus neutralize relative movement");
     auto camera=pallet3d_world_frame();auto cache=pallet3d_stats();ReadOnlyMemory memory{ctx};
     GLint viewport[4];glGetIntegerv(GL_VIEWPORT,viewport);int w=viewport[2],h=viewport[3];
     std::vector<uint8_t> before(size_t(w)*h*4),after(before.size());
     glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,before.data());
-    auto uploads=pallet3d_overlay_stats();
+    auto uploads=pallet3d_overlay_stats();auto storage=pallet3d_storage();
     for(int i=0;i<3;i++)gb_platform_render_frame(gb_get_framebuffer(ctx));
     glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,after.data());
     run.require(memory.unchanged(ctx)&&glGetError()==GL_NO_ERROR,"read-only menu composition and GL");
     run.require(before==after&&camera.camera==pallet3d_world_frame().camera,"menu background and camera are frozen");
     run.require(cache.mesh_builds==pallet3d_stats().mesh_builds&&uploads.uploads==pallet3d_overlay_stats().uploads,"no mesh rebuild or unchanged LCD upload");
+    if(storage.active)run.require(storage.rebuilds==pallet3d_storage().rebuilds&&storage.uploads==pallet3d_storage().uploads,"unchanged box/party bytes reuse shelf geometry and portraits");
     int scale=info.full?std::max(1,int(std::min(w*.75f/160,h*.75f/144))):std::max(1,std::min(w/160,h/144));
     int left=(w-160*scale)/2,top=info.full?(h-144*scale)/2:h-144*scale;
     int checked=0,differences=0;
@@ -48,11 +63,19 @@ inline void verify_menu_overlay(QaWalk& run,const char* label,int expected=-1) {
         for(size_t i=0;i<layout.count;i++)ui|=menu_layout::contains(layout.regions[i],x/8,y/8);
         if(!ui)continue;
         int xx=left+x*scale+scale/2,yy=top+y*scale+scale/2;
+        if(pc.active&&pc.monitor) {
+            float u=(x+.5f)/160,v=(y+.5f)/144;
+            xx=int(pc.screen[0]*(1-u)*(1-v)+pc.screen[2]*u*(1-v)+pc.screen[4]*u*v+pc.screen[6]*(1-u)*v);
+            yy=int(pc.screen[1]*(1-u)*(1-v)+pc.screen[3]*u*(1-v)+pc.screen[5]*u*v+pc.screen[7]*(1-u)*v);
+            run.require(xx>=0&&xx<w&&yy>=0&&yy<h,"complete PC screen visible");
+        }
         auto* pixel=&after[((h-1-yy)*w+xx)*4];auto original=gb_get_framebuffer(ctx)[y*160+x];++checked;
-        differences+=pixel[0]!=(original>>16&255)||pixel[1]!=(original>>8&255)||pixel[2]!=(original&255);
+        bool different=pixel[0]!=(original>>16&255)||pixel[1]!=(original>>8&255)||pixel[2]!=(original&255);
+        if(different&&differences<8)std::fprintf(stderr,"[MENU] mismatch LCD=%d,%d screen=%d,%d actual=%02x%02x%02x expected=%06x monitor=%d\n",x,y,xx,yy,pixel[0],pixel[1],pixel[2],unsigned(original&0xffffff),pc.monitor);
+        differences+=different;
     }
     std::fprintf(stderr,"[MENU] %s original pixels=%d differences=%d\n",label,checked,differences);
-    run.require(checked>0&&differences==0,"every composed LCD pixel retains its original color and integer scale");
+    run.require(checked>0&&differences==0,"every composed LCD pixel retains its original color");
     if(info.full)run.require(left>=16&&top>=16,"full menu leaves the background visible around its frame");
 }
 

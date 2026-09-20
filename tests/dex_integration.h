@@ -1,5 +1,6 @@
 #pragma once
 #include "mon_pic.h"
+#include "dex_nests.h"
 
 namespace dex_qa {
 inline int invisible_selection_frames=0;
@@ -134,5 +135,41 @@ inline int screen(GBContext* ctx,bool fp) {
     ctx->wram[dex_state::Current-0xc000]=uint8_t(original);verify();
     run.require(pallet3d_dex().active,"restored original species presents its own portrait");
     std::puts("PASS: independent data-screen load, exact portrait, bounded texture uploads and stale-VRAM fallback");return 0;
+}
+inline int areas(GBContext* ctx,bool fp=false) {
+    QaWalk run{ctx};run.wait(30);run.require(pallet::view(ctx)==pallet::View::Overworld,"world before original AREA screens");
+    if(fp){SDL_Event e{};e.type=SDL_KEYDOWN;e.key.keysym.scancode=SDL_SCANCODE_F3;pallet3d_event(&e,false);run.wait(20);}
+    // Private seen/owned flags only unlock original menu navigation. No area
+    // list, nest coordinates, OAM entries or encounter tables are fabricated.
+    std::fill_n(ctx->wram+0x12f6,19,255);ctx->wram[0x1308]=127;
+    std::fill_n(ctx->wram+0x1309,19,255);ctx->wram[0x131b]=127;
+    run.press("S");for(int i=0;i<10&&run.read(0xcc26);i++)run.press("U");run.press("A");run.wait(50);
+    FILE* evidence=std::fopen("logs/areas.bin","wb");run.require(evidence,"private original-area evidence");std::fwrite("DXAR1",1,5,evidence);
+    int selected=1;
+    for(int number:{16,41,129}) {
+        for(;selected<number;selected++)run.press("D",2);
+        run.require(run.read(0xcc26)+run.read(0xcc36)+1==number,"original list selects AREA species");
+        run.press("A");run.press("D");run.press("D");run.press("A");run.wait(140);
+        run.require(battle::live_return(ctx,0x71003,0x3852)&&ctx->io[0x47]==0xe4,"original AREA wait routine");
+        std::set<uint8_t> original;
+        for(int i=0;i<36;i++) {
+            int at=0xc508+4*i,y=run.read(at),x=run.read(at+1),tile=run.read(at+2);
+            if(tile!=4||y<24||x<24)continue;
+            run.require((y-24)%8==0&&(x-24)%8==0,"original nest OAM coordinates align with town map");
+            original.insert(uint8_t(((y-24)/8)*16+(x-24)/8));
+        }
+        int species=mon_pic::species(ctx->rom,ctx->rom_size,number);auto parsed=dex_nests::read(ctx->rom,ctx->rom_size,species);
+        run.require(parsed.valid&&parsed.coordinates==original,"ROM nest reader matches the original AREA sprites");
+        std::fprintf(stderr,"[AREA] dex=%d maps=%zu original-locations=%zu coordinates=",number,parsed.locations.size(),original.size());
+        for(auto value:original)std::fprintf(stderr,"%02x,",value);std::fputc('\n',stderr);
+        uint8_t header[]={uint8_t(number),uint8_t(original.size())};std::fwrite(header,1,2,evidence);
+        for(auto value:original)std::fwrite(&value,1,1,evidence);std::fflush(evidence);
+        char path[100];std::snprintf(path,sizeof(path),"logs/area-%03d.ppm",number);capture_surface(path);
+        std::snprintf(path,sizeof(path),"logs/area-%03d.state",number);run.require(gb_context_save_state_file(ctx,path),"private original area fixture");
+        run.press("B");run.wait(40);run.require(battle::live_return(ctx,0x4003d,0x4140),"AREA returns to original list");
+    }
+    std::fclose(evidence);run.press("B");run.press("B");run.wait(30);
+    run.require(pallet::view(ctx)==pallet::View::Overworld,"AREA journey returns to world");
+    std::puts("PASS: Pidgey, Zubat and Magikarp nest coordinates match the original AREA sprites");return 0;
 }
 } // namespace dex_qa

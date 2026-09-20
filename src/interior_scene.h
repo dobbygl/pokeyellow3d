@@ -31,6 +31,7 @@ inline Cell classify(const uint8_t* rom,const pallet::Scene& scene,int x,int z,
     // before the perimeter heuristic: a plant against a wall is still a plant.
     switch(scene.tileset) {
     case 2:case 6: // Shared shop / Pokemon Center graphics.
+        if(scene.tileset==6&&top==0x42&&bottom==0x52)return {Kind::Furniture,1.05f,true}; // PC.
         if(top==0x20||top==0x21)return {Kind::Furniture,1.05f,true};
         if(top==0x22||top==0x23)return {Kind::Furniture,.65f,true}; // Plant pots.
         if(top==0x40||top==0x41||top==0x44||top==0x45)

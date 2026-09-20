@@ -7,8 +7,8 @@ std::array<uint32_t,160*144> lcd{};
 bool lcd_valid=false,presented=false,monitor_image=false;
 firstperson::Matrix matrix{};
 std::array<float,8> screen{};
-void reset() {pc_motion={};pc_sample={};pc_terminal={};pc_composed=false;presented=monitor_image=lcd_valid=false;}
-void shutdown() {if(texture)glDeleteTextures(1,&texture);texture=0;reset();}
+void reset() {pc_motion={};pc_sample={};pc_terminal={};pc_composed=false;presented=monitor_image=lcd_valid=false;pc_boxes::reset();}
+void shutdown() {if(texture)glDeleteTextures(1,&texture);texture=0;reset();pc_boxes::shutdown();}
 void upload(const uint32_t* original) {
     if(!texture) {
         std::vector<uint8_t> pixels(AW*AH*4);
@@ -27,6 +27,9 @@ void upload(const uint32_t* original) {
     glBindTexture(GL_TEXTURE_2D,texture);glTexSubImage2D(GL_TEXTURE_2D,0,0,0,160,144,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
 }
 void draw(GBContext* ctx,int w,int h,bool menu_open) {
+    if(pc_sample.mode==pc_state::Mode::Bill&&pc_boxes::draw(ctx,w,h,menu_open)) {
+        monitor_image=false;presented=true;return;
+    }
     auto pc=pc_terminal;float t=pc_motion.eased();bool open=pc_sample.mode!=pc_state::Mode::None;
     Vec center{pc.x+.5f,pc.height+.47f,pc.z+.195f};
     firstperson::Camera close;
@@ -45,11 +48,13 @@ void draw(GBContext* ctx,int w,int h,bool menu_open) {
     else {upload(nullptr);if(open)monitor_image=false;}
     std::vector<Vertex> v;
     box(v,pc.x-.02f,pc.z+.04f,1.04f,.15f,pc.height,pc.height+.94f,{.28f,.34f,.32f,t});
-    box(v,pc.x+.34f,pc.z+.07f,.32f,.26f,pc.height-.03f,pc.height+.08f,{.22f,.27f,.25f,t});
+    box(v,pc.x+.34f,pc.z+.07f,.32f,.26f,pc.height-.03f,pc.height+.025f,{.22f,.27f,.25f,t});
     Vec corners[]={{center.x-.48f,center.y+.432f,center.z},{center.x+.48f,center.y+.432f,center.z},
         {center.x+.48f,center.y-.432f,center.z},{center.x-.48f,center.y-.432f,center.z}};
     quad(v,corners[0],corners[1],corners[2],corners[3],monitor_image?Color{1,1,1,t}:Color{.17f,.32f,.26f,t},
-        monitor_image?UV{0,0,160,144}:Solid);
+        // Cancel the atlas helper's quarter-texel inset: every LCD pixel has
+        // equal width here, including the first and last rows/columns.
+        monitor_image?UV{-.25f,-.25f,160.5f,144.5f}:Solid);
     for(int i=0;i<4;i++) {
         auto p=corners[i];float d=matrix[3]*p.x+matrix[7]*p.y+matrix[11]*p.z+matrix[15];
         screen[i*2]=((matrix[0]*p.x+matrix[4]*p.y+matrix[8]*p.z+matrix[12])/d+1)*w/2;

@@ -1,6 +1,6 @@
 # Plan: Pokédex and PC in 3D
 
-Date: 2026-09-20. Status: A1 and A2 completed and verified; B1 in progress; A3 and B2/B3 pending. Goal paused at the user's request.
+Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 in progress; B3 pending. Goal paused at the user's request for commit and push.
 
 ## Goal and scope
 
@@ -192,9 +192,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] Turning on the PC at Viridian City's Pokémon Center moves the camera in and shows the menu on the monitor.
-- [ ] The PC in the player's room works the same from both cameras.
-- [ ] Turning off the PC returns the camera and HUD to the previous state with no jumps.
+- [x] Turning on the PC at Viridian City's Pokémon Center moves the camera in and shows the menu on the monitor.
+- [x] The PC in the player's room works the same from both cameras.
+- [x] Turning off the PC returns the camera and HUD to the previous state with no jumps.
 
 ### Phase B2: Bill's boxes with a 3D shelf
 
@@ -214,10 +214,10 @@ Work:
 
 Acceptance criteria:
 
-- [ ] Depositing a Pokémon from the party and withdrawing it updates the grid with no frames showing stale data.
-- [ ] Switching boxes shows the correct content of the chosen box, including boxes read from cartridge RAM.
-- [ ] Releasing a Pokémon removes it from the grid after the original confirmation.
-- [ ] The capture fixture test deposits and withdraws that Pidgey successfully.
+- [x] Depositing a Pokémon from the party and withdrawing it updates the grid with no frames showing stale data.
+- [x] Switching boxes shows the correct content of the chosen box, including boxes read from cartridge RAM.
+- [x] Releasing a Pokémon removes it from the grid after the original confirmation.
+- [x] The capture fixture test deposits and withdraws that Pidgey successfully.
 
 ### Phase B3: item storage, Oak's evaluation, and the Hall of Fame
 
@@ -432,3 +432,118 @@ Acceptance criteria:
 - Preserve this as a work-in-progress checkpoint. Resume with the terminal
   locator and failing test, then finish B1, B2, A3 and B3; the full goal is
   not complete.
+
+### B1 completed after resumption, 2026-09-20
+
+- Corrected terminal detection from actual ROM tiles: Center 42/52 at
+  (13,3), bedroom 42/32 at (0,1). The former 20/30 match was seating;
+  the bedroom's 40/20 graphic is the upper wall, not the interaction cell.
+  Center PCs now have furniture geometry rather than a perimeter wall.
+- Bank-validated live calls distinguish Center, items, Bill, Oak and Hall;
+  synthetic unit cases assert the exact mode, not merely a nonempty result.
+  The bedroom retains its original item-storage-only menu.
+- The camera animates a copied projection over 400 ms of guest time;
+  resident map matrices, meshes and actors remain untouched. Main menus
+  use the monitor, partial dialogue retains its original compositor, and
+  full submenus retain the original LCD over the dimmed scene. The stand
+  ends below the last LCD row, so it cannot obscure text.
+- `tests/pc_focus_qa.sh ROM CENTER_ENTRANCE_STATE WORLD_STATE` passes in
+  `build/qa/pc-focus-xiR0Sr/`: Center and bedroom in both cameras,
+  24-frame approach / 23-frame visible return, settings/focus pauses,
+  preserved camera preference, GL and read-only memory on every frame.
+  All 23,040 monitor pixels and 7,680 power-on dialogue pixels match the
+  original framebuffer. Bill deposit/withdraw and healing also pass in
+  both cameras with full original-menu pixel comparisons.
+- Captures reviewed at `build/qa/logs/pc-b1-focus-review.png`.
+  After-phase CTest **20/20**, world `build/qa/kanto-nl3Tqg/`, first person
+  `build/qa/firstperson-ZdNNhO/`, interiors `build/qa/interiors-n7wA7k/`:
+  all PASS. The 38 exterior captures remain byte-identical to A2
+  (`build/qa/logs/pc-b1-exterior-comparison.txt`). These are the unchanged
+  production baseline for B2.
+
+### B2 in progress
+
+- Added an initially standalone read-only storage reader and tests. It
+  resolves the twelve boxes in SRAM banks 2/3, verifies the aggregate and
+  six individual checksums per bank, gives the active WRAM box precedence,
+  and fingerprints box/party bytes. Never-used boxes follow the original
+  first-change initialization rule; uninitialized SRAM is not read.
+- Bounds, differing banks, malformed records, partial updates and checksum
+  corruption pass standalone tests. The reader is not yet connected to a
+  shelf, and original-engine save/change-box evidence remains required.
+- Original save/checksum reference:
+  https://github.com/pret/pokeyellow/blob/master/engine/menus/save.asm,
+  local read-only copy in `build/qa/dex/references/engine_menus_save.asm`.
+
+### B2 completed, 2026-09-20
+
+- `pc_storage.h` reads active box/party WRAM and both saved-box banks without
+  changing the selected bank. Both aggregate and individual checksums must
+  pass; incomplete records, bad bounds, invalid levels/species or unterminated
+  names fall back to the original menu over the dimmed interior.
+- `pc_boxes.h` keeps twelve numbered cubbies and an open twenty-portrait box
+  around the original centered full LCD; a separate party row lets deposit
+  selections remain visible too. Names, levels and counters use the original
+  ROM font. Projection-aligned glyph quads preserve all strokes at native
+  glyph size. Portrait/geometry updates depend on data fingerprints or resize;
+  frozen frames perform no new uploads or rebuilds. The portrait cache is
+  bounded to 32 entries.
+- `pc_box_state.h` distinguishes list and action cursors using verified live
+  calls. It verifies the actually displayed original nickname and arrow before
+  highlighting a portrait; Cancel and incomplete LCD transfers highlight none.
+  Unit cases cover scroll offsets, WRAM ahead of LCD, action-menu cursors and
+  popped calls, in addition to corruption and the twelve bank-relative reads.
+- Final original-engine QA **PASS** in `build/qa/pc-storage-JZqDwI/`, with
+  orthographic and FP preferences. The helper encountered Rattata, escaped,
+  then naturally encountered and caught Pidgey with one bought Poké Ball.
+  That Pidgey was deposited, saved through a switch to box 7, loaded from
+  bank 2, withdrawn, deposited again and released after the original prompt.
+  Per-frame observers check current box/party portraits, intact game memory,
+  GL, and coverage; every captured full LCD has 23,040 identical pixels.
+- A separate, explicitly synthetic stress fixture clones the captured record
+  into twelve occupied boxes and twenty active entries. It follows the real
+  game's party-level-to-box-level conversion. Original scrolling selects all
+  twenty names correctly, Cancel clears selection, and original switches to
+  boxes 7/12/1 load 7/12/20 records. Corrupting a bank checksum triggers the
+  original-image fallback; restoring it recovers the shelf.
+- Private original WRAM/SRAM exports are `build/qa/pc/boxes.{wram,sram}`.
+  `pc_storage_original` independently checks the decoder against that actual
+  deposit/change-box result (explicit skip when local evidence is absent).
+  Final CTest **22/22**. Repeat with
+  `tests/pc_storage_qa.sh ROM ROUTE1_10_4_WITH_BOUGHT_BALLS_STATE`.
+- World `build/qa/kanto-00tyiB/`, FP `build/qa/firstperson-hVjAo6/` and interiors
+  `build/qa/interiors-tLeSE7/` all pass. All 38 exterior captures remain
+  byte-identical to B1 (`build/qa/logs/pc-b2-exterior-comparison.txt`). Final
+  shelf/font captures: `build/qa/logs/pc-b2-full-grid-final.png` and
+  `build/qa/logs/pc-b2-font-final.png`. These general regressions are the
+  unchanged world baseline for A3; the last shelf-only glyph alignment is
+  additionally covered by the final four PC runs above.
+
+### A3 preparation
+
+- Added a standalone, bounds-checked `dex_nests.h` reader; it is not yet
+  connected to the renderer. ROM results: Pidgey 13 maps/13 town-map locations;
+  Zubat 12 maps/4 locations; Magikarp none. Comparison with the original AREA
+  sprites passes for all three species in `build/qa/dex-area-oracle/logs/run.log`.
+  The 3D renderer, transitions and complete `dex` smoke are still required.
+- The original `FindWildLocationsOfMon` is in `engine/items/item_effects.asm`.
+  It checks grass and water tables only, not fishing. Thus Magikarp is the
+  required no-nest case, rather than a reason to invent fishing markers.
+  `DisplayWildLocations` additionally suppresses Cerulean Cave (coordinate 19).
+- Verified ROM anchors: WildDataPointers CB95, external/internal town-map
+  entries 7139C/7140B; AREA predef call 40118 -> 3EB4 (LD A,4A). The original
+  title is on tile row 0 and must be composited at the bottom of the new view.
+  Blink counter D08A hides at 25 and shows/resets at 50; enable flag D09A.
+- Source copies are private under `build/qa/dex/references/`; the independent
+  map/warp metadata graph supplies entrance positions without modifying the
+  resident-world cache or its camera.
+
+### Paused checkpoint: B1/B2 verified, A3 preparation, 2026-09-20
+
+- Goal paused at the user's request; this checkpoint does not complete the plan.
+- CTest passes 22/22. The AREA reader and state detector are still standalone;
+  `tests/dex_nests_test.cpp` has not yet been registered with CMake.
+- Resume with A3: register its tests, build the independent Kanto overview,
+  markers and original-text compositor, and verify AREA transitions and the
+  complete Pokédex flow. Then finish B3 and the combined `dex`/`pc` smoke modes.
+- ROMs, saves, screenshots and private QA evidence remain under ignored paths.

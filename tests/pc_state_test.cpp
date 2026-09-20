@@ -25,6 +25,8 @@ int main(int argc,char** argv) {
             if(t.map==map){found=true;std::printf("PC map=%d player=%d,%d terminal=%d,%d height=%.2f\n",map,x,z,t.x,t.z,t.height);}
         }
         check(found,"PC furniture found from original ROM");
+        auto terminal=pc_state::terminal(&ctx);
+        check(terminal.x==(map==41?13:0)&&terminal.z==(map==41?3:1),"actual PC location, not a seat or upper wall graphic");
         auto expected=map==41?pc_state::Mode::Center:pc_state::Mode::Items;
         check(pc_state::sample(&ctx).mode==expected,"root PC mode differs between Center and bedroom");
         ctx.rom=sparse.data();check(pc_state::sample(&ctx).mode==expected,"sparse runtime contains verified call anchors");ctx.rom=rom.data();
@@ -32,10 +34,11 @@ int main(int argc,char** argv) {
         ctx.sp=0xdfe2;check(pc_state::sample(&ctx).mode==pc_state::Mode::None,"popped root cannot detect PC");ctx.sp=0xdfe0;
     }
     set(0xd35d,41);set(0xd361,13);set(0xd360,4);
-    for(auto call:{0x17d3f,0x17d51,0x17d63,0x17d87}) {
+    for(auto entry:std::array<std::pair<int,pc_state::Mode>,4>{{{0x17d3f,pc_state::Mode::Items},{0x17d51,pc_state::Mode::Oak},{0x17d63,pc_state::Mode::Hall},{0x17d87,pc_state::Mode::Bill}}}) {
+        auto call=entry.first;
         int ret=call%0x4000+0x4003;set(0xdfe2,ret&255);set(0xdfe3,ret>>8);
         auto mode=pc_state::sample(&ctx).mode;
-        check(mode!=pc_state::Mode::None&&mode!=pc_state::Mode::Center,"each original submenu is detected");
+        check(mode==entry.second,"each original submenu is detected with its own mode");
         uint8_t old=rom[call-4];rom[call-4]=255;check(pc_state::sample(&ctx).mode==pc_state::Mode::Center,"wrong target bank cannot select submenu");rom[call-4]=old;
     }
     auto before=ram;pc_state::sample(&ctx);check(ram==before,"state reader never writes WRAM");

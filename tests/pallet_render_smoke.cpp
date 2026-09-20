@@ -42,6 +42,7 @@ static void capture_surface(const char* path) {
 #include "battle_transition_trace.h"
 #include "presentation_integration.h"
 #include "dex_integration.h"
+#include "pc_integration.h"
 
 int main(int argc,char** argv) {
     if(argc<3) { std::fprintf(stderr,"Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");return 1; }
@@ -78,8 +79,23 @@ int main(int argc,char** argv) {
     if(argc>3&&(!std::strcmp(argv[3],"dex-list")||!std::strcmp(argv[3],"dex-list-fp"))) {
         int result=dex_qa::lists(ctx,!std::strcmp(argv[3],"dex-list-fp"));gb_platform_shutdown();return result;
     }
+    if(argc>3&&!std::strcmp(argv[3],"dex-area-oracle")) {
+        int result=dex_qa::areas(ctx);gb_platform_shutdown();return result;
+    }
     if(argc>3&&(!std::strcmp(argv[3],"dex-screen")||!std::strcmp(argv[3],"dex-screen-fp"))) {
         int result=dex_qa::screen(ctx,!std::strcmp(argv[3],"dex-screen-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"pc-focus")||!std::strcmp(argv[3],"pc-focus-fp"))) {
+        int result=pc_qa::focus(ctx,!std::strcmp(argv[3],"pc-focus-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&!std::strcmp(argv[3],"capture-pidgey")) {
+        int result=battle_capture(ctx,16);gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"pc-storage")||!std::strcmp(argv[3],"pc-storage-fp"))) {
+        int result=pc_qa::storage(ctx,!std::strcmp(argv[3],"pc-storage-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"pc-storage-stress")||!std::strcmp(argv[3],"pc-storage-stress-fp"))) {
+        int result=pc_qa::storage_stress(ctx,!std::strcmp(argv[3],"pc-storage-stress-fp"));gb_platform_shutdown();return result;
     }
     if(argc>3&&(!std::strcmp(argv[3],"crossfade-warp")||!std::strcmp(argv[3],"crossfade-warp-fp"))) {
         int result=presentation_qa::warp(ctx,!std::strcmp(argv[3],"crossfade-warp-fp"));gb_platform_shutdown();return result;

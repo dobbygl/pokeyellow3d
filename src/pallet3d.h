@@ -42,6 +42,12 @@ struct PalletPCInfo {
     std::array<float,16> matrix;std::array<float,8> screen;
 };
 PalletPCInfo pallet3d_pc();
+struct PalletStorageInfo {
+    bool active,party;int box,selected;
+    uint64_t fingerprint;size_t rebuilds,uploads,cached;
+    std::array<int,12> counts;std::array<int,26> species;
+};
+PalletStorageInfo pallet3d_storage();
 bool pallet3d_warp_overlay();
 struct PalletBattleTransitionInfo {bool active,arena;int phase;float wipe;};
 PalletBattleTransitionInfo pallet3d_battle_transition();

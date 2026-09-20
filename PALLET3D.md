@@ -430,7 +430,8 @@ desarrollo de la validación final y sus regresiones.
 | --- | --- |
 | Mundo exterior e interiores compatibles | 3D, ortográfica o primera persona |
 | Texto inferior, Start, guardar, curar y comprar | Ventanas originales sobre el mundo 3D |
-| Equipo, resumen, mochila, PC, ficha, opciones y nombres desde el mundo | LCD original enmarcado sobre la última escena atenuada y desenfocada |
+| Equipo, resumen, mochila, ficha, opciones y nombres desde el mundo | LCD original enmarcado sobre la última escena atenuada y desenfocada |
+| PC del Centro Pokémon y dormitorio | Acercamiento al monitor; menú principal sobre su pantalla y submenús originales sobre la escena atenuada |
 | Ficha de datos de la Pokédex desde su lista | Dispositivo rojo 3D, texto original y retrato verificado; fase A1 completada |
 | Lista de la Pokédex | Dispositivo 3D con retrato, silueta o pantalla vacía según capturado/visto/ausente; fase A2 completada |
 | AREA de la Pokédex | LCD original enmarcado; fase A3 pendiente |
@@ -526,10 +527,43 @@ marcas de registro, comprueba los contadores, abre CRY y vuelve al mundo
 con su cámara y mallas intactas. Capturas:
 `build/qa/logs/dex-a2-list-final.png`.
 
-AREA y las escenas del PC siguen pendientes. La ficha
+AREA y la galería del Hall de la Fama siguen pendientes. La ficha
 original usa A/B para salir; para cambiar de especie se vuelve a su lista,
 sin añadir controles nuevos al juego. El estado de cada fase y sus pruebas
 se registra en `PLAN_POKEDEX_PC.md`. A1/A2 quedan validadas con CTest 19/19,
 las tres regresiones generales y la batería de menús aprobadas, y las
 38 capturas exteriores sin cambios. Capturas de las fichas:
 `build/qa/logs/dex-a1-data-review.png`.
+
+El acceso al PC (B1) está validado en el Centro Pokémon de Ciudad Verde y
+en el dormitorio, con ambas cámaras. La cámara se acerca al monitor en unos
+400 ms y vuelve al cerrar el menú. El dormitorio conserva su almacenamiento
+de objetos original. El menú principal aparece sobre el monitor; los textos
+y submenús conservan los píxeles y controles del juego.
+
+```sh
+tests/pc_focus_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-eqZtuv/center.state build/qa/ui-menus-R28lDE/pallet.state
+```
+
+Evidencia: `build/qa/pc-focus-xiR0Sr/` y
+`build/qa/logs/pc-b1-focus-review.png`. CTest 20/20 y las regresiones de mundo,
+primera persona e interiores pasan; las 38 capturas exteriores no cambian.
+La estantería de Bill (B2) muestra las doce cajas, hasta veinte retratos de la
+caja activa y el equipo. Nombres, niveles y contadores usan la fuente de la ROM.
+Los menús y sus controles siguen siendo los originales. Los bancos guardados
+se verifican con sus checksums; una lectura inválida conserva el menú original
+sobre el interior. El cursor resalta su retrato solo cuando el nombre y la flecha
+ya aparecen en el LCD, y la geometría se reutiliza mientras no cambian los datos.
+
+```sh
+tests/pc_storage_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/town.state
+```
+
+La prueba captura un Pidgey mediante encuentros reales, lo deposita, cambia de
+caja entre bancos, lo retira y lo libera. Otra partida sintética prueba doce
+cajas ocupadas y el scroll de veinte Pokémon. Ambas cámaras pasan, con memoria
+intacta durante el renderizado y píxeles originales en los menús. CTest 22/22;
+evidencia: `build/qa/pc-storage-JZqDwI/`, captura de la estantería:
+`build/qa/logs/pc-b2-full-grid-final.png`.

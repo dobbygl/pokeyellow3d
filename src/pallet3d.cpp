@@ -8,6 +8,7 @@
 #include "menu_state.h"
 #include "battle_transition_state.h"
 #include "mon_pic_cache.h"
+#include "pc_box_state.h"
 #include <SDL_opengles2.h>
 #include <algorithm>
 #include <array>
@@ -650,6 +651,7 @@ void draw_world_frame(int w,int h,fade::Tone tone,bool hide_hero,bool allow_xray
     glBindBuffer(GL_ARRAY_BUFFER,0);glBindTexture(GL_TEXTURE_2D,0);glUseProgram(0);glDisable(GL_DEPTH_TEST);
 }
 
+#include "pc_boxes.h"
 #include "pc3d.h"
 
 void hud(const GBContext* ctx) {
@@ -672,6 +674,7 @@ void hud(const GBContext* ctx) {
 void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
     dex3d::presented=false;
     pc3d::presented=false;
+    pc_boxes::presented=false;
     if(frozen_blend(ctx)) {
         active=presentation::draw(presentation::history,width,height);return;
     }
@@ -961,6 +964,15 @@ PalletMenuInfo pallet3d_menu() {return {menu_overlay&&active&&!dex3d::presented&
 PalletPCInfo pallet3d_pc() {
     return {pc3d::presented&&active,pc_sample.mode!=pc_state::Mode::None,pc3d::monitor_image,
         int(pc_sample.mode),pc_terminal.map,pc_terminal.x,pc_terminal.z,pc_motion.amount,pc3d::matrix,pc3d::screen};
+}
+PalletStorageInfo pallet3d_storage() {
+    PalletStorageInfo info{};info.active=pc_boxes::presented&&active;
+    info.box=pc_boxes::data.active;info.selected=pc_boxes::selected.index;info.party=pc_boxes::selected.party;
+    info.fingerprint=pc_boxes::data.fingerprint;info.rebuilds=pc_boxes::rebuilds;info.uploads=pc_boxes::uploads;info.cached=pc_boxes::portraits.resident();
+    for(int i=0;i<12;i++)info.counts[i]=pc_boxes::data.boxes[i].count;
+    if(info.box>=0&&info.box<12)for(int i=0;i<20;i++)info.species[i]=pc_boxes::data.boxes[info.box].mons[i].species;
+    for(int i=0;i<6;i++)info.species[20+i]=pc_boxes::data.party.mons[i].species;
+    return info;
 }
 PalletDexInfo pallet3d_dex() {
     return {active&&dex3d::presented,dex3d::presented&&dex3d::picture.valid,dex3d::species,

@@ -8,7 +8,7 @@ inline bool battle_menu_visible(const GBContext* ctx) {
 
 // Obtain a second party member for swap/defeat regression through the actual
 // capture rules. The input fixture comes from town's real shop purchase.
-inline int battle_capture(GBContext* ctx) {
+inline int battle_capture(GBContext* ctx,int desired_dex=0) {
     QaWalk run{ctx};run.wait(30);
     run.require(run.read(pallet::Map)==12&&run.read(pallet::X)==10&&run.read(pallet::Y)==4,"Route 1 town fixture");
     int party=run.read(0xd162),arena_frames=0,capture_frames=0;
@@ -26,16 +26,36 @@ inline int battle_capture(GBContext* ctx) {
             if(!shake&&id==0xc2&&run.read(battle::AnimCounter)==3){capture("capture-shake");shake=true;}
         }
     };
-    run.move(12,14,4,"R");run.input("D");bool south=true;
-    for(int i=0;i<4000&&!run.read(pallet::Battle);i++) {
-        if(south&&run.read(pallet::Y)>=12&&!run.read(pallet::Walk)){south=false;run.input("U");}
-        if(!south&&run.read(pallet::Y)<=4&&!run.read(pallet::Walk)){south=true;run.input("D");}
-        tick();
+    run.move(12,14,4,"R");bool found=false;
+    for(int encounter=0;encounter<40&&!found;encounter++) {
+        bool south=run.read(pallet::Y)<12;run.input(south?"D":"U");
+        for(int i=0;i<4000&&!run.read(pallet::Battle);i++) {
+            if(south&&run.read(pallet::Y)>=12&&!run.read(pallet::Walk)){south=false;run.input("U");}
+            if(!south&&run.read(pallet::Y)<=4&&!run.read(pallet::Walk)){south=true;run.input("D");}
+            tick();
+        }
+        run.input(nullptr);run.require(run.read(pallet::Battle)==1,"real wild encounter");
+        for(int i=0;i<2000&&!battle_menu_visible(ctx);i++) {
+            if(i%20==0)run.input("A");if(i%20==6)run.input(nullptr);tick();
+        }
+        run.input(nullptr);run.wait(15);
+        int dex=mon_pic::number(ctx->rom,ctx->rom_size,run.read(0xcfe4));
+        found=!desired_dex||dex==desired_dex;
+        std::fprintf(stderr,"[CAPTURE] natural encounter=%d dex=%d wanted=%d\n",encounter+1,dex,desired_dex);
+        if(found)break;
+        // Leave unwanted encounters through the original RUN command. No
+        // species, encounter table, party record or random seed is injected.
+        for(int attempt=0;attempt<8&&run.read(pallet::Battle);attempt++) {
+            run.press("L");run.press("U");run.press("R");run.press("D");run.press("A");
+            for(int i=0;i<1800&&run.read(pallet::Battle);i++) {
+                if(i>120&&battle_menu_visible(ctx))break;
+                if(i%40==0)run.input("A");if(i%40==6)run.input(nullptr);tick();
+            }
+            run.input(nullptr);
+        }
+        run.wait(40);run.require(!run.read(pallet::Battle),"escape unwanted encounter");
     }
-    run.input(nullptr);run.require(run.read(pallet::Battle)==1,"real wild encounter");
-    for(int i=0;i<2000&&!battle_menu_visible(ctx);i++) {
-        if(i%20==0)run.input("A");if(i%20==6)run.input(nullptr);tick();
-    }
+    run.require(found,"requested species encountered naturally");
     run.input(nullptr);run.wait(15);capture("capture-start");
     int throws=0;
     for(;throws<10&&run.read(0xd162)==party;throws++) {
@@ -63,6 +83,7 @@ inline int battle_capture(GBContext* ctx) {
     }
     run.input(nullptr);run.wait(40);capture("capture-complete");
     run.require(run.read(0xd162)==party+1&&!run.read(pallet::Battle)&&pallet3d_active(),"real capture adds Pokemon and restores world");
+    if(desired_dex)run.require(mon_pic::number(ctx->rom,ctx->rom_size,run.read(0xd163+party))==desired_dex,"captured requested species through original engine");
     run.require(arena_frames>30,"capture encounter uses 3D battle scene");
     run.require(capture_frames>20&&trajectory&&shake,"3D ball trajectory and engine-driven shake are visible");
     std::fprintf(stderr,"PASS: wild capture after %d throws, %d scene frames, %d ball frames, unchanged WRAM/VRAM/framebuffer and no GL errors\n",throws,arena_frames,capture_frames);

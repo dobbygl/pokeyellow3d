@@ -14,8 +14,9 @@ inline Terminal terminal(const GBContext* ctx) {
     int x=battle::read(ctx,0xd361),z=int(battle::read(ctx,0xd360))-1;
     if(x<0||z<0||x>=scene->width||z>=scene->height)return {};
     int tile=pallet::map_tile(ctx->rom,*scene,x*2,z*2);
-    bool bedroom=(scene->tileset==1||scene->tileset==4)&&(tile==0x40||tile==0x42);
-    bool center=(scene->tileset==2||scene->tileset==6)&&(tile==0x20||tile==0x21);
+    int bottom=pallet::map_tile(ctx->rom,*scene,x*2,z*2+1);
+    bool bedroom=(scene->tileset==1||scene->tileset==4)&&tile==0x42&&bottom==0x32;
+    bool center=scene->tileset==6&&tile==0x42&&bottom==0x52;
     auto cell=interior::classify(ctx->rom,*scene,x,z);
     if((!bedroom&&!center)||cell.kind!=interior::Kind::Furniture)return {};
     return {scene->id,x,z,cell.height,bedroom};

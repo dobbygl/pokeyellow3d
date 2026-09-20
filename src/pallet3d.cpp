@@ -9,6 +9,7 @@
 #include "battle_transition_state.h"
 #include "mon_pic_cache.h"
 #include "pc_box_state.h"
+#include "dex_nests.h"
 #include <SDL_opengles2.h>
 #include <algorithm>
 #include <array>
@@ -73,6 +74,7 @@ pc_state::Motion pc_motion;
 pc_state::Sample pc_sample;
 pc_state::Terminal pc_terminal;
 bool pc_composed=false;
+bool can_compose_area(const GBContext* ctx);
 bool can_compose_pc(const GBContext* ctx) {
     return preview_map<0&&ctx&&ctx->wram&&world_frame.map>=0&&world_frame.map==pallet::read(ctx,pallet::Map)&&
         !pallet::read(ctx,pallet::Battle)&&(pc_motion.amount>0||pc_state::sample(ctx).mode!=pc_state::Mode::None);
@@ -95,7 +97,7 @@ bool can_compose_menu(const GBContext* ctx) {
     const auto state=pallet::view(ctx);
     bool resident=world_frame.map>=0&&world_frame.map==pallet::read(ctx,pallet::Map);
     if(!resident)return state==pallet::View::Dialogue&&can_compose_dialogue(ctx);
-    return state==pallet::View::Dialogue||state==pallet::View::Pokedex||state==pallet::View::Computer||menu_state::running(ctx)||
+    return state==pallet::View::Dialogue||state==pallet::View::Pokedex||state==pallet::View::Computer||state==pallet::View::PokedexArea||menu_state::running(ctx)||
         (menu_overlay&&state==pallet::View::Transition);
 }
 bool warp_overlay=false;
@@ -391,7 +393,7 @@ bool wants_scene(const GBContext* ctx) {
     if(!enabled||failed)return false;
     auto state=pallet::view(ctx);
     return (preview_map>=0&&presented_scene(ctx))||state==pallet::View::Overworld||state==pallet::View::Battle||state==pallet::View::Pokedex||
-        load_fade||can_compose_menu(ctx)||can_compose_warp(ctx)||can_compose_battle(ctx)||can_compose_pc(ctx);
+        load_fade||can_compose_area(ctx)||can_compose_menu(ctx)||can_compose_warp(ctx)||can_compose_battle(ctx)||can_compose_pc(ctx);
 }
 bool frozen_blend(const GBContext* ctx) {
     return presentation::blend.paused&&presentation::history.valid&&
@@ -469,6 +471,8 @@ bool initialize(const GBContext* ctx) {
 
 #include "battle3d.h"
 #include "dex3d.h"
+#include "dex_area3d.h"
+bool can_compose_area(const GBContext* ctx) {return preview_map<0&&dex_area3d::wants(ctx); }
 
 void sprite_image(const GBContext* ctx,const pallet::Actor& actor) {
     int ox=actor.slot*32,oy=384;
@@ -673,6 +677,8 @@ void hud(const GBContext* ctx) {
 
 void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
     dex3d::presented=false;
+    dex_area3d::presented=false;
+    dex_area3d::synchronize(ctx);
     pc3d::presented=false;
     pc_boxes::presented=false;
     if(frozen_blend(ctx)) {
@@ -711,7 +717,7 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
     dialogue_overlay=menu_overlay&&pallet::bottom_dialogue(ctx);
     warp_overlay=!battle_composed&&can_compose_warp(ctx);
     if(warp_overlay)warp_destination=pallet::read(ctx,pallet::Map);
-    active=enabled && ((preview_map>=0 && presented_scene(ctx)) || state==pallet::View::Overworld || state==pallet::View::Battle || state==pallet::View::Pokedex || battle_composed || menu_overlay || warp_overlay || load_fade || pc_composed) && width>0 && height>0;
+    active=enabled && ((preview_map>=0 && presented_scene(ctx)) || state==pallet::View::Overworld || state==pallet::View::Battle || state==pallet::View::Pokedex || battle_composed || menu_overlay || warp_overlay || load_fade || pc_composed || can_compose_area(ctx)) && width>0 && height>0;
     if(!battle::normal(ctx)&&!battle_composed)battle3d::reset();
     if(!active||failed) {
         eye.reset();
@@ -778,6 +784,12 @@ void pallet3d_draw(GBContext* ctx,int width,int height,bool menu_open) {
         draw_world_frame(width,height,tone,hidden,false);++active_frames;return;
     }
     if(pc_composed) {pc3d::draw(ctx,width,height,menu_open);++active_frames;return;}
+    if(can_compose_area(ctx)) {
+        if(dex_area3d::draw(ctx,width,height,menu_open)) {++active_frames;return;}
+        // Unsupported AREA data keeps the existing full-LCD compositor, even
+        // on a cold load where no world frame has ever been resident.
+        if(!menu_overlay) {original_frame(ctx,width,height);++active_frames;return;}
+    }
     if(state==pallet::View::Pokedex&&preview_map<0) {
         if(dex3d::draw(ctx,width,height,menu_open)) {++active_frames;return;}
         if(!menu_overlay) {
@@ -826,6 +838,7 @@ bool pallet3d_event(const SDL_Event* event,bool menu_open) {
         enabled=!enabled;controls.reset();pallet3d_poll_controls(input_context,menu_open);std::fprintf(stderr,"[3D] %s\n",enabled?"Enabled":"Disabled");return true;
     }
     if(event->type==SDL_KEYDOWN && !event->key.repeat && event->key.keysym.scancode==SDL_SCANCODE_F3) {
+        if(can_compose_area(input_context))return true;
         first_person=!first_person;eye.reset();controls.reset();pallet3d_poll_controls(input_context,menu_open);return true;
     }
     if(relative_allowed && (event->type==SDL_KEYDOWN || event->type==SDL_KEYUP)) {
@@ -837,7 +850,7 @@ bool pallet3d_event(const SDL_Event* event,bool menu_open) {
             return true;
         }
     }
-    if(!active||warp_overlay||menu_overlay||load_fade||battle_composed||dex3d::presented||pc_composed)return false;
+    if(!active||warp_overlay||menu_overlay||load_fade||battle_composed||dex3d::presented||dex_area3d::presented||pc_composed)return false;
     if(input_context&&pallet::view(input_context)==pallet::View::Battle)return false;
     if(first_person)return false;
     const auto* room=input_context?presented_scene(input_context):nullptr;
@@ -869,6 +882,7 @@ void pallet3d_shutdown() {
     battle_sequence=battle_arena=battle_fighters=battle_dark=battle_composed=false;
     battle3d::shutdown();
     dex3d::shutdown();
+    dex_area3d::shutdown();
     pc3d::shutdown();
     lcd_overlay::shutdown();scene_filter::shutdown();menu_overlay=menu_full=menu_blurred=false;
     for(auto& entry:meshes)glDeleteBuffers(1,&entry.second.buffer);
@@ -924,7 +938,7 @@ void pallet3d_poll_controls(GBContext* ctx,bool menu_open) {
     input_context=ctx;
     bool blending=presentation::blend.running||(presentation::history.valid&&wants_scene(ctx)!=presentation::blend.target);
     relative_allowed=first_person && enabled && !failed && !blending && window_focused && !menu_open && preview_map<0 && !can_compose_battle(ctx) &&
-        pallet::view(ctx)==pallet::View::Overworld && !can_compose_warp(ctx) && !can_compose_menu(ctx) && !can_compose_pc(ctx) && !load_fade;
+        pallet::view(ctx)==pallet::View::Overworld && !can_compose_warp(ctx) && !can_compose_menu(ctx) && !can_compose_pc(ctx) && !can_compose_area(ctx) && !load_fade;
     int facing=relative_allowed?pallet::read(ctx,0xc109):0;
     bool idle=relative_allowed && !pallet::read(ctx,pallet::Walk) &&
         !pallet::read(ctx,0xd527) && pallet::read(ctx,0xcc4b)==1;
@@ -938,6 +952,7 @@ void pallet3d_poll_controls(GBContext* ctx,bool menu_open) {
 uint8_t pallet3d_input_mask() {return input_mask;}
 
 void pallet3d_state_loaded(GBContext* ctx) {
+    dex_area3d::reset();
     pc3d::reset();
     battle_sequence=battle_arena=battle_fighters=battle_dark=battle_composed=false;battle3d::reset();
     warp_overlay=false;warp_destination=-1;menu_overlay=false;scene_filter::invalidate();controls.reset();
@@ -991,4 +1006,10 @@ PalletBattleInfo pallet3d_battle() {
         battle3d::portraits[0].fingerprint,battle3d::portraits[1].fingerprint,
         int(battle3d::effect_kind),battle3d::capture_effect,battle3d::effect_time,battle3d::effect_actor,battle3d::overlay_alpha,battle3d::trainer_class,
         battle3d::portraits[0].hp,battle3d::portraits[1].hp,battle3d::portraits[0].damage,battle3d::portraits[1].damage};
+}
+
+PalletAreaInfo pallet3d_area() {
+    return {active&&dex_area3d::presented,dex_area3d::ready,dex_area3d::blink,dex_area3d::species,
+        dex_area3d::nests.locations.size(),dex_area3d::nests.coordinates.size(),dex_area3d::markers.size(),
+        dex_area3d::builds,dex_area3d::count,dex_area3d::uploads};
 }

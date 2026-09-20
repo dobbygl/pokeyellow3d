@@ -4,6 +4,7 @@
 #include "world_scene.h"
 #include "battle_state.h"
 #include "dex_state.h"
+#include "dex_area_state.h"
 #include "pc_state.h"
 #include <array>
 #include <cstdint>
@@ -22,7 +23,7 @@ inline uint8_t read(const GBContext* ctx, uint16_t addr) {
     return ctx->wram[addr - 0xc000];
 }
 
-enum class View { Unsupported, Transition, Dialogue, Overworld, Battle, Pokedex, Computer };
+enum class View { Unsupported, Transition, Dialogue, Overworld, Battle, Pokedex, Computer, PokedexArea };
 
 inline bool valid_live_map(const GBContext* ctx,const Scene& s) {
     const int bw=s.width/2,bh=s.height/2;
@@ -39,6 +40,7 @@ inline View view(const GBContext* ctx) {
     if(!load_catalog(ctx->rom,ctx->rom_size))return View::Unsupported;
     const Scene* s=ensure_scene(read(ctx,Map));
     if(read(ctx,Battle))return s&&battle::ready(ctx)?View::Battle:View::Unsupported;
+    if(dex_area_state::active(ctx))return View::PokedexArea;
     if(dex_state::data(ctx)||dex_state::list(ctx).number)return View::Pokedex;
     if(pc_state::sample(ctx).mode!=pc_state::Mode::None)return View::Computer;
     if (!s || read(ctx, Width)*2 != s->width || read(ctx, Height)*2 != s->height ||

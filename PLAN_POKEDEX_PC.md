@@ -547,3 +547,48 @@ Acceptance criteria:
   markers and original-text compositor, and verify AREA transitions and the
   complete Pokédex flow. Then finish B3 and the combined `dex`/`pc` smoke modes.
 - ROMs, saves, screenshots and private QA evidence remain under ignored paths.
+
+
+### Paused checkpoint: AREA implementation and regression evidence, 2026-09-20
+
+This checkpoint supersedes the A3 preparation status above. The implementation
+is saved for review; acceptance checkboxes remain unchanged until the final
+phase audit. B3 and the combined PC smoke mode remain pending.
+
+- `src/dex_area3d.h` renders a private 36-map Kanto overview with ROM city
+  names, original encounter markers and original LCD title/unknown-area text.
+  Its geometry and texture caches preserve the resident world's camera and
+  meshes. The complete `dex` and `dex-fp` flows cover list, DATA, CRY and AREA.
+- CMake now registers `dex_nests` and the private original-engine oracle.
+  Pidgey, Zubat and Magikarp match the original AREA results. Both camera
+  preferences and cold AREA loads pass, including blink, exact original text,
+  preserved caches and per-frame guest-memory invariants.
+- Final CTest: **24/24** (`build/qa/logs/dex-a3-ctest-final.log`).
+  ROM-free CTest: **8/8** (`build/qa/logs/dex-a3-no-rom.log`); the independent
+  `build/qa/no-rom` directory contains no ROM. Software rendering also passes
+  with llvmpipe (`dex-a3-software-render.log`).
+- All thirteen `tests/*_qa.sh` suites pass. Logs are
+  `build/qa/logs/dex-a3-{world,firstperson,interiors,battles,ui_battles,ui_crossfade,ui_menus,ui_transitions,dex_list,dex_portraits,dex_area,pc_focus,pc_storage}.log`.
+  The sequential resumed batch exited 0 (`dex-a3-remaining.exit`).
+- All **38 exterior** and **179 interior catalog** captures are byte-identical
+  to B2. Reports: `dex-a3-exterior-comparison.txt` and
+  `dex-a3-interior-catalog-comparison.txt` under `build/qa/logs/`.
+  Five additional live-journey captures differ; these are recorded in
+  `dex-a3-interior-comparison.txt`, not counted as byte-identical. Camera
+  settling tied to real elapsed time is a suspected cause, not a proven
+  explanation for every difference.
+- Reviewed AREA contact sheet: `build/qa/logs/dex-a3-area-review.png`.
+  Final dedicated AREA evidence: `build/qa/dex-area-b8VaUF/`.
+
+Reproduce the focused checks with local, private fixtures:
+
+```sh
+cmake --build build --target pokeyellow3d pallet_render_smoke dex_nests_test
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+tests/dex_area_qa.sh build/roms/pokeyellow.gbc build/qa/ui-menus-R28lDE/pallet.state
+bash build/qa/logs/run-dex-a3-regressions.sh
+```
+
+The last command is the locally retained full fixture-based regression script;
+private ROMs, savestates, screenshots and logs are not committed.

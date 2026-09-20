@@ -22,6 +22,29 @@ int main() {
         machine.place_player(plan.home, 4, 4, 0);
         machine.start_battle(enemy_species, player_species);
 
+        // A procedural compressed 1x1 portrait, independent of cartridge data.
+        // Each source row is AA in the first stream, 55 in the second. Their
+        // differential decode is CC/66; modes 1 and 2 XOR the second plane.
+        for(int mode=0;mode<3;mode++)for(int first=0;first<2;first++) {
+            std::vector<uint8_t> packed{0x11};size_t bit=8;
+            auto put=[&](unsigned value,int n){for(int b=n-1;b>=0;b--){if(bit/8==packed.size())packed.push_back(0);packed[bit/8]|=((value>>b)&1)<<(7-bit%8);++bit;}};
+            put(first,1);put(1,1);for(int i=0;i<32;i++)put(2,2);
+            if(mode==0)put(0,1);else {put(1,1);put(mode-1,1);}
+            put(1,1);for(int i=0;i<32;i++)put(1,2);
+            auto decoded=mon_pic::decompress(packed.data(),packed.size());
+            auto flipped=mon_pic::decompress(packed.data(),packed.size(),true);
+            check(decoded.valid&&flipped.valid&&decoded.mode==mode,"procedural compressed portrait modes");
+            for(int x=0;x<7;x++)for(int y=0;y<56;y++)for(int plane=0;plane<2;plane++) {
+                int expected=0;
+                if(x==3&&y>=48)expected=plane==first?0xcc:mode==0?0x66:mode==1?0x99:0xaa;
+                size_t i=(x*56+y)*2+plane;
+                check(decoded.tiles[i]==expected,"independent expected pixels, alignment and plane order");
+                int mirrored=expected==0xcc?0x33:expected==0xaa?0x55:expected;
+                check(flipped.tiles[i]==mirrored,"compressed portrait mirror");
+            }
+            check(!mon_pic::decompress(packed.data(),packed.size()-2).valid,"truncated compressed stream rejected");
+        }
+
         // --- normal() and ready() --------------------------------------------
         check(battle::normal(ctx), "a wild battle with both parties is normal");
         check(battle::ready(ctx), "the synthetic arena satisfies every ready() condition");

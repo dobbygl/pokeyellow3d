@@ -136,9 +136,51 @@ inline int screen(GBContext* ctx,bool fp) {
     run.require(pallet3d_dex().active,"restored original species presents its own portrait");
     std::puts("PASS: independent data-screen load, exact portrait, bounded texture uploads and stale-VRAM fallback");return 0;
 }
-inline int areas(GBContext* ctx,bool fp=false) {
+inline size_t area_frames=0,area_visible=0,area_hidden=0;
+inline void observe_area(GBContext* ctx,int frame) {
+    observe_menu_frame(ctx,frame);observe(ctx,frame);
+    auto info=pallet3d_area();
+    if(dex_area_state::active(ctx)) {
+        if(!info.active||info.species!=battle::read(ctx,dex_state::Current)||pallet3d_input_mask()!=255) {
+            std::fprintf(stderr,"[AREA] FAIL: presentation/species/controls frame=%d\n",frame);std::exit(50);
+        }
+        if(dex_area_state::ready(ctx)) {
+            if(!info.ready||info.blink!=dex_area_state::blink(ctx)) {
+                std::fprintf(stderr,"[AREA] FAIL: blink mismatch frame=%d\n",frame);std::exit(50);
+            }
+            ++area_frames;if(info.blink)++area_visible;else ++area_hidden;
+        }
+    }
+}
+inline void verify_area_pixels(QaWalk& run) {
+    GLint vp[4];glGetIntegerv(GL_VIEWPORT,vp);int w=vp[2],h=vp[3],s=std::max(1,std::min(w/160,3));
+    std::vector<uint8_t> rgba(size_t(w)*h*4);glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
+    auto compare=[&](int rx,int ry,int rw,int rh,int left,int top) {
+        int differences=0;const uint32_t* original=gb_get_framebuffer(run.ctx);
+        for(int y=0;y<rh;y++)for(int x=0;x<rw;x++) {
+            size_t at=((h-1-(top+y*s+s/2))*w+left+x*s+s/2)*4;uint32_t c=original[(ry+y)*160+rx+x];
+            differences+=rgba[at]!=uint8_t(c>>16)||rgba[at+1]!=uint8_t(c>>8)||rgba[at+2]!=uint8_t(c);
+        }
+        std::fprintf(stderr,"[AREA] original pixels=%d differences=%d\n",rw*rh,differences);
+        run.require(!differences,"AREA text matches original LCD pixels");
+    };
+    compare(0,0,160,8,int(std::floor((w-160*s)*.5f)),h-8*s-16);
+    if(pallet3d_area().maps==0)compare(8,56,136,32,int(std::floor((w-136*s)*.5f)),int(std::floor((h-32*s)*.5f)));
+}
+inline int area_screen(GBContext* ctx) {
+    QaWalk run{ctx};run.require(dex_area_state::ready(ctx),"original AREA savestate");
+    auto frame=[&](){ReadOnlyMemory before{ctx};gb_platform_render_frame(gb_get_framebuffer(ctx));run.require(before.unchanged(ctx)&&glGetError()==GL_NO_ERROR,"cold AREA frame is read only and GL clean");};
+    frame();frame();run.require(pallet3d_area().active&&pallet3d_area().ready,"AREA initializes without a resident world");
+    verify_area_pixels(run);auto info=pallet3d_area();frame();frame();
+    run.require(info.builds==pallet3d_area().builds&&info.uploads==pallet3d_area().uploads,"cold AREA cache remains bounded");
+    capture_surface("logs/area-cold.ppm");
+    std::puts("PASS: cold AREA load, original text, private cache and intact memory");return 0;
+}
+inline int areas(GBContext* ctx,bool fp=false,bool complete=false) {
     QaWalk run{ctx};run.wait(30);run.require(pallet::view(ctx)==pallet::View::Overworld,"world before original AREA screens");
     if(fp){SDL_Event e{};e.type=SDL_KEYDOWN;e.key.keysym.scancode=SDL_SCANCODE_F3;pallet3d_event(&e,false);run.wait(20);}
+    auto world=pallet3d_world_frame();auto cache=pallet3d_stats();
+    if(complete)qa_frame_observer=observe_area;
     // Private seen/owned flags only unlock original menu navigation. No area
     // list, nest coordinates, OAM entries or encounter tables are fabricated.
     std::fill_n(ctx->wram+0x12f6,19,255);ctx->wram[0x1308]=127;
@@ -149,7 +191,15 @@ inline int areas(GBContext* ctx,bool fp=false) {
     for(int number:{16,41,129}) {
         for(;selected<number;selected++)run.press("D",2);
         run.require(run.read(0xcc26)+run.read(0xcc36)+1==number,"original list selects AREA species");
-        run.press("A");run.press("D");run.press("D");run.press("A");run.wait(140);
+        if(complete) {
+            run.press("A");run.press("A");run.wait(140);
+            run.require(pallet3d_dex().active&&!pallet3d_dex().list&&pallet3d_dex().verified,"complete dex data screen");
+            for(int i=0;i<6&&!battle::live_return(ctx,0x4003d,0x4140);i++)run.press("B");
+            run.wait(40);run.press("A");run.press("D");run.press("A");run.wait(120);
+            run.require(pallet3d_dex().active&&pallet3d_dex().list,"original CRY returns to side menu");
+            run.press("D");run.press("A");
+        } else {run.press("A");run.press("D");run.press("D");run.press("A");}
+        run.wait(140);
         run.require(battle::live_return(ctx,0x71003,0x3852)&&ctx->io[0x47]==0xe4,"original AREA wait routine");
         std::set<uint8_t> original;
         for(int i=0;i<36;i++) {
@@ -164,12 +214,29 @@ inline int areas(GBContext* ctx,bool fp=false) {
         for(auto value:original)std::fprintf(stderr,"%02x,",value);std::fputc('\n',stderr);
         uint8_t header[]={uint8_t(number),uint8_t(original.size())};std::fwrite(header,1,2,evidence);
         for(auto value:original)std::fwrite(&value,1,1,evidence);std::fflush(evidence);
+        if(complete) {
+            auto info=pallet3d_area();
+            run.require(info.active&&info.maps==parsed.locations.size()&&info.locations==original.size(),"overview covers every original nest");
+            run.require((info.markers==0)==original.empty()&&info.vertices>0&&info.builds==1,"bounded independent world with no invented nests");
+            verify_area_pixels(run);auto builds=info.builds,uploads=info.uploads;
+            for(int i=0;i<3;i++) {ReadOnlyMemory before{ctx};gb_platform_render_frame(gb_get_framebuffer(ctx));run.require(before.unchanged(ctx)&&glGetError()==GL_NO_ERROR,"frozen overview is read only");}
+            run.require(pallet3d_area().builds==builds&&pallet3d_area().uploads==uploads,"frozen overview reuses mesh and atlas");
+            SDL_Event e{};e.type=SDL_KEYDOWN;e.key.keysym.scancode=SDL_SCANCODE_F3;pallet3d_event(&e,false);
+            run.require(pallet3d_firstperson()==fp,"AREA ignores world camera shortcuts");
+        }
+        if(complete)for(int i=0;i<60&&!pallet3d_area().blink;i++)run.tick();
         char path[100];std::snprintf(path,sizeof(path),"logs/area-%03d.ppm",number);capture_surface(path);
         std::snprintf(path,sizeof(path),"logs/area-%03d.state",number);run.require(gb_context_save_state_file(ctx,path),"private original area fixture");
         run.press("B");run.wait(40);run.require(battle::live_return(ctx,0x4003d,0x4140),"AREA returns to original list");
     }
     std::fclose(evidence);run.press("B");run.press("B");run.wait(30);
     run.require(pallet::view(ctx)==pallet::View::Overworld,"AREA journey returns to world");
+    qa_frame_observer=nullptr;
+    if(complete) {
+        run.require(area_frames>100&&area_visible>40&&area_hidden>40,"original blink observed in both phases");
+        run.require(pallet3d_world_frame().camera==world.camera&&pallet3d_stats().mesh_builds==cache.mesh_builds&&pallet3d_stats().resident_maps==cache.resident_maps,"overview preserves resident meshes and world camera");
+        run.require(!pallet3d_area().active&&pallet3d_firstperson()==fp,"AREA closes and restores camera preference");
+    }
     std::puts("PASS: Pidgey, Zubat and Magikarp nest coordinates match the original AREA sprites");return 0;
 }
 } // namespace dex_qa

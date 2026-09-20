@@ -33,7 +33,7 @@ set_tests_properties(render_preview_synthetic PROPERTIES
     SKIP_RETURN_CODE 77
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy")
 
-foreach(rom_test interior interior_audit battle_state fade_state pallet_state kanto_geometry kanto_rom)
+foreach(rom_test interior interior_audit battle_state fade_state battle_transition pallet_state kanto_geometry kanto_rom)
     if(TEST ${rom_test})
         set_tests_properties(${rom_test} PROPERTIES LABELS rom)
     endif()

@@ -79,6 +79,12 @@ int main(int argc,char** argv) {
     if(argc>3&&(!std::strcmp(argv[3],"dex-list")||!std::strcmp(argv[3],"dex-list-fp"))) {
         int result=dex_qa::lists(ctx,!std::strcmp(argv[3],"dex-list-fp"));gb_platform_shutdown();return result;
     }
+    if(argc>3&&(!std::strcmp(argv[3],"dex")||!std::strcmp(argv[3],"dex-fp"))) {
+        int result=dex_qa::areas(ctx,!std::strcmp(argv[3],"dex-fp"),true);gb_platform_shutdown();return result;
+    }
+    if(argc>3&&!std::strcmp(argv[3],"dex-area-screen")) {
+        int result=dex_qa::area_screen(ctx);gb_platform_shutdown();return result;
+    }
     if(argc>3&&!std::strcmp(argv[3],"dex-area-oracle")) {
         int result=dex_qa::areas(ctx);gb_platform_shutdown();return result;
     }

@@ -527,7 +527,8 @@ marcas de registro, comprueba los contadores, abre CRY y vuelve al mundo
 con su cámara y mallas intactas. Capturas:
 `build/qa/logs/dex-a2-list-final.png`.
 
-AREA y la galería del Hall de la Fama siguen pendientes. La ficha
+La galería del Hall de la Fama sigue pendiente. AREA ya tiene una vista del
+mundo 3D; su validación se detalla abajo. La ficha
 original usa A/B para salir; para cambiar de especie se vuelve a su lista,
 sin añadir controles nuevos al juego. El estado de cada fase y sus pruebas
 se registra en `PLAN_POKEDEX_PC.md`. A1/A2 quedan validadas con CTest 19/19,
@@ -567,3 +568,31 @@ cajas ocupadas y el scroll de veinte Pokémon. Ambas cámaras pasan, con memoria
 intacta durante el renderizado y píxeles originales en los menús. CTest 22/22;
 evidencia: `build/qa/pc-storage-JZqDwI/`, captura de la estantería:
 `build/qa/logs/pc-b2-full-grid-final.png`.
+
+
+### AREA de la Pokédex
+
+AREA presenta los 36 mapas conectados de Kanto con cámara cenital, niebla
+ligera y nombres de ciudades tomados de la ROM. Conserva una malla y un atlas
+propios: al salir reaparecen las mallas y la cámara que estaban en el mundo.
+Los nidos parpadean con el contador del juego. Los mapas aislados y las cuevas
+se señalan en sus entradas; varias plantas pueden compartir una entrada.
+
+Pidgey coincide con las 13 zonas del mapa original. Zubat coincide con sus
+4 zonas; las entradas físicas pueden ocupar varios puntos de una misma zona.
+Magikarp muestra el mensaje original `AREA UNKNOWN`, porque AREA consulta
+encuentros terrestres y acuáticos, no las tablas de pesca. El nombre y ese
+mensaje se componen desde los píxeles originales, sin cambiar sus controles.
+
+```sh
+tests/dex_area_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-R28lDE/pallet.state
+```
+
+El modo `dex` de `pallet_render_smoke` recorre lista, datos, CRY y AREA;
+`dex-fp` repite con preferencia de primera persona. La batería compara los
+nidos con los sprites del mapa original, todos los píxeles del texto, las dos
+fases de parpadeo, las cargas directas y la conservación de cámara y cachés.
+WRAM, VRAM, RAM de cartucho y framebuffer se comprueban en cada frame.
+Capturas revisadas: `build/qa/logs/dex-a3-area-review.png`. El registro del plan
+indica el estado de las regresiones posteriores antes de cerrar A3.

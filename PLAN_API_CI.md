@@ -1,6 +1,6 @@
 # Plan: runtime extension API and CI on GitHub Actions
 
-Date: 2026-09-20. Status: proposed; no phase started. Develops points 1 and 2
+Date: 2026-09-20. Status: partial implementation; goal paused for commit and push. Develops points 1 and 2
 of `PLAN_MEJORAS.md`.
 
 ## Goal and scope
@@ -254,3 +254,23 @@ Acceptance criteria:
 - `tests/pallet_render_smoke.cpp`: headless initialization that reuses the synthetic test.
 - [GB-Recomp/gb-recompiled](https://github.com/GB-Recomp/gb-recompiled).
 - [GitHub Actions: matrices and caching](https://docs.github.com/actions).
+
+
+### Paused checkpoint, 2026-09-20
+
+- The runtime fork exists at `dobbygl/gb-recompiled`, branch
+  `presentation-api`, based on upstream `6581880fce60e6f139901a5942fc984e9c1db8ab`.
+  Its versioned header, frontend callbacks and procedural contract test are
+  implemented and compile. Runtime execution validation is still pending;
+  no API tag or upstream PR has been published.
+- This game still uses its existing runtime integration. Migration to the
+  API and removal of textual patches have not been performed.
+- Existing synthetic tests have been audited: procedural portrait decoding
+  now exercises all three modes, plane ordering, mirroring and truncation;
+  render invariants include cartridge RAM. `battle_transition` is correctly
+  labeled ROM-dependent. The independent ROM-free build passes 8/8 tests,
+  including software GL rendering with llvmpipe. Evidence is recorded in the
+  AREA checkpoint in `PLAN_POKEDEX_PC.md`.
+- CI workflows already exist; the initial-state description above is
+  historical. The remaining CI, test PR, release and upstream validation
+  criteria are not claimed complete by this checkpoint.

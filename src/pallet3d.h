@@ -37,6 +37,10 @@ struct PalletDexInfo {
     bool list;int registration,number,seen,caught;size_t cached,decodes;int row;
 };
 PalletDexInfo pallet3d_dex();
+struct PalletAreaInfo {
+    bool active,ready,blink;int species;size_t maps,locations,markers,builds,vertices,uploads;
+};
+PalletAreaInfo pallet3d_area();
 struct PalletPCInfo {
     bool active,open,monitor;int mode,map,x,z;float progress;
     std::array<float,16> matrix;std::array<float,8> screen;

@@ -35,14 +35,15 @@ void check(bool condition, const char* message) {
 
 // The emulated machine is presentation input only; nothing may write back.
 struct Snapshot {
-    std::vector<uint8_t> wram, vram;
+    std::vector<uint8_t> wram, vram, eram;
     std::vector<uint32_t> framebuffer;
     explicit Snapshot(const synthetic::Context& m)
         : wram(m.wram.begin(), m.wram.end()), vram(m.vram.begin(), m.vram.end()),
-          framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {}
+          eram(m.eram.begin(), m.eram.end()), framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {}
     bool unchanged(const synthetic::Context& m) const {
         return !std::memcmp(wram.data(), m.wram.data(), wram.size()) &&
                !std::memcmp(vram.data(), m.vram.data(), vram.size()) &&
+               !std::memcmp(eram.data(), m.eram.data(), eram.size()) &&
                !std::memcmp(framebuffer.data(), m.framebuffer.data(), framebuffer.size() * 4);
     }
 };

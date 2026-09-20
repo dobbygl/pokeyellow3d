@@ -1,6 +1,6 @@
 # Plan: ten improvements after completing the 3D design
 
-Date: 2026-09-20. Status: proposed. Ordered by priority; each point is
+Date: 2026-09-20. Status: points 5 then 4 authorized after the pending menu, Pokédex/PC and API/CI phases. Ordered by priority; each point is
 independent except where a dependency is noted.
 
 ## Starting point
@@ -110,6 +110,43 @@ Acceptance criteria:
 - [ ] An application setting allows fixing the time or disabling the cycle.
 - [ ] Encounters, scripts, and RNG do not change with the time of day.
 
+### Phase 4A: presentational clock and lighting
+
+Work:
+
+- Convert local system time into a continuous sun direction and palette for
+  sky, fog, ambient/direct light and emissive window surfaces. Reuse the
+  existing materials; completing point 3 is outside this requested scope.
+- Add application settings for automatic local time, a fixed hour and disabled
+  cycle. Persist presentation preferences separately from cartridge saves.
+- Keep disabled mode byte-identical to the previous world rendering. Keep
+  title sunset independent of the world clock. Never advance or sample RNG.
+
+Acceptance criteria:
+
+- [ ] Unit tests cover midnight wrap, dawn/noon/dusk/night and fixed/disabled settings.
+- [ ] Both cameras expose the settings and preserve them across application restarts.
+- [ ] Sun, sky, fog and window light respond continuously; disabled mode preserves the reference captures.
+
+### Phase 4B: visual and engine parity gate
+
+Work:
+
+- Capture and review dawn, noon, dusk and night in Pallet Town, Route 1 and
+  Viridian City in both cameras. Record exact fixed hours and commands.
+- Replay identical input with different fixed hours and disabled lighting;
+  compare complete engine state, scripts, encounters and RNG. Guard WRAM,
+  VRAM, cartridge RAM and framebuffer around every presentation frame.
+- Run full CTest, ROM-free CTest and every `tests/*_qa.sh` suite. Compare all
+  38 exterior references with the cycle disabled, and explicitly document
+  intended illumination differences for the enabled captures.
+
+Acceptance criteria:
+
+- [ ] All 24 location/time/camera captures are reviewed under `build/qa/logs/`.
+- [ ] Engine states and RNG are identical for the time-of-day replay variants.
+- [ ] All regression suites pass; capture comparisons and reproducible commands are recorded.
+
 ## 5. Animated world
 
 What: water and flower tileset animations driven by the ROM flag; grass
@@ -124,6 +161,49 @@ Acceptance criteria:
 - [ ] Water and flowers animate at the original game's cadence.
 - [ ] An NPC walking outside the original screen shows its walking frames.
 - [ ] The regression journeys keep passing with memory intact.
+
+### Phase 5A: original tileset animation
+
+Work:
+
+- Verify the tileset animation flag, original water/flower frames and cadence
+  against the ROM and the live VRAM output of the original engine.
+- Animate private presentation textures from ROM data at the original guest
+  cadence, honoring tileset flags, pause, reload and map transitions. Never
+  modify guest tiles or depend on wall-clock time for original animations.
+
+Acceptance criteria:
+
+- [ ] Water and flower frames match original VRAM over complete animation periods.
+- [ ] Non-animated tilesets, pauses and loads select the correct frame without stale textures.
+- [ ] Full CTest, ROM-free CTest and every QA suite pass; frame guards cover all guest memory.
+
+### Phase 5B: distant actors, wind and particles
+
+Work:
+
+- Derive NPC direction and walking frame from live movement state and decode
+  the corresponding ROM sprite sheet even outside the original LCD bounds.
+- Animate grass with deterministic presentation-only wind. Add bounded grass
+  and surf particle pools triggered by observed movement, without invoking
+  game RNG, changing state or adding movement to stationary actors.
+- Reset transient effects on loads/map changes and freeze them while paused.
+
+Acceptance criteria:
+
+- [ ] A walking NPC outside the LCD shows the ROM walking frames matching its live state; stationary actors stay stationary.
+- [ ] Reviewed grass wind, walking particles and surf particles work in both cameras, with bounded memory.
+- [ ] Identical input yields identical engine state with effects enabled or disabled, including RNG and cartridge RAM.
+- [ ] Full CTest, ROM-free CTest and every QA suite pass. All 38 exterior reference captures remain byte-identical at their fixed reference animation phase; separate frame sequences prove the animation, without relaxing the reference gate.
+
+### Execution and validation order for points 5 and 4
+
+Implement 5A, 5B, 4A, then 4B after the three prerequisite plans. Every phase
+records build/test commands and output directories; unchecked criteria remain
+pending until the relevant evidence is inspected. ROMs, saves and captures stay
+private under `build/qa/`. Unsupported input retains the existing presentation.
+Final delivery includes `build/pokeyellow3d`, updated `PALLET3D.md` and
+`README.md`, reviewed captures, and green CI on `main`.
 
 ## 6. Web build and gamepad
 

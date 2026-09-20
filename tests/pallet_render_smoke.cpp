@@ -38,6 +38,7 @@ static void capture_surface(const char* path) {
 #include "town_integration.h"
 #include "interior_transitions.h"
 #include "ui_transitions.h"
+#include "battle_transition_trace.h"
 
 int main(int argc,char** argv) {
     if(argc<3) { std::fprintf(stderr,"Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");return 1; }
@@ -102,6 +103,9 @@ int main(int argc,char** argv) {
     }
     if(argc>3&&std::strcmp(argv[3],"battle-probe")==0) {
         int result=battle_probe(ctx);gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"battle-timing")||!std::strcmp(argv[3],"trainer-timing"))) {
+        int result=battle_transition_trace::run(ctx,!std::strcmp(argv[3],"trainer-timing"));gb_platform_shutdown();return result;
     }
     if(argc>3&&std::strcmp(argv[3],"battle-menus")==0) {
         int result=battle_menus(ctx);gb_platform_shutdown();return result;

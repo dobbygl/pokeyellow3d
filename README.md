@@ -230,7 +230,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. Windows (MSVC) and macOS run best-effort and do not block merges: the pinned gb-recompiled runtime is not portable to MSVC yet, and macOS lacks the GLES2 headers. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The Windows (MSVC) and macOS jobs are defined but disabled for now: the pinned gb-recompiled runtime is not portable to MSVC yet, and macOS lacks the GLES2 headers. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel

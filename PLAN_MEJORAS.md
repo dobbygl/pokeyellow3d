@@ -65,7 +65,7 @@ Acceptance criteria:
 ## 2. CI on GitHub Actions and tests without the ROM
 
 What: a continuous integration workflow that builds on Linux (Windows and
-macOS as non-blocking canaries until the runtime is portable),
+macOS jobs defined but disabled until the runtime is portable),
 runs the tests that do not require the ROM, and publishes binaries on every
 tag. A synthetic ROM generated in code feeds the reader, the classifiers,
 view selection, and a headless render.
@@ -75,7 +75,7 @@ verify a contribution.
 
 Acceptance criteria:
 
-- [x] Every push and every pull request builds and passes CTest on Linux; Windows and macOS report without blocking.
+- [x] Every push and every pull request builds and passes CTest on Linux; Windows and macOS jobs stay disabled.
 - [ ] At minimum, the ROM reader, the terrain and interior classifiers, `view()`, and the renderer in preview mode are tested without the ROM.
 - [ ] Tests that require the ROM remain separated and documented for local execution.
 

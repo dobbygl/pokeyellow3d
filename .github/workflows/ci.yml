@@ -188,8 +188,10 @@ jobs:
   # uses C++20 designated initializers while this project pins C++17. Both
   # are upstream matters (see PLAN_API_CI.md, phase 5); the job stays so a
   # future runtime bump is checked automatically.
+  # Disabled for now (if: false): remove that line to re-enable the job.
   windows:
-    name: Windows (MSVC, non-blocking)
+    name: Windows (MSVC, disabled)
+    if: false
     runs-on: windows-2022
     continue-on-error: true
     timeout-minutes: 45
@@ -269,8 +271,10 @@ jobs:
   # build step; continue-on-error still lets the rest of the workflow
   # finish green.
   # ---------------------------------------------------------------------
+  # Disabled for now (if: false): remove that line to re-enable the job.
   macos:
-    name: macOS (best-effort, non-blocking)
+    name: macOS (disabled)
+    if: false
     runs-on: macos-14
     timeout-minutes: 45
     continue-on-error: true

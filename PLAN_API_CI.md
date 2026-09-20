@@ -188,7 +188,7 @@ Work:
 
 Acceptance criteria:
 
-- [x] A push to `main` and a test pull request show the workflow passing on Linux. Windows and macOS run as non-blocking canaries: the pinned runtime includes POSIX headers unconditionally and uses C++20 designated initializers under the project's C++17 standard; macOS lacks GLES2 headers.
+- [x] A push to `main` and a test pull request show the workflow passing on Linux. Windows and macOS jobs are defined but disabled: the pinned runtime includes POSIX headers unconditionally and uses C++20 designated initializers under the project's C++17 standard; macOS lacks GLES2 headers.
 - [ ] A pull request that breaks the synthetic reader fails in CI with the test flagged.
 - [ ] A `v0.1.0` tag produces a release with Linux binaries (Windows once the runtime is portable).
 - [ ] Total workflow time with a warm cache is under ten minutes.

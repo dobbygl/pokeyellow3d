@@ -1,84 +1,223 @@
-# pokeyellow
+<div align="center">
 
-**Local Kanto 3D prototype:** 36 connected outdoor maps, Viridian Forest and
-Vermilion Dock, with ROM-derived terrain, buildings and a bounded mesh cache.
-Press **F3** for first-person view: **W** moves forward, **A/D** turn and **S**
-turns around. All 179 reachable interiors load on demand, with real house,
-healing, shopping, stairs, elevator and cave journeys verified. Unclassified
-interior art keeps its original flat texture. Normal battles have an initial
-3D arena with the original portraits and menus; party-change validation and
-battle effects are still in progress in [PLAN_INTERIORES_COMBATES.md](PLAN_INTERIORES_COMBATES.md).
-The default local build produces
-`build/pokeyellow3d`. See [PALLET3D.md](PALLET3D.md) for scope, controls and tests.
-Build with `-DPOKEYELLOW_3D=OFF` for the original `pokeyellow` executable below.
+# Pokémon Yellow 3D
 
-Static recompilation of Pokemon Yellow into portable C, built with
-[GB-Recomp/gb-recompiled](https://github.com/GB-Recomp/gb-recompiled).
+**Explore Kanto from a new perspective.**
 
-This repo ships pre-generated C sources so it builds out of the box —
-you don't need an asm toolchain or the pret/pokeyellow decompilation just
-to play.
+A 3D presentation layer for statically recompiled Pokémon Yellow, with an overhead camera, first-person exploration, and the original game logic.
 
-## Build
+[Get started](#get-started) · [Screenshots](#screenshots) · [Controls](#controls) · [Development status](#development-status) · [Documentation](#documentation)
 
-You need a C/C++ compiler, CMake 3.16+, SDL2, libcurl, and OpenGL ES 2.
-CMake fetches `gb-recompiled` automatically (no manual setup).
+![Pallet Town in 3D, with its red-roofed houses, Professor Oak's laboratory, and the path to Route 1](docs/screenshots/pallet-town.png)
+
+**38 outdoor maps · 179 reachable interiors · Two camera modes**
+
+</div>
+
+`pokeyellow3d` is a fork of [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow), powered by [gb-recompiled](https://github.com/GB-Recomp/gb-recompiled). It builds Pokémon Yellow into a native executable and adds a 3D view of the world. Movement, collisions, encounters, story events, battles, and saving remain under the original game's control.
+
+> [!NOTE]
+> This is a playable prototype under active development. Outdoor exploration and interiors have automated coverage; battle presentation and effects are still being refined. See [development status](#development-status) for the current scope.
+
+## Highlights
+
+- **A connected Kanto.** Explore 36 connected outdoor maps, plus Viridian Forest and Vermilion Dock, with terrain, buildings, and textures derived from the ROM.
+- **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
+- **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
+- **An evolving battle view.** Normal battles use a 3D arena with original Pokémon portraits, health displays, and the game's original menus and text.
+- **Original 2D at a keypress.** Press `F2` to switch presentation. Unsupported scenes and full-screen interfaces use the original framebuffer automatically.
+- **Bounded rendering work.** Outdoor meshes are cached for the current map and its immediate neighbors, with at most five resident maps.
+
+## Screenshots
+
+Real captures from the renderer and its QA runs, stored at their original 800 × 720 resolution. Click any image to inspect it. Celadon City and Viridian Forest use the map-catalog preview camera.
+
+| First-person exploration | Viridian City |
+| --- | --- |
+| [![First-person view between Pallet Town's houses, looking toward the path ahead](docs/screenshots/first-person.png)](docs/screenshots/first-person.png) | [![The player and Pikachu exploring Viridian City from the overhead camera](docs/screenshots/viridian-city.png)](docs/screenshots/viridian-city.png) |
+| **Celadon City** | **Viridian Forest** |
+| [![Catalog overview of Celadon City's buildings, streets, and department store](docs/screenshots/celadon-city.png)](docs/screenshots/celadon-city.png) | [![Catalog overview of Viridian Forest's paths and dense rows of trees](docs/screenshots/viridian-forest.png)](docs/screenshots/viridian-forest.png) |
+| **Professor Oak's laboratory** | **Battle presentation · in development** |
+| [![Professor Oak's laboratory with its desks, equipment, and original characters](docs/screenshots/oaks-lab.png)](docs/screenshots/oaks-lab.png) | [![Pikachu facing a wild Rattata in the 3D arena above the original battle menu](docs/screenshots/battle.png)](docs/screenshots/battle.png) |
+
+## Get started
+
+### Requirements
+
+The current build and graphics checks have been run on Linux with Mesa. Other platforms have not been validated for this fork.
+
+- Git and CMake **3.16 or newer**.
+- A compiler with **C11 and C++17** support, plus Make or Ninja.
+- **SDL2**, **libcurl**, and **OpenGL ES 2** development libraries and a compatible graphics driver.
+- A matching **English USA/Europe Pokémon Yellow ROM**, supplied by you.
+
+CMake downloads the pinned `gb-recompiled` runtime automatically, so the first configure requires network access. Generated C sources are included; RGBDS and the Pokémon disassembly are only needed if you regenerate them.
+
+> [!IMPORTANT]
+> No ROM or extracted game assets are included. This build targets the 1 MiB English USA/Europe ROM with SHA-1 `cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1`. Other revisions and ROM hacks are not supported.
+
+### Build and launch
 
 ```sh
-mkdir build && cd build
-cmake ..
-cmake --build . -j$(nproc)
-```
+git clone https://github.com/dobbygl/pokeyellow3d.git
+cd pokeyellow3d
 
-This produces `pokeyellow3d` by default (`pokeyellow` with `-DPOKEYELLOW_3D=OFF`).
+# Supply your matching ROM before configuring to enable all ROM-based tests.
+mkdir -p build/roms
+cp /path/to/pokeyellow.gb build/roms/pokeyellow.gbc
 
-## Run
+cmake -S . -B build -DPOKEYELLOW_3D=ON
+cmake --build build --parallel 4
+ctest --test-dir build --output-on-failure
 
-The runtime needs a ROM the first time it boots (it extracts assets into
-`assets/pokeyellow/` and then runs from there on subsequent launches).
-
-Drop a Pokemon Yellow ROM at `roms/pokeyellow.gbc` next to the executable:
-
-```sh
-mkdir -p roms
-cp /path/to/pokeyellow.gb roms/pokeyellow.gbc
+cd build
 ./pokeyellow3d
 ```
 
-The launcher auto-starts when only one game is registered, so you go
-straight into Red. Battery RAM saves to `pokeyellow.sav` next to the
-binary. Press Esc in-game for the settings menu (palette, audio,
-savestates, **Restart Game**, etc.).
+On first launch, the runtime extracts the required assets into `assets/pokeyellow/` inside the build directory. Later launches reuse those assets. The launcher starts Pokémon Yellow automatically when its ROM or extracted assets are available.
 
-## Regenerating the C sources
+Run the executable from `build/` so its relative paths resolve correctly. Battery saves are written to `build/pokeyellow.sav`; `Esc` opens runtime settings, including save states and **Restart Game**. Close other instances before using the same save.
 
-If you want to rebuild the C from scratch — bump `gb-recompiled`, pick
-up a recompiler change, or tweak the analyzer — run:
+<details>
+<summary><strong>Build the original 2D executable</strong></summary>
+
+From the repository root:
+
+```sh
+cmake -S . -B build/2d -DPOKEYELLOW_3D=OFF
+cmake --build build/2d --parallel 4
+mkdir -p build/2d/roms
+cp /path/to/pokeyellow.gb build/2d/roms/pokeyellow.gbc
+cd build/2d
+./pokeyellow
+```
+
+This produces the original `pokeyellow` executable in a separate build directory, with its own assets and saves.
+
+</details>
+
+## Controls
+
+| Input | Action |
+| --- | --- |
+| `F2` | Switch between original 2D and 3D presentation |
+| `F3` | Switch between overhead and first-person cameras |
+| Arrow keys | Original movement along the map axes |
+| `W` / `A` / `S` / `D`, overhead | Original up / left / down / right movement |
+| `W`, first person | Move forward |
+| `A` / `D`, first person | Turn left / right by 90° |
+| `S`, first person | Turn around |
+| `Q` / `E`, overhead | Rotate the camera within its allowed arc |
+| Mouse wheel / `R`, overhead | Zoom / reset camera |
+| `Z` or `J` | A: talk, interact, confirm |
+| `X` or `K` | B: cancel, go back |
+| `Enter` | Original game menu |
+| `Esc` | Application settings |
+
+First person follows the original movement grid; it does not provide free movement or mouse look. Dialogues and menus retain the original game controls. Small interiors use a fixed overhead framing; larger rooms allow limited rotation and zoom.
+
+## Development status
+
+| Area | Current scope |
+| --- | --- |
+| Outdoor world | 36 connected maps, Viridian Forest, and Vermilion Dock; geometry audits and representative journeys are implemented. |
+| First person | Movement, turning, transitions, dialogue overlays, and camera parity have dedicated checks. |
+| Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
+| Battles | 3D arenas, portraits, HUDs, party changes, and capture scenarios are implemented. Battle coverage and effects remain in development. |
+| Menus and transitions | Original 2D interfaces remain available; broader presentation work is planned. |
+| Pokédex and PC | Original interfaces remain in use; dedicated presentation work is planned. |
+
+The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, water and vegetation are static, and neighboring-map NPCs are not simulated. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
+
+## Development and validation
+
+The 3D layer reads the game state to draw the scene; it does not run a second gameplay simulation. The SDL integration is generated into the build directory by [`cmake/Pallet3D.cmake`](cmake/Pallet3D.cmake), leaving fetched runtime sources and generated game C untouched.
+
+| Location | Purpose |
+| --- | --- |
+| [`src/pallet3d.cpp`](src/pallet3d.cpp) | Rendering, mesh cache, scene selection, and input integration |
+| [`src/kanto_rom.h`](src/kanto_rom.h) | ROM map data, connections, tilesets, warps, and objects |
+| [`src/world_scene.h`](src/world_scene.h) / [`src/interior_scene.h`](src/interior_scene.h) | Outdoor geometry and interior classification |
+| [`src/firstperson.h`](src/firstperson.h) | Camera math and relative controls |
+| [`src/battle_state.h`](src/battle_state.h) / [`src/battle3d.h`](src/battle3d.h) | Battle state, portraits, arena, and effects |
+| [`tests/`](tests/) | State tests, map audits, rendering checks, and scripted journeys |
+| `pokeyellow_*.c` | Pre-generated game sources |
+
+### Tests
+
+With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, CMake registers seven CTest checks: first-person controls, interior state, interior catalog, battle state, world state, outdoor geometry, and ROM data. Without that file, only the ROM-independent first-person test is registered. Reconfigure after adding the ROM.
+
+```sh
+cmake -S . -B build -DPOKEYELLOW_3D=ON
+cmake --build build --parallel 4
+ctest --test-dir build --output-on-failure
+
+# Optional helper for scripted rendering and gameplay checks.
+cmake --build build --target pallet_render_smoke --parallel 4
+```
+
+The full QA scripts require local ROM and save-state fixtures. They check representative journeys, scene transitions, OpenGL errors, cache limits, and whether drawing leaves game memory unchanged. Fixture setup, commands, and recorded results are documented in [PALLET3D.md](PALLET3D.md#compilar-y-probar). These checks do not imply complete game coverage.
+
+<details>
+<summary><strong>Regenerate the game C sources</strong></summary>
+
+Only needed when changing the recompilation. Requires local clones of `pret/pokeyellow` and `gb-recompiled`, plus RGBDS and Make.
 
 ```sh
 tools/regen.sh /path/to/pret/pokeyellow /path/to/gb-recompiled
+cmake -S . -B build
+cmake --build build --parallel 4
+ctest --test-dir build --output-on-failure
 ```
 
-That re-builds the ROM via the pret toolchain (requires `rgbds`), then
-invokes `gbrecomp` with the same flags the compilation uses, and copies
-the freshly generated `pokeyellow_*.c` files into this repo. Verify with
-`cmake --build .` and commit.
+The script rebuilds the ROM and recompiler, then replaces the generated sources and asset manifest. Review the diff and verify compatibility with the pinned runtime before committing.
 
-## In a compilation
+</details>
 
-If you're building a multi-cart compilation that wants to include Red,
-add this repo via `FetchContent` in your top-level CMakeLists:
+<details>
+<summary><strong>Use the cartridge in a multi-game launcher</strong></summary>
 
 ```cmake
+include(FetchContent)
 FetchContent_Declare(pokeyellow
-    GIT_REPOSITORY https://github.com/GB-Recomp/pokeyellow.git
+    GIT_REPOSITORY https://github.com/dobbygl/pokeyellow3d.git
     GIT_TAG main
 )
 FetchContent_MakeAvailable(pokeyellow)
-# Now link the `pokeyellow_cart` target into your launcher executable
-# and call pokeyellow_main(argc, argv) from your launcher's g_games[].
 ```
 
-The standalone `pokeyellow` executable is only built when this repo is the
-top-level project, so consuming it as a subdir doesn't produce a
-conflicting executable target.
+Link `pokeyellow_cart` into your launcher and register `pokeyellow_main(argc, argv)`. The standalone executable and 3D SDL hooks are enabled only when this repository is the top-level CMake project; consuming the cartridge alone does not enable the 3D frontend.
+
+</details>
+
+### Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| ROM is missing or the launcher stays open | Start from `build/` and check `roms/pokeyellow.gbc`. |
+| ROM hash mismatch | Verify the revision against the SHA-1 above; renaming a different ROM does not make it compatible. |
+| CMake cannot find SDL2, CURL, or GLES | Install the corresponding development packages, then reconfigure. |
+| `Pallet 3D: runtime integration point changed` | Use the pinned `GBRT_REF` below; a cached override may select an incompatible runtime. |
+| A menu or scene appears in 2D | Original interfaces and unsupported states intentionally use the 2D framebuffer. Press `F2` to check your presentation preference. |
+| CTest runs only one test | Add the matching ROM to `build/roms/`, then rerun CMake configuration. |
+
+The current runtime pin is `6581880fce60e6f139901a5942fc984e9c1db8ab`. Restore it with:
+
+```sh
+cmake -S . -B build -DGBRT_REF=6581880fce60e6f139901a5942fc984e9c1db8ab
+```
+
+## Documentation
+
+The detailed engineering notes and plans are currently written in Spanish.
+
+- [Technical guide, QA procedures, and measured performance](PALLET3D.md)
+- [Kanto world plan and implementation evidence](PLAN_KANTO_3D.md)
+- [First-person camera and controls](PLAN_PRIMERA_PERSONA.md)
+- [Interiors and battle presentation](PLAN_INTERIORES_COMBATES.md)
+- [Menus, title screen, and transitions](PLAN_MENUS_TITULO_TRANSICIONES.md)
+- [Pokédex and PC presentation](PLAN_POKEDEX_PC.md)
+
+## Acknowledgments
+
+Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the [gb-recompiled runtime and recompiler](https://github.com/GB-Recomp/gb-recompiled), with the [pret/pokeyellow disassembly](https://github.com/pret/pokeyellow) as a reference for the original game's data and behavior. Rendering and runtime UI use SDL2, OpenGL ES 2, and Dear ImGui.

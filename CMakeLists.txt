@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18)
 project(pokeyellow C CXX)
 
 include(CheckIPOSupported)
@@ -192,4 +192,8 @@ if(CMAKE_PROJECT_NAME STREQUAL "pokeyellow")
     else()
         set_target_properties(pokeyellow_launcher PROPERTIES OUTPUT_NAME pokeyellow)
     endif()
+endif()
+
+if(CMAKE_PROJECT_NAME STREQUAL "pokeyellow")
+    include(cmake/ProjectWarnings.cmake)
 endif()

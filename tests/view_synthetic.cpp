@@ -7,22 +7,25 @@
 // GBContext of tests/synthetic_context.h, so the view selection is covered on
 // machines without the cartridge. Every branch of view() is reached by editing
 // one byte of the fixture at a time.
-static void check(bool condition, const char* message) {
-    if (!condition) throw std::runtime_error(message);
+static void check(bool condition, const char *message) {
+    if (!condition)
+        throw std::runtime_error(message);
 }
-static bool close_to(float value, float expected) { return std::fabs(value - expected) < 1e-4f; }
+static bool close_to(float value, float expected) {
+    return std::fabs(value - expected) < 1e-4f;
+}
 
 using V = pallet::View;
 
 int main() {
     try {
-        const auto& plan = synthetic::layout();
+        const auto &plan = synthetic::layout();
         synthetic::Context machine;
-        GBContext* ctx = &machine.ctx;
+        GBContext *ctx = &machine.ctx;
 
         // --- Overworld ------------------------------------------------------
         machine.reset();
-        const auto* home = machine.place_player(plan.home, 4, 4, 0);
+        const auto *home = machine.place_player(plan.home, 4, 4, 0);
         check(home && home->id == plan.home, "the home map is resident");
         check(pallet::view(ctx) == V::Overworld, "a clean standing state is the overworld");
 
@@ -82,7 +85,8 @@ int main() {
         machine.open_bottom_dialogue();
         check(pallet::view(ctx) == V::Dialogue, "the text box is a dialogue");
         check(pallet::bottom_dialogue(ctx), "the complete frame is composable");
-        for (auto corner : {std::pair<int, int>{0, 12}, {19, 12}, {0, 17}, {19, 17}, {5, 12}, {0, 14}}) {
+        for (auto corner :
+             {std::pair<int, int>{0, 12}, {19, 12}, {0, 17}, {19, 17}, {5, 12}, {0, 14}}) {
             uint8_t saved = machine.at(0xc3a0 + corner.second * 20 + corner.first);
             machine.tile(corner.first, corner.second, 0x7f);
             check(!pallet::bottom_dialogue(ctx), "an incomplete frame is not composable");
@@ -109,11 +113,12 @@ int main() {
         // --- player() interpolation ------------------------------------------
         machine.reset();
         machine.place_player(plan.home, 3, 5, 0);
-        machine.write(pallet::Sprite1 + 3, uint8_t(int8_t(-2)));  // northward step
-        machine.write(pallet::Sprite1 + 5, 2);                    // eastward step
+        machine.write(pallet::Sprite1 + 3, uint8_t(int8_t(-2))); // northward step
+        machine.write(pallet::Sprite1 + 5, 2);                   // eastward step
         machine.write(pallet::Walk, 0);
         auto p = pallet::player(ctx);
-        check(close_to(p[0], 3.5f) && close_to(p[1], 5.5f), "an idle player sits on the cell centre");
+        check(close_to(p[0], 3.5f) && close_to(p[1], 5.5f),
+              "an idle player sits on the cell centre");
         machine.write(pallet::Walk, 8);
         p = pallet::player(ctx);
         check(close_to(p[0], 3.5f) && close_to(p[1], 5.5f), "a step that has not advanced yet");
@@ -125,7 +130,8 @@ int main() {
         // --- actor() ----------------------------------------------------------
         pallet::Actor a{};
         check(pallet::actor(ctx, 0, a), "the player slot is an actor");
-        check(a.slot == 0 && close_to(a.x, 3.5f) && close_to(a.z, 5.5f), "the player actor follows player()");
+        check(a.slot == 0 && close_to(a.x, 3.5f) && close_to(a.z, 5.5f),
+              "the player actor follows player()");
         machine.write(pallet::Sprite1, 0);
         check(!pallet::actor(ctx, 0, a), "an empty slot is no actor");
         machine.write(pallet::Sprite1, 1);
@@ -133,8 +139,8 @@ int main() {
         // Slot 1 is on screen: its position comes from the screen offsets.
         machine.write(0xc110, 1);
         machine.write(0xc112, 0x10);
-        machine.write(0xc114, 0x2c);  // 16 pixels north of the player
-        machine.write(0xc116, 0x50);  // 16 pixels east of the player
+        machine.write(0xc114, 0x2c); // 16 pixels north of the player
+        machine.write(0xc116, 0x50); // 16 pixels east of the player
         check(pallet::actor(ctx, 1, a), "an on-screen NPC is an actor");
         check(a.slot == 1 && a.image == 0x10, "the on-screen image index is used as is");
         check(close_to(a.x, 4.5f) && close_to(a.z, 4.5f), "screen offsets place the on-screen NPC");
@@ -143,11 +149,12 @@ int main() {
         machine.write(0xc120, 1);
         machine.write(0xc122, 255);
         machine.write(0xc129, 4);
-        machine.write(0xc224, 6);   // z = 2
-        machine.write(0xc225, 11);  // x = 7
-        machine.write(0xc22e, 3);   // sprite base
+        machine.write(0xc224, 6);  // z = 2
+        machine.write(0xc225, 11); // x = 7
+        machine.write(0xc22e, 3);  // sprite base
         check(pallet::actor(ctx, 2, a), "an off-screen NPC is still an actor");
-        check(a.slot == 2 && close_to(a.x, 7.5f) && close_to(a.z, 2.5f), "off-screen map coordinates");
+        check(a.slot == 2 && close_to(a.x, 7.5f) && close_to(a.z, 2.5f),
+              "off-screen map coordinates");
         check(a.image == 0x24, "the off-screen image is rebuilt from the sprite base");
         machine.write(0xc22e, 12);
         check(!pallet::actor(ctx, 2, a), "a sprite base outside 1..11 is refused");
@@ -167,21 +174,25 @@ int main() {
 
         // --- world_player() ----------------------------------------------------
         machine.reset();
-        const auto* north = machine.place_player(plan.north, 2, 3, 0);
-        check(north && north->origin_x == plan.north_origin_x && north->origin_z == plan.north_origin_z,
+        const auto *north = machine.place_player(plan.north, 2, 3, 0);
+        check(north && north->origin_x == plan.north_origin_x &&
+                  north->origin_z == plan.north_origin_z,
               "the northern scene keeps the origin the catalog derived");
         check(pallet::view(ctx) == V::Overworld, "the northern neighbour is a valid overworld");
         auto local = pallet::player(ctx);
         auto world = pallet::world_player(ctx);
-        check(close_to(local[0], 2.5f) && close_to(local[1], 3.5f), "local coordinates stay map relative");
-        check(close_to(world[0], 2.5f + plan.north_origin_x) && close_to(world[1], 3.5f + plan.north_origin_z),
+        check(close_to(local[0], 2.5f) && close_to(local[1], 3.5f),
+              "local coordinates stay map relative");
+        check(close_to(world[0], 2.5f + plan.north_origin_x) &&
+                  close_to(world[1], 3.5f + plan.north_origin_z),
               "world coordinates add the scene origin");
 
         std::fprintf(stderr,
-                     "PASS: five view states, the six-tile text frame, walk interpolation, three actor kinds "
+                     "PASS: five view states, the six-tile text frame, walk interpolation, three "
+                     "actor kinds "
                      "and the scene origin at (%d,%d)\n",
                      plan.north_origin_x, plan.north_origin_z);
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::fprintf(stderr, "FAIL: %s\n", e.what());
         return 1;
     }

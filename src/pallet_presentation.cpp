@@ -6,11 +6,11 @@ bool relative_controls = false;
 void attributes() {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 }
-bool begin(GBContext* ctx, bool menu_open, const uint32_t* framebuffer) {
+bool begin(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
     pallet3d_begin_frame(ctx, menu_open, framebuffer);
     return pallet3d_covers_frame(ctx);
 }
-bool frame(GBContext* ctx, int width, int height, bool menu_open) {
+bool frame(GBContext *ctx, int width, int height, bool menu_open) {
     pallet3d_draw(ctx, width, height, menu_open);
     return pallet3d_active();
 }
@@ -37,9 +37,8 @@ bool pallet3d_register() {
 
 void pallet3d_set_input_mask(uint8_t mask, bool relative) {
     if (relative != relative_controls) {
-        const SDL_Scancode keys[] = {
-            SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D
-        };
+        const SDL_Scancode keys[] = {SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S,
+                                     SDL_SCANCODE_D};
         gb_platform_release_keys(keys, sizeof(keys) / sizeof(keys[0]));
     }
     relative_controls = relative;

@@ -134,7 +134,18 @@ jobs:
           # offscreen. LIBGL_ALWAYS_SOFTWARE forces llvmpipe in case the
           # runner exposes a DRI device that Mesa tries before the
           # software renderer.
-          xvfb-run -a ctest --test-dir build -LE rom --output-on-failure
+          xvfb-run -a ctest --test-dir build -LE rom --output-on-failure --output-junit "$PWD/build/ctest.xml"
+
+      - name: Require software rendering coverage
+        run: |
+          python3 - <<'PYCODE'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("build/ctest.xml").getroot()
+          preview = root.find(".//testcase[@name='render_preview_synthetic']")
+          assert preview is not None and preview.find("skipped") is None, "Renderer test must run, not skip"
+          output = preview.findtext("system-out", "").lower()
+          assert "llvmpipe" in output or "softpipe" in output, "Renderer must run on software Mesa"
+          PYCODE
 
   # ---------------------------------------------------------------------
   # Linux: build with the 3D layer disabled, so the original 2D
@@ -166,6 +177,15 @@ jobs:
         with:
           path: build/_deps
           key: ${{ runner.os }}-2d-deps-${{ steps.gbrt.outputs.ref }}
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-2d-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-2d-ccache-
+            ${{ runner.os }}-gcc-ccache-
 
       - name: Configure
         run: |
@@ -315,18 +335,17 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: ctest --test-dir build -LE rom --output-on-failure
 
-  # ---------------------------------------------------------------------
-  # Format: commented out because there is no .clang-format in the
-  # repository yet. Once one is added at the root, uncomment this job so
-  # that src/ and tests/ pass `clang-format --dry-run --Werror`.
-  # ---------------------------------------------------------------------
-  # format:
-  #   name: clang-format
-  #   runs-on: ubuntu-24.04
-  #   timeout-minutes: 10
-  #   steps:
-  #     - uses: actions/checkout@v7
-  #     - name: Check formatting
-  #       run: |
-  #         find src tests \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
-  #           | xargs clang-format --dry-run --Werror
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the pinned formatter
+        run: |
+          python3 -m venv .format-venv
+          .format-venv/bin/python -m pip install clang-format==18.1.8
+      - name: Check project source formatting
+        run: |
+          git ls-files -z 'src/*.cpp' 'src/*.h' 'src/*.c' 'tests/*.cpp' 'tests/*.h' 'tests/*.c' \
+            | xargs -0 .format-venv/bin/clang-format --dry-run --Werror

@@ -22,42 +22,45 @@ namespace {
 constexpr int Width = 640, Height = 480;
 constexpr int Skipped = 77;
 
-int skip(const char* reason) {
-    const char* detail = SDL_GetError();
+int skip(const char *reason) {
+    const char *detail = SDL_GetError();
     std::fprintf(stderr, "SKIP: %s (driver %s: %s)\n", reason,
                  SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "none",
                  detail && *detail ? detail : "no OpenGL support in the video driver");
     return Skipped;
 }
-void check(bool condition, const char* message) {
-    if (!condition) throw std::runtime_error(message);
+void check(bool condition, const char *message) {
+    if (!condition)
+        throw std::runtime_error(message);
 }
 
 // The emulated machine is presentation input only; nothing may write back.
 struct Snapshot {
     std::vector<uint8_t> wram, vram, eram;
     std::vector<uint32_t> framebuffer;
-    explicit Snapshot(const synthetic::Context& m)
+    explicit Snapshot(const synthetic::Context &m)
         : wram(m.wram.begin(), m.wram.end()), vram(m.vram.begin(), m.vram.end()),
-          eram(m.eram.begin(), m.eram.end()), framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {}
-    bool unchanged(const synthetic::Context& m) const {
+          eram(m.eram.begin(), m.eram.end()),
+          framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {}
+    bool unchanged(const synthetic::Context &m) const {
         return !std::memcmp(wram.data(), m.wram.data(), wram.size()) &&
                !std::memcmp(vram.data(), m.vram.data(), vram.size()) &&
                !std::memcmp(eram.data(), m.eram.data(), eram.size()) &&
                !std::memcmp(framebuffer.data(), m.framebuffer.data(), framebuffer.size() * 4);
     }
 };
-}  // namespace
+} // namespace
 
 int main() {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) return skip("SDL video initialization failed");
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+        return skip("SDL video initialization failed");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     // pallet3d clears and tests depth; the runtime attributes callback requests the same value.
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_Window* window = SDL_CreateWindow("pallet3d synthetic preview", SDL_WINDOWPOS_CENTERED,
+    SDL_Window *window = SDL_CreateWindow("pallet3d synthetic preview", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, Width, Height,
                                           SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
     if (!window) {
@@ -71,37 +74,40 @@ int main() {
         return skip("no OpenGL ES 2 context on this video driver");
     }
     std::fprintf(stderr, "[SYNTH] driver=%s renderer=%s\n", SDL_GetCurrentVideoDriver(),
-                 reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
+                 reinterpret_cast<const char *>(glGetString(GL_RENDERER)));
 
     // A bare ImGui context: pallet3d only asks for GetIO().DeltaTime and the
     // foreground draw list, and the draw data is never submitted to OpenGL.
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.DisplaySize = ImVec2(float(Width), float(Height));
     io.DeltaTime = 1.f / 60;
-    unsigned char* font_pixels = nullptr;
+    unsigned char *font_pixels = nullptr;
     int font_width = 0, font_height = 0;
     io.Fonts->GetTexDataAsRGBA32(&font_pixels, &font_width, &font_height);
     io.Fonts->SetTexID(reinterpret_cast<ImTextureID>(intptr_t(1)));
 
     int status = 0;
     try {
-        const auto& plan = synthetic::layout();
+        const auto &plan = synthetic::layout();
         synthetic::Context machine;
-        GBContext* ctx = &machine.ctx;
+        GBContext *ctx = &machine.ctx;
         machine.reset();
         machine.place_player(plan.home, 4, 4, 0);
-        check(pallet::view(ctx) == pallet::View::Overworld, "the fixture starts on a live overworld");
+        check(pallet::view(ctx) == pallet::View::Overworld,
+              "the fixture starts on a live overworld");
         // presented_scene() looks the map up without instantiating it.
-        check(pallet::ensure_scene(plan.interior) != nullptr, "the interior is resident before its preview");
+        check(pallet::ensure_scene(plan.interior) != nullptr,
+              "the interior is resident before its preview");
         // The outdoor atlas always samples tilesets 0, 3, 14 and 23. The
         // procedural world has no map on the plateau tileset, which the
         // cartridge reaches through Route 23 inside Pallet Town's connected
         // component, so it is registered here. Its header is valid in the
         // generated image like every other tileset id.
-        pallet::catalog->tilesets.emplace(23, kanto::read_tileset(kanto::Rom(ctx->rom, ctx->rom_size), 23));
+        pallet::catalog->tilesets.emplace(
+            23, kanto::read_tileset(kanto::Rom(ctx->rom, ctx->rom_size), 23));
 
         std::vector<uint8_t> rgba(size_t(Width) * Height * 4);
         auto frame = [&] {
@@ -111,7 +117,7 @@ int main() {
             ImGui::EndFrame();
         };
         // Reading before any buffer swap keeps the back buffer defined.
-        auto preview = [&](int map, const char* label) {
+        auto preview = [&](int map, const char *label) {
             pallet3d_preview(map);
             Snapshot before{machine};
             for (int i = 0; i < 10; i++) {
@@ -129,15 +135,16 @@ int main() {
             size_t drawn = 0, shades = 0;
             bool seen[4096] = {};
             for (size_t i = 0; i < rgba.size(); i += 4) {
-                if (std::memcmp(&rgba[i], rgba.data(), 3)) ++drawn;
+                if (std::memcmp(&rgba[i], rgba.data(), 3))
+                    ++drawn;
                 int key = (rgba[i] >> 4) << 8 | (rgba[i + 1] >> 4) << 4 | (rgba[i + 2] >> 4);
                 if (!seen[key]) {
                     seen[key] = true;
                     ++shades;
                 }
             }
-            std::fprintf(stderr, "[SYNTH] %s map=%d vertices=%zu bytes=%zu drawn=%zu shades=%zu\n", label, map,
-                         stats.vertices, stats.bytes, drawn, shades);
+            std::fprintf(stderr, "[SYNTH] %s map=%d vertices=%zu bytes=%zu drawn=%zu shades=%zu\n",
+                         label, map, stats.vertices, stats.bytes, drawn, shades);
             check(drawn > rgba.size() / 4 / 20, "the surface is still the background colour");
             check(shades > 4, "the surface carries no shaded geometry");
         };
@@ -158,7 +165,7 @@ int main() {
         check(pallet3d_stats().vertices > 0, "the live overworld keeps its mesh");
         std::fprintf(stderr, "PASS: 30 preview frames over three maps plus the live overworld, "
                              "OpenGL clean, memory untouched and a non-empty surface\n");
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::fprintf(stderr, "FAIL: %s\n", e.what());
         status = 1;
     }

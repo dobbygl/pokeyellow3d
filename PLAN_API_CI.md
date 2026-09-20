@@ -416,3 +416,27 @@ override. Upstream remains at the original pinned revision. Windows work is
 isolated on `windows-portability`; only the C++17 initializer issue has been
 fixed and checked on Linux so far. POSIX networking/directory access and the
 Windows GLES backend still need work and actual Windows validation.
+
+
+### CI hardening in progress, 2026-09-20
+
+The API migration is merged as `d727fa66a40d4a967e390bd9248e5e1bbd0ceeeb`;
+main's Linux CI passes at
+https://github.com/dobbygl/pokeyellow3d/actions/runs/35526424594 .
+
+- Added a pinned clang-format 18.1.8 check and formatted only `src/` and
+  `tests/`. Generated cartridge C and runtime sources are untouched.
+- `cmake/ProjectWarnings.cmake` applies strict warnings to the two owned
+  renderer/adapter sources and test targets. Actual Ninja commands verify
+  **23 owned translation units** have `-Wall -Wextra -Werror`; **71 other
+  units** do not. Evidence: `build/qa/logs/ci-hardening-warning-scope.txt`.
+  CMake minimum is now 3.18 for source properties in another target directory.
+- Removed an unused parameter name and value-initialized a QA actor before
+  its checked lookup. The GCC build now passes with warnings as errors.
+- The 2D job now caches ccache too. Format validation passes locally.
+- Local CTest passes **24/24**, and the separate no-ROM build passes
+  **8/8**. Logs: `build/qa/logs/ci-ctest.log` and
+  `build/qa/logs/ci-no-rom.log`.
+- The full post-hardening graphics gate is still running via
+  `bash build/qa/logs/run-ci-regressions.sh` at this checkpoint; its final
+  result and remote CI are not yet verified. The phase remains open.

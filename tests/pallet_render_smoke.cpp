@@ -53,6 +53,7 @@ static void capture_surface(const char *path) {
 #include "pc_integration.h"
 #include "pc_details_integration.h"
 #include "pc_hall_integration.h"
+#include "tile_animation_integration.h"
 
 int main(int argc, char **argv) {
     if (argc < 3) {
@@ -98,6 +99,12 @@ int main(int argc, char **argv) {
         stderr, "[SMOKE] party=%u hp=%u level=%u script=%u/%u font=%u\n", pallet::read(ctx, 0xd162),
         pallet::read(ctx, 0xd16b) * 256 + pallet::read(ctx, 0xd16c), pallet::read(ctx, 0xd18b),
         pallet::read(ctx, 0xd5f0), pallet::read(ctx, 0xd5ef), pallet::read(ctx, pallet::Font));
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "tile-animation") || !std::strcmp(argv[3], "tile-animation-fp"))) {
+        int result = tile_animation_qa::run(ctx, !std::strcmp(argv[3], "tile-animation-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 3 && (!std::strcmp(argv[3], "crossfade") || !std::strcmp(argv[3], "crossfade-fp"))) {
         int result = presentation_qa::run(ctx, !std::strcmp(argv[3], "crossfade-fp"));
         gb_platform_shutdown();

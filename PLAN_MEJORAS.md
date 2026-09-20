@@ -198,6 +198,10 @@ Acceptance criteria:
 
 ### Execution and validation order for points 5 and 4
 
+The user explicitly advanced phase 5A on 2026-09-21 while the integrated
+goal remained paused. This changes the order for 5A only; the other phases
+and prerequisite work remain pending.
+
 Implement 5A, 5B, 4A, then 4B after the three prerequisite plans. Every phase
 records build/test commands and output directories; unchecked criteria remain
 pending until the relevant evidence is inspected. ROMs, saves and captures stay

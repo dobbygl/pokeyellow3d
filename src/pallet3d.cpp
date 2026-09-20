@@ -1,5 +1,6 @@
 #include "pallet3d.h"
 #include "pallet_state.h"
+#include "tile_animation.h"
 #include "firstperson.h"
 #include "interior_scene.h"
 #include "imgui.h"
@@ -291,6 +292,27 @@ void make_house(const pallet::Scene &scene, const pallet::House &h,
     box(scenery, x + w - .8f, z + .45f, .42f, .45f, eave, ridge + .25f, {.62f, .55f, .44f});
 }
 
+std::array<Color, 4> room_colors(int id) {
+    std::array<Color, 4> room = {
+        {{.95f, .89f, .77f}, {.74f, .70f, .56f}, {.43f, .50f, .46f}, {.16f, .23f, .25f}}};
+    if (id == 6 || id == 2) {
+        room[0] = {.91f, .95f, .94f};
+        room[1] = {.65f, .80f, .80f};
+        room[2] = {.39f, .53f, .64f};
+    }
+    if (id == 5 || id == 7 || id == 20 || id == 22) {
+        room[0] = {.92f, .94f, .84f};
+        room[1] = {.70f, .79f, .67f};
+        room[2] = {.43f, .58f, .53f};
+    }
+    if (id == 17 || id == 11) {
+        room[0] = {.72f, .72f, .66f};
+        room[1] = {.48f, .52f, .49f};
+        room[2] = {.31f, .37f, .35f};
+    }
+    return room;
+}
+
 void create_atlas(const GBContext *ctx) {
     std::fill(pixels.begin(), pixels.end(), 0);
     const auto &current = *presented_scene(ctx);
@@ -299,23 +321,7 @@ void create_atlas(const GBContext *ctx) {
          current.interior ? std::vector<int>{current.tileset} : std::vector<int>{0, 3, 14, 23}) {
         const auto &tiles = pallet::catalog->tilesets.at(id);
         int slot = current.interior ? 0 : id == 3 ? 1 : id == 14 ? 2 : id == 23 ? 3 : 0;
-        Color room[4] = {
-            {.95f, .89f, .77f}, {.74f, .70f, .56f}, {.43f, .50f, .46f}, {.16f, .23f, .25f}};
-        if (id == 6 || id == 2) {
-            room[0] = {.91f, .95f, .94f};
-            room[1] = {.65f, .80f, .80f};
-            room[2] = {.39f, .53f, .64f};
-        }
-        if (id == 5 || id == 7 || id == 20 || id == 22) {
-            room[0] = {.92f, .94f, .84f};
-            room[1] = {.70f, .79f, .67f};
-            room[2] = {.43f, .58f, .53f};
-        }
-        if (id == 17 || id == 11) {
-            room[0] = {.72f, .72f, .66f};
-            room[1] = {.48f, .52f, .49f};
-            room[2] = {.31f, .37f, .35f};
-        }
+        auto room = room_colors(id);
         for (int tile = 0; tile < 96; tile++)
             for (int y = 0; y < 8; y++)
                 for (int x = 0; x < 8; x++) {
@@ -324,7 +330,7 @@ void create_atlas(const GBContext *ctx) {
                                 (((ctx->rom[at + 1] >> (7 - x)) & 1) << 1);
                     for (int palette = 0; palette < 3; palette++)
                         pixel(slot * 128 + (tile % 16) * 8 + x, palette * 128 + (tile / 16) * 8 + y,
-                              (current.interior ? (palette == 2 ? water : room)
+                              (current.interior ? (palette == 2 ? water : room.data())
                                                 : (palette == 0   ? ground
                                                    : palette == 1 ? facade
                                                                   : water))[value]);
@@ -332,6 +338,53 @@ void create_atlas(const GBContext *ctx) {
     }
     pixel(511, 511, White);
     sprites_uploaded = false;
+}
+
+PalletTileAnimationInfo tile_animation_info{};
+void animate_tiles(const GBContext *ctx, const pallet::Scene &current) {
+    auto phase = preview_map < 0 ? tile_animation::sample(ctx, pallet::tileset(current))
+                                 : tile_animation::Phase{};
+    tile_animation_info.water_shift = phase.water;
+    tile_animation_info.flower_frame = phase.flower;
+    tile_animation_info.texture = atlas;
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, atlas);
+    for (int id :
+         current.interior ? std::vector<int>{current.tileset} : std::vector<int>{0, 3, 14, 23}) {
+        const auto &tiles = pallet::catalog->tilesets.at(id);
+        int slot = current.interior ? 0 : id == 3 ? 1 : id == 14 ? 2 : id == 23 ? 3 : 0;
+        auto room = room_colors(id);
+        for (int tile : {tile_animation::Water, tile_animation::Flower}) {
+            auto bytes = tile_animation::frame(ctx, tiles, tile, phase);
+            for (int palette = 0; palette < 3; ++palette) {
+                const auto *colors = current.interior ? (palette == 2 ? water : room.data())
+                                     : palette == 0   ? ground
+                                     : palette == 1   ? facade
+                                                      : water;
+                int ox = slot * 128 + (tile % 16) * 8;
+                int oy = palette * 128 + (tile / 16) * 8;
+                std::array<uint8_t, 8 * 8 * 4> patch{};
+                bool changed = false;
+                for (int y = 0; y < 8; ++y)
+                    for (int x = 0; x < 8; ++x) {
+                        int value = ((bytes[y * 2] >> (7 - x)) & 1) |
+                                    (((bytes[y * 2 + 1] >> (7 - x)) & 1) << 1);
+                        const auto &c = colors[value];
+                        std::array<uint8_t, 4> rgba{uint8_t(c.r * 255), uint8_t(c.g * 255),
+                                                    uint8_t(c.b * 255), uint8_t(c.a * 255)};
+                        auto *dest = pixels.data() + ((oy + y) * AW + ox + x) * 4;
+                        changed |= std::memcmp(dest, rgba.data(), 4) != 0;
+                        std::copy(rgba.begin(), rgba.end(), dest);
+                        std::copy(rgba.begin(), rgba.end(), patch.begin() + (y * 8 + x) * 4);
+                    }
+                if (changed) {
+                    glTexSubImage2D(GL_TEXTURE_2D, 0, ox, oy, 8, 8, GL_RGBA, GL_UNSIGNED_BYTE,
+                                    patch.data());
+                    ++tile_animation_info.uploads;
+                }
+            }
+        }
+    }
 }
 
 void interior_map(const GBContext *ctx, const pallet::Scene &scene,
@@ -717,6 +770,7 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
         glBindTexture(GL_TEXTURE_2D, atlas);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, AW, AH, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
     }
+    animate_tiles(ctx, current);
     update_meshes(ctx);
     vertices.clear();
     const bool fp = first_person && preview_map < 0;
@@ -1339,6 +1393,7 @@ void pallet3d_shutdown() {
     captured = false;
     sprites_uploaded = false;
     atlas_tileset = -2;
+    tile_animation_info = {};
     world_frame = {};
     warp_overlay = false;
     warp_destination = -1;
@@ -1599,4 +1654,8 @@ PalletAreaInfo pallet3d_area() {
             dex_area3d::builds,
             dex_area3d::count,
             dex_area3d::uploads};
+}
+
+PalletTileAnimationInfo pallet3d_tile_animation() {
+    return tile_animation_info;
 }

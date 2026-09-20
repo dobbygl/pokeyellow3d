@@ -5,18 +5,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifndef PG1_ASSET_ENTRY_DEFINED
-#define PG1_ASSET_ENTRY_DEFINED
-typedef struct {
-    uint32_t rom_offset;
-    uint32_t size;
-    const char* path;
-} Pg1AssetEntry;
-#endif
+#include "gb_asset_loader.h"
 
 #define POKEYELLOW_ASSETS_MANIFEST_COUNT 145
 
-static const Pg1AssetEntry POKEYELLOW_ASSETS_MANIFEST[POKEYELLOW_ASSETS_MANIFEST_COUNT] = {
+static const GBAssetEntry POKEYELLOW_ASSETS_MANIFEST[POKEYELLOW_ASSETS_MANIFEST_COUNT] = {
     { 0x00000000, 0x00000008, "code/rst0.bin" }, /* rst0 bank 00 */
     { 0x00000008, 0x00000008, "code/rst8.bin" }, /* rst8 bank 00 */
     { 0x00000010, 0x00000008, "code/rst10.bin" }, /* rst10 bank 00 */

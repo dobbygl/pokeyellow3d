@@ -1,247 +1,256 @@
-# Plan: API de extensión del runtime y CI en GitHub Actions
+# Plan: runtime extension API and CI on GitHub Actions
 
-Fecha: 2026-09-20. Estado: propuesta; ninguna fase iniciada. Desarrolla los
-puntos 1 y 2 de `PLAN_MEJORAS.md`.
+Date: 2026-09-20. Status: proposed; no phase started. Develops points 1 and 2
+of `PLAN_MEJORAS.md`.
 
-## Objetivo y alcance
+## Goal and scope
 
-Dos resultados encadenados. Primero, que la capa 3D se integre con
-gb-recompiled a través de una interfaz declarada y versionada, en lugar de
-reescribir el frontend SDL en tiempo de configuración. Segundo, que cada push
-y cada pull request de `github.com/dobbygl/pokeyellow3d` compile en Linux y
-Windows y ejecute una batería de pruebas que no necesita la ROM, con los
-binarios publicados en cada etiqueta.
+Two chained outcomes. First, that the 3D layer integrates with gb-recompiled
+through a declared, versioned interface, instead of rewriting the SDL
+frontend at configure time. Second, that every push and every pull request to
+`github.com/dobbygl/pokeyellow3d` builds on Linux and runs a test
+suite that does not need the ROM, with binaries published on every tag.
 
-Quedan fuera: cambiar el comportamiento del juego o del renderer, incluir la
-ROM o cualquier derivado suyo en el repositorio o en la CI, y las pruebas de
-recorrido con savestates, que siguen siendo locales.
+Out of scope: changing the game's or the renderer's behavior, including the
+ROM or any derivative of it in the repository or in CI, and journey tests
+with savestates, which remain local.
 
-## Punto de partida verificado
+## Verified starting point
 
-- `cmake/Pallet3D.cmake` aplica 14 reemplazos textuales sobre
-  `runtime/src/platform_sdl.cpp` del runtime descargado y compila la copia
-  resultante en lugar del original. Cada reemplazo aborta la configuración si
-  su ancla desaparece. Los puntos tocados son: inclusión de cabecera, tamaño
-  del búfer de profundidad, dibujo tras `ImGui::NewFrame`, evento antes del
-  mando, cierre antes de destruir GL, captura antes de `SDL_GL_SwapWindow`,
-  omisión de la subida y el dibujo del framebuffer cuando el 3D cubre el frame
-  en tres puntos, y un canal de d-pad propio con liberación de teclas WASD en
-  cinco puntos, incluida la grabación de entradas.
-- `CMakeLists.txt` obtiene gb-recompiled por `FetchContent` con la revisión
-  fijada en `GBRT_REF`. El runtime enlaza SDL2, CURL, Threads y OpenGL o GLES2,
-  y su CMake ya distingue Linux, Windows y macOS.
-- Las fuentes C generadas del juego están en el repositorio, 13 archivos y
-  unos 700 KB el mayor, así que la compilación no necesita rgbds ni pret.
-- Pruebas CTest actuales: `firstperson` corre sin ROM. `pallet_state`,
-  `kanto_rom`, `kanto_geometry`, `interior`, `interior_audit` y
-  `battle_state` se registran solo si existe `build/roms/pokeyellow.gbc`.
-  `pallet_render_smoke` está excluido de `all` y requiere ROM y savestates.
-- `pallet_render_smoke` ya inicializa el runtime sin cabeza con
-  `SDL_VIDEODRIVER=offscreen` y `SDL_AUDIODRIVER=dummy` sobre el backend
-  OpenGL real, y `pallet3d_preview` dibuja un mapa sin actores ni partida.
-- `.gitignore` excluye `build/`, las ROM y las partidas. No existe `.github/`.
-- El lector `kanto::Rom` valida rangos y lanza excepciones con diagnóstico;
-  las estructuras de cabeceras, tilesets, cornisas y pares de colisión están
-  descritas en `src/kanto_rom.h` con sus offsets, lo que permite generar una
-  imagen sintética que las satisfaga.
+- `cmake/Pallet3D.cmake` applies 14 textual replacements to the downloaded
+  runtime's `runtime/src/platform_sdl.cpp` and compiles the resulting copy
+  instead of the original. Each replacement aborts configuration if its
+  anchor disappears. The points touched are: header inclusion, depth buffer
+  size, drawing after `ImGui::NewFrame`, event before the gamepad, shutdown
+  before destroying GL, capture before `SDL_GL_SwapWindow`, skipping the
+  framebuffer upload and draw when the 3D layer covers the frame at three
+  points, and a dedicated d-pad channel with WASD key release at five
+  points, including input recording.
+- `CMakeLists.txt` fetches gb-recompiled via `FetchContent` at the revision
+  pinned in `GBRT_REF`. The runtime links SDL2, CURL, Threads, and OpenGL or
+  GLES2, and its CMake already distinguishes Linux, Windows, and macOS.
+- The game's generated C sources are in the repository, 13 files with the
+  largest around 700 KB, so the build does not need rgbds or pret.
+- Current CTest tests: `firstperson` runs without the ROM. `pallet_state`,
+  `kanto_rom`, `kanto_geometry`, `interior`, `interior_audit`, and
+  `battle_state` are only registered if `build/roms/pokeyellow.gbc` exists.
+  `pallet_render_smoke` is excluded from `all` and requires the ROM and
+  savestates.
+- `pallet_render_smoke` already initializes the runtime headless with
+  `SDL_VIDEODRIVER=offscreen` and `SDL_AUDIODRIVER=dummy` over the real
+  OpenGL backend, and `pallet3d_preview` draws a map without actors or a
+  save.
+- `.gitignore` excludes `build/`, ROMs, and saves. `.github/` does not exist.
+- The `kanto::Rom` reader validates ranges and throws exceptions with
+  diagnostics; the header, tileset, ledge, and collision-pair structures are
+  described in `src/kanto_rom.h` with their offsets, which makes it possible
+  to generate a synthetic image that satisfies them.
 
-## Decisiones de arquitectura
+## Architecture decisions
 
-1. La interfaz vive en el runtime, no en este repositorio. Se define en un
-   nuevo `runtime/include/gb_presentation.h` con una estructura de callbacks
-   y una constante `GB_PRESENTATION_API_VERSION`. Este repositorio solo
-   registra su implementación.
-2. Camino en tres pasos: fork `dobbygl/gb-recompiled` con la interfaz y una
-   etiqueta; este repositorio apunta a esa etiqueta; pull request al proyecto
-   original. Cuando se acepte, `GBRT_REF` pasa a la etiqueta original. El
-   repositorio no depende de que el pull request se acepte para funcionar.
-3. La interfaz cubre exactamente lo que hoy hacen los parches, sin ampliar:
-   atributos GL antes de crear el contexto, dibujo por frame que devuelve si
-   cubre el framebuffer, evento con posibilidad de consumirlo, cierre,
-   captura antes del intercambio de búferes, y un canal de d-pad externo con
-   una llamada para soltar las teclas de un conjunto de acciones. La
-   grabación de entradas incluye el canal externo, como ahora.
-4. Compatibilidad de versión explícita: `Pallet3D.cmake` comprueba la
-   constante de la cabecera y falla con mensaje si no coincide. Desaparecen
-   todas las anclas textuales.
-5. Las pruebas sin ROM usan una imagen sintética construida en memoria por
-   `tests/synthetic_rom.h`, con las tablas mínimas que el lector y los
-   clasificadores esperan, y un `GBContext` de prueba con WRAM, VRAM, E/S y
-   framebuffer propios. Nunca contiene datos copiados de la ROM real.
-6. Las pruebas que exigen ROM conservan su registro condicional y se ejecutan
-   en local o en un runner propio. La CI las lista como omitidas, no como
-   fallidas.
-7. Un solo flujo `ci.yml` con matriz de sistemas y un flujo `release.yml`
-   por etiqueta. Sin secretos.
+1. The interface lives in the runtime, not in this repository. It is
+   defined in a new `runtime/include/gb_presentation.h` with a callback
+   structure and a `GB_PRESENTATION_API_VERSION` constant. This repository
+   only registers its implementation.
+2. Three-step path: fork `dobbygl/gb-recompiled` with the interface and a
+   tag; this repository points to that tag; pull request to the original
+   project. Once accepted, `GBRT_REF` switches to the original tag. The
+   repository does not depend on the pull request being accepted in order to
+   work.
+3. The interface covers exactly what the patches do today, without
+   expanding it: GL attributes before creating the context, per-frame
+   drawing that returns whether it covers the framebuffer, an event with the
+   option to consume it, shutdown, capture before the buffer swap, and an
+   external d-pad channel with a call to release the keys of a set of
+   actions. Input recording includes the external channel, as it does now.
+4. Explicit version compatibility: `Pallet3D.cmake` checks the header
+   constant and fails with a message if it does not match. All textual
+   anchors disappear.
+5. Tests without the ROM use a synthetic image built in memory by
+   `tests/synthetic_rom.h`, with the minimal tables the reader and the
+   classifiers expect, and a test `GBContext` with its own WRAM, VRAM, I/O,
+   and framebuffer. It never contains data copied from the real ROM.
+6. Tests that require the ROM keep their conditional registration and run
+   locally or on a dedicated runner. CI lists them as skipped, not failed.
+7. A single `ci.yml` workflow with an OS matrix, and a `release.yml`
+   workflow per tag. No secrets.
 
-## Fase 1: interfaz de presentación en un fork del runtime
+## Phase 1: presentation interface in a runtime fork
 
-Trabajo:
+Work:
 
-- Crear el fork `dobbygl/gb-recompiled` desde la revisión fijada actual.
-- Añadir `gb_presentation.h`:
-  - `GBPresentationHooks` con `gl_attributes()`, `frame(ctx, w, h, menu_open) -> bool covers`,
+- Create the `dobbygl/gb-recompiled` fork from the currently pinned
+  revision.
+- Add `gb_presentation.h`:
+  - `GBPresentationHooks` with `gl_attributes()`, `frame(ctx, w, h, menu_open) -> bool covers`,
     `event(const SDL_Event*, menu_open) -> bool consumed`, `before_swap(w, h)`,
-    `shutdown()`, y `input_poll(ctx, menu_open)`.
+    `shutdown()`, and `input_poll(ctx, menu_open)`.
   - `gb_platform_set_presentation(const GBPresentationHooks*)`.
-  - `gb_platform_set_external_dpad(uint8_t mask)` y
+  - `gb_platform_set_external_dpad(uint8_t mask)` and
     `gb_platform_release_keys(const SDL_Scancode*, size_t)`.
-  - `GB_PRESENTATION_API_VERSION` entera.
-- Implementar en `platform_sdl.cpp` los seis puntos de llamada y el canal de
-  d-pad, replicando el comportamiento actual de omisión de subida del
-  framebuffer y de grabación de entradas. Sin presentación registrada, el
-  runtime se comporta exactamente como antes.
-- Etiqueta `presentation-api-v1` en el fork.
+  - Integer `GB_PRESENTATION_API_VERSION`.
+- Implement the six call points and the d-pad channel in `platform_sdl.cpp`,
+  replicating the current behavior of skipping the framebuffer upload and of
+  input recording. Without a registered presentation, the runtime behaves
+  exactly as before.
+- Tag `presentation-api-v1` on the fork.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] El runtime del fork compila y ejecuta un juego sin presentación registrada con comportamiento idéntico.
-- [ ] Una presentación de prueba en el propio fork recibe frame, evento, cierre y captura en el orden esperado.
-- [ ] La constante de versión está documentada en el README del runtime.
+- [ ] The fork's runtime builds and runs a game with no registered presentation with identical behavior.
+- [ ] A test presentation in the fork itself receives frame, event, shutdown, and capture in the expected order.
+- [ ] The version constant is documented in the runtime's README.
 
-## Fase 2: migración de la capa 3D a la interfaz
+## Phase 2: migrating the 3D layer to the interface
 
-Trabajo:
+Work:
 
-- `GBRT_REF` apunta a `presentation-api-v1` del fork, con la URL del fork
-  como variable de caché para poder volver al original.
-- `src/pallet3d.cpp` expone una `GBPresentationHooks` estática y la registra
-  desde el lanzador o desde `pokeyellow_main`. Los controles relativos usan
-  `gb_platform_set_external_dpad` y `gb_platform_release_keys`.
-- `cmake/Pallet3D.cmake` queda reducido a: comprobar la versión de la API,
-  añadir `src/pallet3d.cpp` al ejecutable y fijar el tamaño del búfer de
-  profundidad a través del callback de atributos.
-- Eliminar el directorio `pallet-runtime` generado y toda referencia a él en
-  documentación y scripts.
+- `GBRT_REF` points to `presentation-api-v1` on the fork, with the fork's
+  URL as a cache variable so it is possible to go back to the original.
+- `src/pallet3d.cpp` exposes a static `GBPresentationHooks` and registers it
+  from the launcher or from `pokeyellow_main`. Relative controls use
+  `gb_platform_set_external_dpad` and `gb_platform_release_keys`.
+- `cmake/Pallet3D.cmake` is reduced to: checking the API version, adding
+  `src/pallet3d.cpp` to the executable, and setting the depth buffer size
+  through the attributes callback.
+- Remove the generated `pallet-runtime` directory and every reference to it
+  in documentation and scripts.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] `cmake/Pallet3D.cmake` no contiene ninguna llamada de reemplazo textual.
-- [ ] CTest completo y las tres baterías `world_qa.sh`, `firstperson_qa.sh` e `interiors_qa.sh` pasan en local.
-- [ ] Las 38 capturas exteriores y las de interiores son idénticas a las de la versión anterior.
-- [ ] La grabación y reproducción de entradas con controles relativos produce el mismo estado final que antes.
+- [ ] `cmake/Pallet3D.cmake` contains no textual-replacement calls.
+- [ ] The full CTest suite and the three `world_qa.sh`, `firstperson_qa.sh`, and `interiors_qa.sh` suites pass locally.
+- [ ] The 38 outdoor captures and the interior captures are identical to those of the previous version.
+- [ ] Recording and replaying input with relative controls produces the same final state as before.
 
-## Fase 3: ROM sintética y pruebas sin ROM
+## Phase 3: synthetic ROM and tests without the ROM
 
-Trabajo:
+Work:
 
-- `tests/synthetic_rom.h`: constructor de una imagen de 1 MiB con cabecera de
-  cartucho válida, `MapHeaderBanks`, `MapHeaderPointers`, cabeceras de
-  tilesets, tabla de cornisas y pares de colisión en los offsets que espera
-  `kanto_rom.h`. Genera un mundo pequeño: tres exteriores conectados con
-  desplazamientos, un interior por warp, un tileset exterior y uno interior
-  con gráficos procedurales, hierba, agua, una cornisa y un cartel.
-- `tests/synthetic_context.h`: `GBContext` con WRAM, VRAM, E/S, HRAM y
-  framebuffer propios, con ayudantes para colocar al jugador, escribir el
-  mapa vivo, abrir un cuadro de texto por tiles de borde y montar un tilemap
-  de combate con retratos.
-- Pruebas nuevas, todas registradas siempre:
-  - `rom_reader_synthetic`: catálogo, conexiones, orígenes, warps, rechazo de
-    imágenes truncadas.
-  - `terrain_synthetic`: clasificación exterior e interior sobre el mundo generado.
-  - `view_synthetic`: `Unsupported`, `Transition`, `Dialogue`, `Overworld` y
-    `Battle` a partir del contexto sintético.
-  - `battle_state_synthetic`: rectángulos de retrato, nombres, paleta por
-    defecto y descompresión de un retrato sintético si la fase A1 de
-    `PLAN_POKEDEX_PC.md` ya existe.
-  - `render_preview_synthetic`: inicializa SDL sin cabeza, construye las
-    mallas del mundo sintético con `pallet3d_preview`, dibuja diez frames y
-    comprueba GL sin errores, memoria intacta y una captura no vacía.
-- Las pruebas con ROM real siguen registradas solo si la ROM existe. Añadir
-  una etiqueta CTest `rom` para poder excluirlas con `-LE rom`.
+- `tests/synthetic_rom.h`: builds a 1 MiB image with a valid cartridge
+  header, `MapHeaderBanks`, `MapHeaderPointers`, tileset headers, a ledge
+  table, and collision pairs at the offsets `kanto_rom.h` expects. It
+  generates a small world: three connected outdoor maps with offsets, one
+  interior per warp, one outdoor tileset and one interior tileset with
+  procedural graphics, grass, water, a ledge, and a sign.
+- `tests/synthetic_context.h`: `GBContext` with its own WRAM, VRAM, I/O,
+  HRAM, and framebuffer, with helpers to place the player, write the live
+  map, open a text box via border tiles, and build a battle tilemap with
+  portraits.
+- New tests, all registered unconditionally:
+  - `rom_reader_synthetic`: catalog, connections, origins, warps, rejection
+    of truncated images.
+  - `terrain_synthetic`: outdoor and interior classification over the
+    generated world.
+  - `view_synthetic`: `Unsupported`, `Transition`, `Dialogue`, `Overworld`,
+    and `Battle` from the synthetic context.
+  - `battle_state_synthetic`: portrait rectangles, names, default palette,
+    and decompression of a synthetic portrait if phase A1 of
+    `PLAN_POKEDEX_PC.md` already exists.
+  - `render_preview_synthetic`: initializes SDL headless, builds the
+    synthetic world's meshes with `pallet3d_preview`, draws ten frames, and
+    checks for no GL errors, intact memory, and a non-empty capture.
+- Tests with the real ROM remain registered only if the ROM exists. Add a
+  `rom` CTest label so they can be excluded with `-LE rom`.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] `ctest -LE rom` pasa en un directorio de compilación sin `roms/`.
-- [ ] Ninguna prueba sintética contiene bytes copiados de la ROM real; el generador es puramente procedural.
-- [ ] `render_preview_synthetic` pasa con `SDL_VIDEODRIVER=offscreen` sobre Mesa por software.
+- [ ] `ctest -LE rom` passes in a build directory without `roms/`.
+- [ ] No synthetic test contains bytes copied from the real ROM; the generator is purely procedural.
+- [ ] `render_preview_synthetic` passes with `SDL_VIDEODRIVER=offscreen` over software Mesa.
 
-## Fase 4: flujo de CI
+## Phase 4: CI workflow
 
-Trabajo:
+Work:
 
-- `.github/workflows/ci.yml` con disparo en push y pull request:
-  - Matriz: `ubuntu-24.04` con GCC y con Clang; `windows-2022` con MSVC y
-    dependencias por vcpkg; `macos-14` marcado como no bloqueante hasta
-    confirmar el backend GL del runtime.
-  - Pasos: checkout, instalación de dependencias, caché de `_deps` de
-    FetchContent y de ccache, configuración con `-DPOKEYELLOW_3D=ON`,
-    compilación con Ninja, `ctest -LE rom --output-on-failure`.
-  - En Linux, `render_preview_synthetic` bajo `xvfb-run` o con Mesa
-    `llvmpipe` por EGL sin superficie; se fija el que funcione en el runner.
-  - Compilación adicional con `-DPOKEYELLOW_3D=OFF` en Linux para no romper el
-    ejecutable 2D.
-  - Avisos como errores para `src/` y `tests/` con `-Wall -Wextra -Werror`;
-    el runtime y el C generado quedan fuera de esa regla.
-  - Comprobación de formato con `clang-format --dry-run` sobre `src/` y `tests/`.
-- `.github/workflows/release.yml` con disparo por etiqueta `v*`: compila en
-  Linux y Windows, empaqueta `pokeyellow3d` con el lanzador, `PALLET3D.md` y
-  un `README` de ejecución, y publica los archivos en la release. Sin ROM.
-- Insignias de estado en `README.md` y una sección "Contribuir" con los
-  comandos locales y la nota de que las pruebas `rom` son locales.
-- Protección de rama: `main` exige el flujo en verde para fusionar.
+- `.github/workflows/ci.yml` triggered on push and pull request:
+  - Matrix: `ubuntu-24.04` with GCC and with Clang; `windows-2022` with
+    MSVC and vcpkg dependencies; `macos-14` marked non-blocking until the
+    runtime's GL backend is confirmed.
+  - Steps: checkout, dependency installation, FetchContent `_deps` cache
+    and ccache cache, configure with `-DPOKEYELLOW_3D=ON`, build with
+    Ninja, `ctest -LE rom --output-on-failure`.
+  - On Linux, `render_preview_synthetic` under `xvfb-run` or with
+    surfaceless EGL Mesa `llvmpipe`; whichever works on the runner is the
+    one that is pinned.
+  - Additional build with `-DPOKEYELLOW_3D=OFF` on Linux so the 2D
+    executable does not break.
+  - Warnings as errors for `src/` and `tests/` with `-Wall -Wextra -Werror`;
+    the runtime and the generated C are outside that rule.
+  - Format check with `clang-format --dry-run` on `src/` and `tests/`.
+- `.github/workflows/release.yml` triggered by a `v*` tag: builds on Linux
+  and Windows, packages `pokeyellow3d` with the launcher, `PALLET3D.md`, and
+  a run `README`, and publishes the files to the release. No ROM.
+- Status badges in `README.md` and a "Contributing" section with the local
+  commands and the note that `rom` tests are local.
+- Branch protection: `main` requires the workflow to pass in order to
+  merge.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Un push a `main` y un pull request de prueba muestran el flujo en verde en Linux y Windows.
-- [ ] Un pull request que rompa el lector sintético falla en la CI con la prueba señalada.
-- [ ] Una etiqueta `v0.1.0` produce una release con binarios de Linux y Windows.
-- [ ] El tiempo total del flujo con caché caliente es inferior a diez minutos.
+- [x] A push to `main` and a test pull request show the workflow passing on Linux. Windows and macOS run as non-blocking canaries: the pinned runtime includes POSIX headers unconditionally and uses C++20 designated initializers under the project's C++17 standard; macOS lacks GLES2 headers.
+- [ ] A pull request that breaks the synthetic reader fails in CI with the test flagged.
+- [ ] A `v0.1.0` tag produces a release with Linux binaries (Windows once the runtime is portable).
+- [ ] Total workflow time with a warm cache is under ten minutes.
 
-## Fase 5: contribución al proyecto original
+## Phase 5: contribution to the original project
 
-Trabajo:
+Work:
 
-- Pull request a `GB-Recomp/gb-recompiled` con `gb_presentation.h`, la
-  implementación, la presentación de ejemplo y la documentación. Sin ninguna
-  referencia a Pokémon en el código del runtime.
-- Atender la revisión; si la interfaz cambia, actualizar la etiqueta del fork
-  y este repositorio en el mismo cambio.
-- Al fusionarse, `GBRT_REF` apunta a la etiqueta del proyecto original y el
-  fork queda como espejo.
+- Raise the runtime's Windows portability with upstream as well: the POSIX
+  headers included unconditionally by `serial_link.c` and
+  `network_discovery.c`, and the C++20 designated initializers in
+  `platform_sdl.cpp` when the consumer pins C++17.
+- Pull request to `GB-Recomp/gb-recompiled` with `gb_presentation.h`, the
+  implementation, the example presentation, and the documentation. No
+  reference to Pokémon anywhere in the runtime code.
+- Address review feedback; if the interface changes, update the fork's tag
+  and this repository in the same change.
+- Once merged, `GBRT_REF` points to the original project's tag and the fork
+  remains as a mirror.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] El pull request está abierto con la CI del proyecto original en verde.
-- [ ] Este repositorio compila contra la etiqueta original tras la fusión, o contra el fork mientras tanto, sin parches textuales en ningún caso.
+- [ ] The pull request is open with the original project's CI passing.
+- [ ] This repository builds against the original tag after the merge, or against the fork in the meantime, without textual patches in either case.
 
-## Limitaciones asumidas
+## Accepted limitations
 
-- Las pruebas de recorrido, combate real, interiores reales y comparaciones
-  de capturas siguen necesitando la ROM y savestates privados. La CI no las
-  sustituye; garantiza el lector, los clasificadores, la selección de vista y
-  el renderer.
-- macOS depende de que el runtime ofrezca un backend GL compatible; hasta
-  confirmarlo no bloquea.
-- La aceptación del pull request no depende de este proyecto; el fork cubre
-  el intervalo.
+- Journey tests, real battles, real interiors, and capture comparisons
+  still need the ROM and private savestates. CI does not replace them; it
+  guarantees the reader, the classifiers, view selection, and the renderer.
+- macOS depends on the runtime offering a compatible GL backend; until that
+  is confirmed, it does not block.
+- Acceptance of the pull request does not depend on this project; the fork
+  covers the interval.
 
-## Validación y entrega
+## Validation and delivery
 
-- Cada fase termina con CTest completo en local con ROM y con `ctest -LE rom`
-  en un directorio sin ROM.
-- Las capturas de regresión se comparan byte a byte tras la fase 2.
-- Entregables: fork etiquetado, `Pallet3D.cmake` sin parches, generador
-  sintético y sus pruebas, dos flujos de GitHub Actions, README con insignias
-  y sección de contribución, y el pull request al proyecto original.
-- Marcar las casillas solo con evidencia registrada, incluidos los enlaces a
-  las ejecuciones de la CI.
+- Each phase ends with the full CTest suite locally with the ROM and with
+  `ctest -LE rom` in a directory without the ROM.
+- Regression captures are compared byte for byte after phase 2.
+- Deliverables: tagged fork, `Pallet3D.cmake` without patches, the synthetic
+  generator and its tests, two GitHub Actions workflows, a README with
+  badges and a contributing section, and the pull request to the original
+  project.
+- Check the boxes only with recorded evidence, including links to the CI
+  runs.
 
-## Orden recomendado
+## Recommended order
 
-1. Fase 3 puede empezar ya, en paralelo con la fase 1, porque no toca la
-   integración con el runtime.
-2. Fase 1 y fase 2 en secuencia, con la regresión de capturas como puerta.
-3. Fase 4 en cuanto la fase 3 tenga la primera prueba sintética; se amplía a
-   medida que llegan las demás.
-4. Fase 5 al cerrar la fase 2.
+1. Phase 3 can start now, in parallel with phase 1, because it does not
+   touch the runtime integration.
+2. Phase 1 and phase 2 in sequence, with the capture regression as a gate.
+3. Phase 4 as soon as phase 3 has its first synthetic test; it expands as
+   the others arrive.
+4. Phase 5 once phase 2 closes.
 
-## Referencias técnicas
+## Technical references
 
-- `cmake/Pallet3D.cmake`: inventario de los 14 puntos de integración actuales.
+- `cmake/Pallet3D.cmake`: inventory of the 14 current integration points.
 - `build/_deps/gb_recompiled-src/runtime/src/platform_sdl.cpp`:
-  `update_effective_joypad_state`, subida del framebuffer y bucle de eventos.
-- `build/_deps/gb_recompiled-src/runtime/CMakeLists.txt`: dependencias y ramas por sistema.
-- `tests/pallet_render_smoke.cpp`: inicialización sin cabeza que reutiliza la prueba sintética.
+  `update_effective_joypad_state`, framebuffer upload, and the event loop.
+- `build/_deps/gb_recompiled-src/runtime/CMakeLists.txt`: dependencies and per-OS branches.
+- `tests/pallet_render_smoke.cpp`: headless initialization that reuses the synthetic test.
 - [GB-Recomp/gb-recompiled](https://github.com/GB-Recomp/gb-recompiled).
-- [GitHub Actions: matrices y caché](https://docs.github.com/actions).
+- [GitHub Actions: matrices and caching](https://docs.github.com/actions).

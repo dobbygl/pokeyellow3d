@@ -1,195 +1,199 @@
-# Plan: diez mejoras tras completar el diseño 3D
+# Plan: ten improvements after completing the 3D design
 
-Fecha: 2026-09-20. Estado: propuesta. Ordenado por prioridad; cada punto es
-independiente salvo donde se indica una dependencia.
+Date: 2026-09-20. Status: proposed. Ordered by priority; each point is
+independent except where a dependency is noted.
 
-## Estado de partida
+## Starting point
 
-Los planes `PLAN_KANTO_3D.md`, `PLAN_PRIMERA_PERSONA.md`,
-`PLAN_INTERIORES_COMBATES.md`, `PLAN_MENUS_TITULO_TRANSICIONES.md` y
-`PLAN_POKEDEX_PC.md` definen la presentación 3D completa. Este documento
-recoge lo que viene después. Hechos verificados el 2026-09-20:
+The `PLAN_KANTO_3D.md`, `PLAN_PRIMERA_PERSONA.md`,
+`PLAN_INTERIORES_COMBATES.md`, `PLAN_MENUS_TITULO_TRANSICIONES.md`, and
+`PLAN_POKEDEX_PC.md` plans define the complete 3D presentation. This
+document covers what comes next. Facts verified on 2026-09-20:
 
-- Repositorio `github.com/dobbygl/pokeyellow3d`, 12 commits, sin `.github/`.
-- La integración con el runtime son 14 parches textuales en
-  `cmake/Pallet3D.cmake` sobre `platform_sdl.cpp`, con gb-recompiled fijado a
-  una revisión concreta por `GBRT_REF`.
-- De las pruebas CTest solo `firstperson` corre sin ROM; las otras seis y todos
-  los recorridos de `pallet_render_smoke` exigen la ROM y savestates privados.
-- El mundo se dibuja con cajas de color y tiles de 8 píxeles; 2.960 casillas
-  de 104 interiores no tienen clasificación artística.
-- El lector de tilesets ya extrae el flag de animación, pero agua y flores se
-  dibujan estáticas. Los NPC fuera de la pantalla original no se animan.
-- El runtime trae SDL2, OpenGL ES 2, ImGui, soporte de mando por
-  `SDL_GameController`, transferencia serie con callbacks y un lanzador con
-  tabla de juegos verificada por SHA-256.
-- El juego expone la pista de música actual en `wMapMusicSoundID`,
-  `wNewSoundID` y `wLastMusicSoundID`.
+- Repository `github.com/dobbygl/pokeyellow3d`, 12 commits, no `.github/`.
+- The runtime integration consists of 14 textual patches in
+  `cmake/Pallet3D.cmake` over `platform_sdl.cpp`, with gb-recompiled pinned
+  to a specific revision via `GBRT_REF`.
+- Of the CTest tests, only `firstperson` runs without the ROM; the other six
+  and all `pallet_render_smoke` journeys require the ROM and private
+  savestates.
+- The world is drawn with colored boxes and 8-pixel tiles; 2,960 tiles
+  across 104 interiors have no art classification.
+- The tileset reader already extracts the animation flag, but water and
+  flowers are drawn static. NPCs outside the original screen are not
+  animated.
+- The runtime bundles SDL2, OpenGL ES 2, ImGui, controller support via
+  `SDL_GameController`, serial transfer with callbacks, and a launcher with
+  a game table verified by SHA-256.
+- The game exposes the current music track in `wMapMusicSoundID`,
+  `wNewSoundID`, and `wLastMusicSoundID`.
 
-## Resumen
+## Summary
 
-| # | Mejora | Ganancia | Esfuerzo | Depende de |
+| # | Improvement | Payoff | Effort | Depends on |
 | --- | --- | --- | --- | --- |
-| 1 | API de extensión estable en gb-recompiled | Elimina el riesgo estructural | Medio | — |
-| 2 | CI en GitHub Actions y pruebas sin ROM | Regresiones y contribuciones | Medio | 1 |
-| 3 | Pase artístico dirigido por datos e iluminación | El mayor salto visual | Alto | 2 |
-| 4 | Ciclo día y noche presentacional | Atmósfera con coste bajo | Bajo | 3 |
-| 5 | Mundo animado | Elimina la sensación de maqueta | Medio | 2 |
-| 6 | Build web y mando | Alcance masivo | Medio | 1, 2 |
-| 7 | Rojo, Azul y Amarillo en español | Triplica la audiencia | Alto | 2 |
-| 8 | Audio mejorado opcional | Inmersión | Medio | 1 |
-| 9 | Modo foto y cámaras de evento | Compartibilidad | Bajo | 3 |
-| 10 | Cable link entre instancias | Intercambios y combates | Medio | 1 |
+| 1 | Stable extension API in gb-recompiled | Removes the structural risk | Medium | — |
+| 2 | CI on GitHub Actions and tests without the ROM | Regressions and contributions | Medium | 1 |
+| 3 | Data-driven art pass and lighting | The biggest visual leap | High | 2 |
+| 4 | Presentational day/night cycle | Atmosphere at low cost | Low | 3 |
+| 5 | Animated world | Removes the diorama feel | Medium | 2 |
+| 6 | Web build and gamepad | Massive reach | Medium | 1, 2 |
+| 7 | Red, Blue, and Spanish Yellow | Triples the audience | High | 2 |
+| 8 | Optional enhanced audio | Immersion | Medium | 1 |
+| 9 | Photo mode and event cameras | Shareability | Low | 3 |
+| 10 | Cable link between instances | Trades and battles | Medium | 1 |
 
-Los puntos 1 y 2 se detallan en `PLAN_API_CI.md`.
+Points 1 and 2 are detailed in `PLAN_API_CI.md`.
 
-## 1. API de extensión estable en gb-recompiled
+## 1. Stable extension API in gb-recompiled
 
-Qué: sustituir los 14 parches textuales por una interfaz de presentación del
-runtime, con callbacks de frame, evento, cierre, captura, cobertura del
-framebuffer y máscara de mando. Primero en un fork propio, después como
-contribución a `GB-Recomp/gb-recompiled`.
+What: replace the 14 textual patches with a runtime presentation interface,
+with frame, event, shutdown, capture, framebuffer coverage, and controller
+mask callbacks. First in an own fork, then as a contribution to
+`GB-Recomp/gb-recompiled`.
 
-Por qué: cualquier cambio del frontend SDL rompe la compilación; la revisión
-fijada impide adoptar mejoras del runtime; otros juegos recompilados no pueden
-reutilizar la capa 3D.
+Why: any change to the SDL frontend breaks the build; the pinned revision
+prevents adopting runtime improvements; other recompiled games cannot reuse
+the 3D layer.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] `cmake/Pallet3D.cmake` no contiene ningún reemplazo textual del runtime.
-- [ ] La capa 3D compila contra una versión etiquetada del runtime que declara la versión de la API.
-- [ ] Las baterías de regresión existentes pasan sin cambios de comportamiento.
+- [ ] `cmake/Pallet3D.cmake` contains no textual replacement of the runtime.
+- [ ] The 3D layer builds against a tagged runtime version that declares the API version.
+- [ ] The existing regression suites pass with no behavior changes.
 
-## 2. CI en GitHub Actions y pruebas sin ROM
+## 2. CI on GitHub Actions and tests without the ROM
 
-Qué: flujo de integración continua que compila en Linux y Windows, ejecuta las
-pruebas que no requieren ROM y publica binarios en cada etiqueta. Una ROM
-sintética generada en código alimenta el lector, los clasificadores, la
-selección de vista y un render sin cabeza.
+What: a continuous integration workflow that builds on Linux (Windows and
+macOS as non-blocking canaries until the runtime is portable),
+runs the tests that do not require the ROM, and publishes binaries on every
+tag. A synthetic ROM generated in code feeds the reader, the classifiers,
+view selection, and a headless render.
 
-Por qué: hoy no existe red de seguridad automática y nadie externo puede
-verificar una contribución.
+Why: today there is no automatic safety net and no outside contributor can
+verify a contribution.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Cada push y cada pull request compila y pasa CTest en Linux y Windows.
-- [ ] Al menos el lector de ROM, los clasificadores de terreno e interior, `view()` y el renderer en modo previsualización se prueban sin ROM.
-- [ ] Las pruebas que exigen ROM quedan separadas y documentadas para ejecución local.
+- [x] Every push and every pull request builds and passes CTest on Linux; Windows and macOS report without blocking.
+- [ ] At minimum, the ROM reader, the terrain and interior classifiers, `view()`, and the renderer in preview mode are tested without the ROM.
+- [ ] Tests that require the ROM remain separated and documented for local execution.
 
-## 3. Pase artístico dirigido por datos e iluminación
+## 3. Data-driven art pass and lighting
 
-Qué: pipeline por familia de tile que admita modelos y texturas opcionales
-con caída al tile original; luz direccional, sombras por mapa de sombras,
-oclusión ambiental y materiales por familia. Completar la clasificación de
-las 2.960 casillas pendientes.
+What: a per-tile-family pipeline that supports optional models and textures
+with fallback to the original tile; directional light, shadow-map shadows,
+ambient occlusion, and per-family materials. Complete the classification of
+the 2,960 pending tiles.
 
-Por qué: es la mejora que cualquiera percibe en la primera captura. La
-arquitectura ya separa datos de ROM y retoques artísticos; falta el arte.
+Why: it's the improvement anyone notices in the first screenshot. The
+architecture already separates ROM data from art touch-ups; only the art is
+missing.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Ninguna casilla de los 38 exteriores ni de los 179 interiores queda sin clasificar.
-- [ ] Sombras e iluminación activas en ambas cámaras sin superar el doble del tiempo de presentación actual.
-- [ ] Un recurso artístico ausente nunca produce un hueco: siempre cae al tile original.
+- [ ] No tile in the 38 outdoor maps or the 179 interiors remains unclassified.
+- [ ] Shadows and lighting active in both cameras without exceeding twice the current presentation time.
+- [ ] A missing art asset never produces a gap: it always falls back to the original tile.
 
-## 4. Ciclo día y noche presentacional
+## 4. Presentational day/night cycle
 
-Qué: hora del sistema convertida en posición del sol, color del cielo, niebla
-y luz de ventanas por la noche. Solo presentación; el juego no cambia.
+What: system time converted into sun position, sky color, fog, and window
+light at night. Presentation only; the game does not change.
 
-Por qué: la primera generación no tiene reloj y el ambiente estático se
-percibe como plano. Con la iluminación del punto 3 el coste es bajo.
+Why: the first generation has no clock and the static ambience feels flat.
+With the lighting from point 3, the cost is low.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Amanecer, mediodía, atardecer y noche se revisan en Paleta, Ruta 1 y Ciudad Verde.
-- [ ] Un ajuste de la aplicación permite fijar la hora o desactivar el ciclo.
-- [ ] Los encuentros, scripts y RNG no cambian con la hora.
+- [ ] Dawn, noon, dusk, and night are reviewed in Pallet Town, Route 1, and Viridian City.
+- [ ] An application setting allows fixing the time or disabling the cycle.
+- [ ] Encounters, scripts, and RNG do not change with the time of day.
 
-## 5. Mundo animado
+## 5. Animated world
 
-Qué: animaciones de tileset de agua y flores según el flag de la ROM; hierba
-con viento; NPC fuera de la pantalla original animados a partir de su estado
-de movimiento y de las hojas de sprites de la ROM; partículas al andar en
-hierba y al surfear.
+What: water and flower tileset animations driven by the ROM flag; grass
+with wind; NPCs outside the original screen animated from their movement
+state and the ROM's sprite sheets; particles when walking in grass and when
+surfing.
 
-Por qué: hoy el mundo es una maqueta con actores congelados a distancia.
+Why: today the world is a diorama with actors frozen at a distance.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Agua y flores se animan con la cadencia del juego original.
-- [ ] Un NPC caminando fuera de la pantalla original muestra sus frames de andar.
-- [ ] Los recorridos de regresión siguen pasando con memoria intacta.
+- [ ] Water and flowers animate at the original game's cadence.
+- [ ] An NPC walking outside the original screen shows its walking frames.
+- [ ] The regression journeys keep passing with memory intact.
 
-## 6. Build web y mando
+## 6. Web build and gamepad
 
-Qué: compilación con Emscripten, con la ROM aportada por el usuario en el
-navegador y verificada por hash; mapeo de mando para movimiento relativo,
-cámara y atajos.
+What: an Emscripten build, with the ROM supplied by the user in the browser
+and verified by hash; gamepad mapping for relative movement, camera, and
+shortcuts.
 
-Por qué: SDL2, OpenGL ES 2 e ImGui son la combinación natural para WebAssembly.
-Jugar sin instalar multiplica el alcance.
+Why: SDL2, OpenGL ES 2, and ImGui are the natural combination for
+WebAssembly. Playing without installing multiplies the reach.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] La versión web arranca, carga una ROM local y llega al exterior en 3D.
-- [ ] Un mando recorre Paleta, habla con un NPC y combate sin teclado.
-- [ ] La CI publica la versión web en cada etiqueta.
+- [ ] The web version starts, loads a local ROM, and reaches the outdoor world in 3D.
+- [ ] A gamepad navigates Pallet Town, talks to an NPC, and battles without a keyboard.
+- [ ] CI publishes the web version on every tag.
 
-## 7. Rojo, Azul y Amarillo en español
+## 7. Red, Blue, and Spanish Yellow
 
-Qué: tabla de direcciones por variante de ROM, verificada contra los símbolos
-de cada proyecto pret, y selección automática por hash en el lanzador.
+What: an address table per ROM variant, verified against each pret
+project's symbols, and automatic selection by hash in the launcher.
 
-Por qué: la capa 3D solo entiende la ROM inglesa de Amarillo. Las otras tres
-variantes comparten estructura y multiplican la audiencia.
+Why: the 3D layer only understands the English Yellow ROM. The other three
+variants share the same structure and multiply the audience.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Cada variante pasa la auditoría de ROM y el recorrido de Paleta a Ciudad Verde.
-- [ ] Ninguna dirección se comparte entre variantes sin verificación registrada.
-- [ ] El lanzador identifica la variante por hash y rechaza ROM desconocidas.
+- [ ] Each variant passes the ROM audit and the Pallet Town–to–Viridian City journey.
+- [ ] No address is shared between variants without recorded verification.
+- [ ] The launcher identifies the variant by hash and rejects unknown ROMs.
 
-## 8. Audio mejorado opcional
+## 8. Optional enhanced audio
 
-Qué: detección de la pista actual por WRAM, pack de música aportado por el
-usuario con fundido cruzado, y efectos posicionales en 3D. Audio original por
-defecto y ningún recurso incluido en el repositorio.
+What: current-track detection via WRAM, a user-supplied music pack with
+crossfade, and positional 3D effects. Original audio by default and no
+asset included in the repository.
 
-Por qué: la inmersión del 3D contrasta con el chip original, y la pista
-actual ya es legible.
+Why: the immersion of the 3D contrasts with the original chip audio, and
+the current track is already readable.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Cambiar de mapa o entrar en combate cambia la pista del pack con fundido.
-- [ ] Sin pack, el audio es idéntico al actual.
-- [ ] Los efectos de pasos y puertas se posicionan respecto a la cámara.
+- [ ] Changing maps or entering a battle changes the pack's track with a fade.
+- [ ] Without a pack, the audio is identical to the current one.
+- [ ] Footstep and door effects are positioned relative to the camera.
 
-## 9. Modo foto y cámaras de evento
+## 9. Photo mode and event cameras
 
-Qué: cámara libre con el juego en pausa, cámaras guiadas en los eventos de
-Oak y del Team Rocket detectadas por script, captura PNG y GIF desde la
-aplicación.
+What: a free camera with the game paused, guided cameras for the Oak and
+Team Rocket events detected by script, and PNG and GIF capture from the
+application.
 
-Por qué: es barato, no escribe en memoria y las capturas compartidas son el
-mejor crecimiento posible para el proyecto.
+Why: it's cheap, it never writes to memory, and shared screenshots are the
+best possible growth for the project.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] El modo foto no avanza el juego ni altera WRAM.
-- [ ] La entrada de Oak en Ruta 1 tiene cámara guiada y vuelve a la cámara normal al terminar.
-- [ ] Las capturas se guardan junto a la partida con nombre por mapa y fecha.
+- [ ] Photo mode does not advance the game or alter WRAM.
+- [ ] Oak's entrance on Route 1 has a guided camera and returns to the normal camera when it ends.
+- [ ] Screenshots are saved next to the save with a name based on map and date.
 
-## 10. Cable link entre instancias
+## 10. Cable link between instances
 
-Qué: transporte por socket local o de red para la transferencia serie del
-runtime, con las pantallas del Club Cable compuestas sobre el 3D.
+What: local or network socket transport for the runtime's serial transfer,
+with the Cable Club screens composited over the 3D.
 
-Por qué: intercambios y combates originales son el mayor valor nostálgico
-que queda, y la escena 3D de combate ya existe.
+Why: original trades and battles are the biggest remaining nostalgia value,
+and the 3D battle scene already exists.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [ ] Dos instancias intercambian un Pokémon y ambas partidas quedan coherentes.
-- [ ] Un combate link completo se presenta en 2D, como define el plan de combates, sin desincronía.
-- [ ] La desconexión se gestiona con el mensaje original del juego.
+- [ ] Two instances trade a Pokémon and both saves remain consistent.
+- [ ] A full link battle is presented in 2D, as defined by the battle plan, with no desync.
+- [ ] Disconnection is handled with the game's original message.

@@ -1,9 +1,9 @@
 name: Release
 
-# Fase 4 de PLAN_API_CI.md. Publica binarios de Linux y Windows para cada
-# etiqueta `vX.Y.Z`. Nunca empaqueta la ROM: el paquete solo trae el
-# ejecutable, la documentacion y un RUN.md que explica donde colocar la
-# ROM propia del usuario.
+# Phase 4 of PLAN_API_CI.md. Publishes Linux and Windows binaries for every
+# `vX.Y.Z` tag. It never packages the ROM: the package only carries the
+# executable, the documentation, and a RUN.md explaining where to place the
+# user's own ROM.
 
 on:
   push:
@@ -19,8 +19,8 @@ defaults:
 
 jobs:
   # ---------------------------------------------------------------------
-  # Linux (gcc). Mismos pasos de dependencias/configuracion que el job
-  # `linux` de ci.yml; ver ese fichero para el detalle de cada paquete.
+  # Linux (gcc). Same dependency/configure steps as the `linux` job in
+  # ci.yml; see that file for the details of each package.
   # ---------------------------------------------------------------------
   build-linux:
     name: Build Linux package
@@ -101,99 +101,15 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------
-  # Windows (MSVC). Mismos pasos que el job `windows` de ci.yml.
+  # Windows (MSVC). Same steps as the `windows` job in ci.yml.
   # ---------------------------------------------------------------------
-  build-windows:
-    name: Build Windows package
-    runs-on: windows-2022
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v7
+  # build-windows is intentionally absent: the pinned gb-recompiled runtime
+  # does not compile with MSVC yet (see the Windows job in ci.yml). Restore
+  # it once the runtime is portable.
 
-      - name: Set up MSVC developer environment
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Install dependencies via vcpkg
-        run: |
-          # Ver el comentario equivalente en ci.yml sobre opengl-registry:
-          # riesgo no verificado sin ejecutar Actions.
-          vcpkg install sdl2:x64-windows curl:x64-windows opengl-registry:x64-windows
-          echo "$VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin" >> "$GITHUB_PATH"
-
-      - name: Extract GBRT_REF
-        id: gbrt
-        run: |
-          ref=$(sed -n 's/.*set(GBRT_REF "\([0-9a-f]*\)".*/\1/p' CMakeLists.txt)
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-
-      - name: Cache FetchContent deps (gb-recompiled)
-        uses: actions/cache@v6
-        with:
-          path: build/_deps
-          key: ${{ runner.os }}-release-msvc-deps-${{ steps.gbrt.outputs.ref }}
-
-      - name: Configure
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=x64-windows \
-            -DPOKEYELLOW_3D=ON \
-            -DCMAKE_BUILD_TYPE=MinSizeRel
-
-      - name: Build
-        run: cmake --build build --parallel
-
-      - name: Sanity test (ctest -LE rom)
-        env:
-          SDL_VIDEODRIVER: dummy
-          SDL_AUDIODRIVER: dummy
-        run: ctest --test-dir build -LE rom --output-on-failure
-
-      - name: Package
-        run: |
-          set -eu
-          pkg="pokeyellow3d-windows-x86_64-${{ github.ref_name }}"
-          mkdir -p "dist/$pkg"
-          cp build/pokeyellow3d.exe "dist/$pkg/"
-          # vcpkg x64-windows es un triplet dinamico: el .exe necesita las
-          # DLL de SDL2/curl (y sus dependencias transitivas, p.ej. zlib)
-          # al lado. Se copian todas para no listar nombres exactos a mano.
-          cp "$VCPKG_INSTALLATION_ROOT"/installed/x64-windows/bin/*.dll "dist/$pkg/" || true
-          cp PALLET3D.md README.md "dist/$pkg/"
-          cat > "dist/$pkg/RUN.md" <<'EOF'
-          # Running pokeyellow3d
-
-          This package does not include the Pokemon Yellow ROM. Supply your
-          own legally obtained copy:
-
-          1. Create a `roms` folder next to the `pokeyellow3d` executable
-             (Linux) or `pokeyellow3d.exe` (Windows).
-          2. Copy your ROM into it as `roms/pokeyellow.gbc`. The build
-             targets the 1 MiB English USA/Europe ROM, SHA-1
-             `cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1`.
-          3. Run the executable from this folder (double-click, or `cd`
-             into it and run `./pokeyellow3d` / `pokeyellow3d.exe`).
-
-          On first launch the game extracts its assets into an `assets/`
-          folder next to the executable; later launches reuse them. Saves
-          are written to `pokeyellow.sav` in the same folder. See
-          `PALLET3D.md` and `README.md` for controls and troubleshooting.
-          EOF
-          cd dist && 7z a -tzip "${pkg}.zip" "$pkg" >/dev/null
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: pokeyellow3d-windows
-          path: dist/*.zip
-          if-no-files-found: error
-
-  # ---------------------------------------------------------------------
-  # Publica ambos paquetes en la release de la etiqueta.
-  # ---------------------------------------------------------------------
   publish:
     name: Publish release
-    needs: [build-linux, build-windows]
+    needs: [build-linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

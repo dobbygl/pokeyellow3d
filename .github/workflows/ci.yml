@@ -1,17 +1,16 @@
 name: CI
 
-# Fase 4 de PLAN_API_CI.md. Compila y prueba en cada push a main y en cada
-# pull request. No usa ni contiene la ROM en ningun paso: las pruebas
-# etiquetadas `rom` (registradas solo cuando build/roms/pokeyellow.gbc
-# existe localmente) se excluyen con `ctest -LE rom`.
+# Phase 4 of PLAN_API_CI.md. Builds and tests on every push to main and on
+# every pull request. It never uses or contains the ROM in any step: tests
+# tagged `rom` (registered only when build/roms/pokeyellow.gbc exists
+# locally) are excluded with `ctest -LE rom`.
 
 on:
   push:
     branches: [main]
   pull_request:
 
-# Cancela ejecuciones obsoletas de la misma rama/PR cuando llegan commits
-# nuevos.
+# Cancels stale runs of the same branch/PR when new commits arrive.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -21,14 +20,14 @@ permissions:
 
 defaults:
   run:
-    # bash tambien en windows-2022 (Git Bash viene preinstalado en el
-    # runner), asi el mismo `sed`/sintaxis de variables de entorno sirve
-    # para los tres sistemas operativos.
+    # bash also on windows-2022 (Git Bash comes preinstalled on the
+    # runner), so the same `sed`/environment-variable syntax works for
+    # all three operating systems.
     shell: bash
 
 jobs:
   # ---------------------------------------------------------------------
-  # Linux: matriz GCC / Clang, build 3D completo + ctest sin ROM.
+  # Linux: GCC / Clang matrix, full 3D build + ctest without the ROM.
   # ---------------------------------------------------------------------
   linux:
     name: Linux (${{ matrix.compiler }})
@@ -50,29 +49,29 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          # Paquetes pedidos por PLAN_API_CI.md: ninja-build libsdl2-dev
+          # Packages requested by PLAN_API_CI.md: ninja-build libsdl2-dev
           # libcurl4-openssl-dev libgles2-mesa-dev libegl1-mesa-dev
           # libgl1-mesa-dri xvfb.
           #
-          # libgles2-mesa-dev / libegl1-mesa-dev son los nombres del
-          # paquete de transicion en 24.04 (los sucesores son libgles-dev
-          # / libegl-dev). Si Ubuntu los retira, este paso es el primero a
-          # arreglar. Proveen <GLES2/gl2.h>, que
-          # runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp incluye
-          # directamente cuando se compila con IMGUI_IMPL_OPENGL_ES2 (asi
-          # lo hace cmake/Pallet3D.cmake en todas las plataformas).
-          # libgl1-mesa-dri aporta el rasterizador software (llvmpipe)
-          # usado por el contexto GL sin cabeza en el runner.
+          # libgles2-mesa-dev / libegl1-mesa-dev are the transitional
+          # package names on 24.04 (the successors are libgles-dev /
+          # libegl-dev). If Ubuntu drops them, this step is the first
+          # thing to fix. They provide <GLES2/gl2.h>, which
+          # runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp includes
+          # directly when built with IMGUI_IMPL_OPENGL_ES2 (which is how
+          # cmake/Pallet3D.cmake builds it on every platform).
+          # libgl1-mesa-dri provides the software rasterizer (llvmpipe)
+          # used by the headless GL context on the runner.
           #
-          # libgl-dev y ccache NO estan en la lista literal del plan; se
-          # anaden aqui porque runtime/CMakeLists.txt enlaza `-lGL` a
-          # pelo cuando find_package(OpenGL) no resuelve el target
-          # OpenGL::GL (rama Linux, ni APPLE ni WIN32), y solo libgl-dev
-          # (o el antiguo libgl1-mesa-dev) provee el enlace simbolico sin
-          # version libGL.so y las cabeceras GL/gl.h que FindOpenGL.cmake
-          # busca; sin el, el enlazado del ejecutable falla. ccache hace
-          # falta como binario para la cache de compilacion pedida en el
-          # plan.
+          # libgl-dev and ccache are NOT in the plan's literal list; they
+          # are added here because runtime/CMakeLists.txt links `-lGL`
+          # directly when find_package(OpenGL) fails to resolve the
+          # OpenGL::GL target (Linux branch, neither APPLE nor WIN32), and
+          # only libgl-dev (or the older libgl1-mesa-dev) provides the
+          # unversioned libGL.so symlink and the GL/gl.h headers that
+          # FindOpenGL.cmake looks for; without it, linking the executable
+          # fails. ccache is needed as a binary for the build cache
+          # requested by the plan.
           sudo apt-get install -y --no-install-recommends \
             ninja-build libsdl2-dev libcurl4-openssl-dev \
             libgles2-mesa-dev libegl1-mesa-dev libgl1-mesa-dri \
@@ -83,7 +82,7 @@ jobs:
         run: |
           ref=$(sed -n 's/.*set(GBRT_REF "\([0-9a-f]*\)".*/\1/p' CMakeLists.txt)
           if [ -z "$ref" ]; then
-            echo "::error::No se pudo extraer GBRT_REF de CMakeLists.txt" >&2
+            echo "::error::Could not extract GBRT_REF from CMakeLists.txt" >&2
             exit 1
           fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
@@ -122,26 +121,26 @@ jobs:
           SDL_AUDIODRIVER: dummy
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
-          # Decision Fase 4 (documentada en PLAN_API_CI.md, decision 6-7):
-          # SDL_VIDEODRIVER=offscreen es el driver elegido porque es el
-          # que tests/pallet_render_smoke.cpp ya usa localmente para abrir
-          # un contexto GL real sin cabeza (ver "Punto de partida
-          # verificado" en PLAN_API_CI.md). Con SDL_VIDEODRIVER fijado,
-          # SDL NO reintenta con otro driver si offscreen falla: se limita
-          # a devolver error. `xvfb-run -a` no cambia eso ni hace de
-          # respaldo a nivel de driver; su valor real, mas estrecho, es
-          # garantizar un $DISPLAY (coste ~1s) para cualquier ruta de Mesa,
-          # ImGui o del propio SDL que asuma que existe uno, aunque el
-          # driver activo siga siendo offscreen. LIBGL_ALWAYS_SOFTWARE
-          # fuerza llvmpipe por si el runner expone un dispositivo DRI que
-          # Mesa intenta usar antes que el software renderer.
+          # Phase 4 decision (documented in PLAN_API_CI.md, decision 6-7):
+          # SDL_VIDEODRIVER=offscreen is the driver chosen because it's the
+          # one tests/pallet_render_smoke.cpp already uses locally to open
+          # a real headless GL context (see "Verified starting point" in
+          # PLAN_API_CI.md). With SDL_VIDEODRIVER fixed, SDL does NOT retry
+          # with another driver if offscreen fails: it just returns an
+          # error. `xvfb-run -a` doesn't change that or act as a
+          # driver-level fallback; its real, narrower value is guaranteeing
+          # a $DISPLAY (cost ~1s) for any Mesa, ImGui, or SDL code path
+          # that assumes one exists, even though the active driver stays
+          # offscreen. LIBGL_ALWAYS_SOFTWARE forces llvmpipe in case the
+          # runner exposes a DRI device that Mesa tries before the
+          # software renderer.
           xvfb-run -a ctest --test-dir build -LE rom --output-on-failure
 
   # ---------------------------------------------------------------------
-  # Linux: build con la capa 3D desactivada, para no romper el ejecutable
-  # 2D original. No registra pruebas (enable_testing()/add_test() viven
-  # dentro del bloque if(POKEYELLOW_3D) de CMakeLists.txt), asi que este
-  # job solo valida la compilacion.
+  # Linux: build with the 3D layer disabled, so the original 2D
+  # executable does not break. It registers no tests (enable_testing()/
+  # add_test() live inside the if(POKEYELLOW_3D) block of CMakeLists.txt),
+  # so this job only validates the build.
   # ---------------------------------------------------------------------
   linux-2d:
     name: Linux (2D, POKEYELLOW_3D=OFF)
@@ -180,12 +179,19 @@ jobs:
         run: cmake --build build --parallel
 
   # ---------------------------------------------------------------------
-  # Windows: MSVC + Ninja, dependencias via el vcpkg preinstalado en el
-  # runner (classic mode, sin vcpkg.json).
+  # Windows: MSVC + Ninja, dependencies via the vcpkg preinstalled on the
+  # runner (classic mode, no vcpkg.json).
   # ---------------------------------------------------------------------
+  # Windows is a non-blocking canary until the pinned gb-recompiled revision
+  # is portable: its runtime includes <pthread.h> and <arpa/inet.h>
+  # unconditionally (serial_link.c, network_discovery.c) and platform_sdl.cpp
+  # uses C++20 designated initializers while this project pins C++17. Both
+  # are upstream matters (see PLAN_API_CI.md, phase 5); the job stays so a
+  # future runtime bump is checked automatically.
   windows:
-    name: Windows (MSVC)
+    name: Windows (MSVC, non-blocking)
     runs-on: windows-2022
+    continue-on-error: true
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -195,18 +201,17 @@ jobs:
 
       - name: Install dependencies via vcpkg
         run: |
-          # sdl2 y curl son los pedidos por el plan. opengl-registry se
-          # anade porque runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp
-          # incluye <GLES2/gl2.h> directamente cuando se compila con
-          # IMGUI_IMPL_OPENGL_ES2 (ver comentario del job Linux); ese
-          # fichero no lo trae ni sdl2 ni curl. RIESGO no verificable sin
-          # ejecutar Actions: no se ha confirmado en un runner real que
-          # opengl-registry:x64-windows sea suficiente (solo aporta
-          # cabeceras Khronos; el enlazado sigue siendo contra
-          # opengl32.lib del SDK de Windows, igual que en
-          # runtime/CMakeLists.txt). Si el job falla en compilacion por
-          # una cabecera GLES2/EGL que falte, ese es el primer sitio a
-          # mirar.
+          # sdl2 and curl are the ones requested by the plan. opengl-registry
+          # is added because runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp
+          # includes <GLES2/gl2.h> directly when built with
+          # IMGUI_IMPL_OPENGL_ES2 (see the Linux job comment); that header
+          # comes from neither sdl2 nor curl. RISK not verifiable without
+          # running Actions: it has not been confirmed on a real runner
+          # that opengl-registry:x64-windows is enough (it only provides
+          # Khronos headers; linking is still against the Windows SDK's
+          # opengl32.lib, same as in runtime/CMakeLists.txt). If the job
+          # fails to build over a missing GLES2/EGL header, that is the
+          # first place to look.
           vcpkg install sdl2:x64-windows curl:x64-windows opengl-registry:x64-windows
           echo "$VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin" >> "$GITHUB_PATH"
 
@@ -223,9 +228,9 @@ jobs:
           key: ${{ runner.os }}-msvc-deps-${{ steps.gbrt.outputs.ref }}
 
       - name: Set up sccache
-        # sccache-action instala el binario y, con SCCACHE_GHA_ENABLED,
-        # usa la propia cache de GitHub Actions como backend, sin
-        # necesitar un paso actions/cache aparte para su directorio local.
+        # sccache-action installs the binary and, with SCCACHE_GHA_ENABLED,
+        # uses GitHub Actions' own cache as its backend, without needing a
+        # separate actions/cache step for its local directory.
         uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Configure
@@ -252,19 +257,20 @@ jobs:
         run: ctest --test-dir build -LE rom --output-on-failure
 
   # ---------------------------------------------------------------------
-  # macOS: no bloqueante. Ver PLAN_API_CI.md ("macOS depende de que el
-  # runtime ofrezca un backend GL compatible; hasta confirmarlo no
-  # bloquea"). Evidencia concreta encontrada al preparar este flujo:
-  # runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp incluye
-  # <GLES2/gl2.h> sin condicion de Apple desktop (solo excluye iOS/tvOS),
-  # y ni el SDK de macOS ni `brew install sdl2 curl` proveen esa cabecera
-  # Khronos (existe un formula `mesa` en homebrew-core, pero arrastra X11
-  # y LLVM y no forma parte de las dependencias pedidas). Es muy probable
-  # que este job falle en la fase de compilacion; continue-on-error deja
-  # que el resto del flujo termine en verde igualmente.
+  # macOS: non-blocking. See PLAN_API_CI.md ("macOS depends on the
+  # runtime offering a compatible GL backend; until that is confirmed,
+  # it does not block"). Concrete evidence found while preparing this
+  # workflow: runtime/vendor/imgui/backends/imgui_impl_opengl3.cpp
+  # includes <GLES2/gl2.h> with no Apple-desktop guard (it only excludes
+  # iOS/tvOS), and neither the macOS SDK nor `brew install sdl2 curl`
+  # provides that Khronos header (a `mesa` formula exists in
+  # homebrew-core, but it pulls in X11 and LLVM and is not part of the
+  # requested dependencies). This job is very likely to fail at the
+  # build step; continue-on-error still lets the rest of the workflow
+  # finish green.
   # ---------------------------------------------------------------------
   macos:
-    name: macOS (best-effort, no bloqueante)
+    name: macOS (best-effort, non-blocking)
     runs-on: macos-14
     timeout-minutes: 45
     continue-on-error: true
@@ -288,9 +294,13 @@ jobs:
 
       - name: Configure
         run: |
+          # macOS ships no Khronos GLES2 headers; SDL_USE_BUILTIN_OPENGL_DEFINITIONS
+          # makes <SDL_opengles2.h> use the copies bundled with SDL instead.
           cmake -S . -B build -G Ninja \
             -DPOKEYELLOW_3D=ON \
-            -DCMAKE_BUILD_TYPE=MinSizeRel
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_FLAGS="-DSDL_USE_BUILTIN_OPENGL_DEFINITIONS=1" \
+            -DCMAKE_CXX_FLAGS="-DSDL_USE_BUILTIN_OPENGL_DEFINITIONS=1"
 
       - name: Build
         run: cmake --build build --parallel
@@ -302,9 +312,9 @@ jobs:
         run: ctest --test-dir build -LE rom --output-on-failure
 
   # ---------------------------------------------------------------------
-  # Formato: comentado porque no existe un .clang-format en el repositorio
-  # todavia. En cuanto se añada uno en la raiz, descomentar este job para
-  # que src/ y tests/ pasen `clang-format --dry-run --Werror`.
+  # Format: commented out because there is no .clang-format in the
+  # repository yet. Once one is added at the root, uncomment this job so
+  # that src/ and tests/ pass `clang-format --dry-run --Werror`.
   # ---------------------------------------------------------------------
   # format:
   #   name: clang-format

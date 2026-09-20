@@ -1,389 +1,406 @@
-# Plan: interiores y combates en 3D
+# Plan: 3D interiors and battles
 
-Fecha: 2026-09-19. Estado: A1, A2, B1 y B2 completadas y verificadas el 2026-09-20.
+Date: 2026-09-19. Status: A1, A2, B1, and B2 complete and verified on 2026-09-20.
 
-## Objetivo y alcance
+## Goal and scope
 
-Extender `build/pokeyellow3d` a los dos ámbitos que hoy siempre vuelven a 2D:
-los interiores a los que se entra por warp y los combates. El motor recompilado
-sigue siendo la única autoridad sobre estado, reglas, texto, menús y guardado.
-Ninguna parte de este plan escribe en la memoria de la máquina; la vista se
-deriva de ROM, WRAM, VRAM y del framebuffer que el juego ya ha pintado.
+Extend `build/pokeyellow3d` to the two areas that today always fall back to
+2D: interiors entered through a warp, and battles. The recompiled engine
+remains the sole authority over state, rules, text, menus, and saving. No
+part of this plan writes to the machine's memory; the view is derived from
+ROM, WRAM, VRAM, and the framebuffer the game has already painted.
 
-El plan tiene dos bloques independientes. Los interiores amplían el catálogo de
-escenas y las reglas de geometría. Los combates añaden una escena nueva que no
-comparte mundo con los mapas. Cualquiera de los dos puede entregarse sin el
-otro. Ambos dependen de que `PLAN_KANTO_3D.md` haya cerrado su fase 2, porque
-tocan `src/pallet3d.cpp` y `src/pallet_state.h`. La primera persona de
-`PLAN_PRIMERA_PERSONA.md` es ortogonal: si existe, los interiores la heredan;
-los combates no la usan.
+The plan has two independent blocks. Interiors extend the scene catalog and
+the geometry rules. Battles add a new scene that shares no world with the
+maps. Either one can be delivered without the other. Both depend on
+`PLAN_KANTO_3D.md` having closed its phase 2, because they touch
+`src/pallet3d.cpp` and `src/pallet_state.h`. First person from
+`PLAN_PRIMERA_PERSONA.md` is orthogonal: if it exists, interiors inherit it;
+battles do not use it.
 
-Quedan fuera: combates por cable link, la lucha tutorial del anciano, el Safari
-como escena distinta, modelos 3D de Pokémon, texto o menús redibujados con otra
-tipografía, y cualquier cambio en el runtime descargado o en el C generado.
+Out of scope: link-cable battles, the old man tutorial fight, the Safari
+Zone as a distinct scene, 3D Pokémon models, text or menus redrawn with a
+different typeface, and any change to the downloaded runtime or the
+generated C.
 
-## Punto de partida verificado
+## Verified starting point
 
-- `src/kanto_rom.h` ya lee los 25 tilesets y, para cada mapa, sus warps con
-  destino y entrada. El catálogo actual solo instancia los 36 mapas conectados
-  más Bosque Verde y muelle; los destinos de warp no se cargan.
-- `pallet::view()` exige que el mapa esté en el catálogo, que su tileset
-  coincida con el esperado y que `wIsInBattle` (0xD056) sea cero. Por eso
-  interiores y combates presentan hoy la vista 2D.
-- Cada tileset expone su lista de tiles transitables (`collisions`), sus
-  gráficos y su blockset. Con eso se distingue suelo de pared o mueble sin
-  inventar una segunda simulación.
-- `wCurMapTileset` (0xD366) identifica el tileset vivo. Los tilesets de
-  interior en Amarillo son: casa de Rojo 1 y 2, tienda, dojo, centro Pokémon,
-  gimnasio, casa, puerta de bosque, museo, subterráneo, puerta, barco,
-  cementerio, interior, caverna, vestíbulo, mansión, laboratorio, club,
-  instalación y casa de la playa. Caverna y subterráneo son cuevas, no
-  edificios; se tratan aparte.
-- El bucle `route` de `pallet_render_smoke` ya entra en la casa del jugador y
-  comprueba el retorno a 2D. Es la primera fixture de interiores.
-- Símbolos de combate disponibles en `pokeyellow_internal.h`: `wIsInBattle`,
+- `src/kanto_rom.h` already reads the 25 tilesets and, for each map, its
+  warps with destination and entry point. The current catalog only
+  instantiates the 36 connected maps plus Viridian Forest and the dock; warp
+  destinations are not loaded.
+- `pallet::view()` requires the map to be in the catalog, its tileset to
+  match the expected one, and `wIsInBattle` (0xD056) to be zero. That is why
+  interiors and battles currently present the 2D view.
+- Each tileset exposes its list of walkable tiles (`collisions`), its
+  graphics, and its blockset. That is enough to tell floor from wall or
+  furniture without inventing a second simulation.
+- `wCurMapTileset` (0xD366) identifies the live tileset. The interior
+  tilesets in Yellow are: Red's house 1 and 2, mart, dojo, Pokémon Center,
+  gym, house, forest gate, museum, underground, gate, ship, graveyard,
+  interior, cave, lobby, mansion, laboratory, club, facility, and beach
+  house. Cave and underground are caves, not buildings; they are handled
+  separately.
+- The `route` loop in `pallet_render_smoke` already enters the player's
+  house and checks the return to 2D. It is the first interiors fixture.
+- Battle symbols available in `pokeyellow_internal.h`: `wIsInBattle`,
   `wBattleType` (0xD059), `wCurOpponent` (0xD058), `wTrainerClass`,
   `wEnemyMonSpecies` (0xCFE4), `wEnemyMonHP` (0xCFE5), `wEnemyMonLevel`,
   `wEnemyMonStatus`, `wEnemyMonNick`, `wBattleMonSpecies` (0xD013),
-  `wBattleMonHP` (0xD014), `wBattleMonLevel`, `wBattleMonStatus`, `wBattleMonNick`,
-  `wPlayerMoveNum`, `wEnemyMoveNum`, `wMoveMenuType`, `wCurrentMenuItem`,
-  `wEnemyHPBarColor`, `wSubAnimTransform` y `wLinkState`.
-- Los retratos de combate no van por OAM: el juego descomprime la imagen frontal
-  del rival y la trasera del jugador en la zona de tiles de fondo de VRAM y las
-  pinta en `wTileMap` (0xC3A0, 20 por 18). El decodificador de `sprite_image`
-  ya lee tiles de VRAM por índice; el mismo mecanismo sirve aquí.
-- `gb_get_framebuffer(ctx)` devuelve la imagen LCD del frame actual. Las
-  pruebas ya lo usan. Permite recortar las filas del cuadro de texto y los
-  menús para componerlos sobre el 3D sin redibujarlos.
-- El identificador de animación de movimiento (`wAnimationID` en pret) no está
-  exportado en el header interno. Hay que verificar su dirección contra
-  `wram.asm` antes de depender de él.
+  `wBattleMonHP` (0xD014), `wBattleMonLevel`, `wBattleMonStatus`,
+  `wBattleMonNick`, `wPlayerMoveNum`, `wEnemyMoveNum`, `wMoveMenuType`,
+  `wCurrentMenuItem`, `wEnemyHPBarColor`, `wSubAnimTransform`, and
+  `wLinkState`.
+- Battle portraits do not go through OAM: the game decompresses the
+  opponent's front image and the player's back image into VRAM's background
+  tile area and paints them into `wTileMap` (0xC3A0, 20 by 18). The
+  `sprite_image` decoder already reads VRAM tiles by index; the same
+  mechanism serves here.
+- `gb_get_framebuffer(ctx)` returns the current frame's LCD image. The tests
+  already use it. It lets us crop the text box and menu rows to composite
+  them over the 3D view without redrawing them.
+- The movement animation identifier (`wAnimationID` in pret) is not exported
+  in the internal header. Its address must be verified against `wram.asm`
+  before relying on it.
 
-## Decisiones de arquitectura
+## Architecture decisions
 
-1. Los interiores son escenas del mismo catálogo `kanto::World`, con
-   `component` propio por mapa y origen cero. No comparten mundo con el
-   exterior; el cambio de warp reajusta la cámara de forma explícita.
-2. La clasificación de interior usa las colisiones del tileset como base:
-   tile transitable es suelo; tile no transitable en el borde superior o en el
-   perímetro es pared; tile no transitable rodeado de suelo es mueble. Los
-   warps del header marcan puertas, escaleras y alfombras, que siempre son
-   planos. Todo tile sin clasificar se dibuja plano con su textura original y
-   se registra, igual que en el plan de Kanto.
-3. La escena de combate es un módulo aparte, `src/battle3d.h`, con su propia
-   cámara y geometría. `pallet3d.cpp` le cede el frame cuando `view()` devuelve
-   un estado nuevo `Battle`. No se mezcla con las mallas de mapa.
-4. Los retratos de combate se extraen de VRAM siguiendo `wTileMap`, no de la
-   ROM comprimida. Así la imagen coincide siempre con lo que el motor decidió
-   mostrar, incluidas sustituciones, cambios de Pokémon y transformaciones.
-5. Texto, menús de lucha, cajas de movimientos y listas de equipo se componen
-   desde el framebuffer original como textura sobre la vista 3D. No se
-   reimplementa ningún menú.
-6. Los marcadores de nombre, nivel, barra de vida y estado se dibujan con ImGui
-   leyendo WRAM, con la misma información que muestra el juego. La barra de
-   vida interpola entre lecturas para que el descenso sea continuo.
-7. Ante cualquier estado no cubierto se vuelve a la vista 2D completa. Esa es
-   la conducta correcta, no un fallo: combates link, tutorial, Safari,
-   transformaciones no reconocidas o tilemap sin retrato.
-8. Ningún módulo nuevo escribe en WRAM, VRAM ni framebuffer. Las pruebas lo
-   siguen comprobando en cada frame.
+1. Interiors are scenes of the same `kanto::World` catalog, with their own
+   `component` per map and a zero origin. They do not share a world with the
+   outdoors; a warp change explicitly resets the camera.
+2. Interior classification uses the tileset's collisions as its base: a
+   walkable tile is floor; a non-walkable tile on the top rows or the
+   perimeter is a wall; a non-walkable tile surrounded by floor is
+   furniture. Warps from the header mark doors, stairs, and rugs, which are
+   always flat. Any unclassified tile is drawn flat with its original
+   texture and logged, as in the Kanto plan.
+3. The battle scene is a separate module, `src/battle3d.h`, with its own
+   camera and geometry. `pallet3d.cpp` hands it the frame when `view()`
+   returns a new `Battle` state. It is not mixed with map meshes.
+4. Battle portraits are extracted from VRAM following `wTileMap`, not from
+   compressed ROM. This way the image always matches what the engine
+   decided to show, including substitutions, Pokémon changes, and
+   transformations.
+5. Text, fight menus, move boxes, and party lists are composited from the
+   original framebuffer as a texture over the 3D view. No menu is
+   reimplemented.
+6. Name, level, health bar, and status markers are drawn with ImGui reading
+   WRAM, with the same information the game shows. The health bar
+   interpolates between reads so the drop is continuous.
+7. Any uncovered state falls back to the full 2D view. That is correct
+   behavior, not a bug: link battles, tutorial, Safari Zone, unrecognized
+   transformations, or a tilemap without a portrait.
+8. No new module writes to WRAM, VRAM, or the framebuffer. The tests keep
+   checking this on every frame.
 
-## Bloque A: interiores
+## Block A: interiors
 
-### Fase A1: catálogo de interiores y primer edificio
+### Phase A1: interior catalog and first building
 
-Trabajo:
+Work:
 
-- Ampliar `kanto::World` para instanciar bajo demanda los destinos de warp de
-  los mapas ya catalogados, con `component` igual al propio id y origen cero.
-  Resolver el destino especial "último mapa" sin cargar nada.
-- Leer título de cada interior a partir del nombre de la constante de mapa;
-  hasta entonces conservar "MAPA n".
-- Añadir a `pallet_state.h` la selección de escena para interiores: mapa en
-  catálogo, tileset coincidente, dimensiones coincidentes y estado de LCD y
-  sprites igual al de exteriores.
-- Regla de geometría de interior en `create_map`: pared con textura del tile
-  original en las dos filas superiores y en el perímetro, altura fija de dos
-  unidades; muebles como cajas con la textura del tile en la cara superior y
-  color derivado en los laterales; suelo plano con su tile. Puertas, escaleras
-  y alfombras planas según los warps.
-- Cámara ortográfica encuadrando la sala completa, sin giro libre en salas
-  pequeñas, y reajuste explícito al entrar o salir.
-- Paleta de interior distinta a la de exterior en el atlas, elegida por tileset.
-- Primer hito: la casa del jugador, planta baja y planta alta, y el laboratorio
-  de Oak.
+- Extend `kanto::World` to instantiate, on demand, the warp destinations of
+  already-cataloged maps, with `component` equal to the map's own id and a
+  zero origin. Resolve the special "last map" destination without loading
+  anything.
+- Read each interior's title from its map constant's name; until then, keep
+  "MAP n".
+- Add scene selection for interiors to `pallet_state.h`: map in catalog,
+  matching tileset, matching dimensions, and LCD and sprite state equal to
+  that used outdoors.
+- Interior geometry rule in `create_map`: walls with the original tile's
+  texture on the top two rows and on the perimeter, fixed height of two
+  units; furniture as boxes with the tile's texture on the top face and a
+  derived color on the sides; flat floor with its tile. Doors, stairs, and
+  rugs flat, following the warps.
+- Orthographic camera framing the whole room, with no free rotation in
+  small rooms, and an explicit reset on entering or leaving.
+- An interior palette distinct from the outdoor one in the atlas, chosen
+  per tileset.
+- First milestone: the player's house, ground floor and upper floor, and
+  Professor Oak's laboratory.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [x] Entrar en la casa del jugador desde Paleta muestra la sala en 3D; subir la escalera cambia de escena; salir devuelve el exterior con su cámara.
-- [x] Los NPC de la sala se sitúan sobre el suelo y las conversaciones funcionan con la caída a 2D actual.
-- [x] El PC, la televisión, la mesa y la cama tienen volumen; ningún mueble oculta permanentemente al jugador.
-- [x] `route` sigue pasando y añade la comprobación de que el interior se presenta en 3D.
-- [x] Cero errores OpenGL y WRAM intacta en cada frame.
+- [x] Entering the player's house from Pallet Town shows the room in 3D; going up the stairs changes scene; leaving returns the outdoors with its camera.
+- [x] The room's NPCs stand on the floor and conversations work with the current fallback to 2D.
+- [x] The PC, the TV, the table, and the bed have volume; no piece of furniture permanently hides the player.
+- [x] `route` still passes and adds a check that the interior is presented in 3D.
+- [x] Zero OpenGL errors and WRAM intact on every frame.
 
-### Fase A2: cobertura de los edificios de los 36 mapas
+### Phase A2: coverage of the buildings in the 36 maps
 
-Trabajo:
+Work:
 
-- Recorrer todos los warps de los 36 mapas exteriores y de los interiores
-  alcanzados desde ellos, con límite de profundidad, y auditar: dimensiones,
-  tileset, tiles sin clasificar, muebles inferidos y paredes. Informe CSV bajo
-  `build/qa/logs/` como el de Kanto.
-- Reglas por tileset para tienda, centro Pokémon, gimnasio, casa, laboratorio,
-  puerta, mansión, vestíbulo, club, instalación, museo, barco y cementerio.
-  Mostradores y estanterías son muebles altos; mesas de curación y puertas de
-  gimnasio, bajos.
-- Interiores de varias plantas y edificios grandes: Torre Pokémon, Silph,
-  centro comercial de Azulona y el barco. Cámara con giro limitado y zoom en
-  salas anchas.
-- Cuevas y subterráneo: techo oscuro con niebla, paredes de roca por colisión,
-  agua interior. Se aceptan como escenas de este bloque pero no bloquean la
-  entrega del resto.
-- Reutilizar las sustituciones de bloques vivos de WRAM para puertas que se
-  abren, ascensores y muros que se mueven por script.
+- Walk every warp of the 36 outdoor maps and of the interiors reached from
+  them, with a depth limit, and audit: dimensions, tileset, unclassified
+  tiles, inferred furniture, and walls. CSV report under `build/qa/logs/`,
+  as in the Kanto plan.
+- Per-tileset rules for mart, Pokémon Center, gym, house, laboratory, gate,
+  mansion, lobby, club, facility, museum, ship, and graveyard. Counters and
+  shelves are tall furniture; healing tables and gym doors are low.
+- Multi-floor interiors and large buildings: Pokémon Tower, Silph Co.,
+  Celadon Department Store, and the ship. Camera with limited rotation and
+  zoom in wide rooms.
+- Caves and the underground: dark ceiling with fog, rock walls by collision,
+  interior water. These are accepted as scenes of this block but do not
+  block delivery of the rest.
+- Reuse the live WRAM block substitutions for doors that open, elevators,
+  and walls that move by script.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [x] La auditoría lista todos los interiores alcanzados y ninguno falla al decodificar.
-- [x] Tienda, centro Pokémon y gimnasio de Ciudad Verde revisados con capturas.
-- [x] Un recorrido curar en el centro Pokémon, comprar en la tienda y volver a Ruta 1 pasa en `pallet_render_smoke`.
-- [x] Cambiar de planta, usar un ascensor y entrar en una cueva no dejan frames con escena incorrecta.
-- [x] La caché de mallas sigue acotada al mapa actual y sus vecinos.
+- [x] The audit lists every reachable interior and none fails to decode.
+- [x] Mart, Pokémon Center, and gym in Viridian City reviewed with captures.
+- [x] A journey healing at the Pokémon Center, shopping at the mart, and returning to Route 1 passes in `pallet_render_smoke`.
+- [x] Changing floors, using an elevator, and entering a cave leave no frames with the wrong scene.
+- [x] The mesh cache remains bounded to the current map and its neighbors.
 
-## Bloque B: combates
+## Block B: battles
 
-### Fase B1: escena estática con retratos y marcadores
+### Phase B1: static scene with portraits and markers
 
-Trabajo:
+Work:
 
-- Añadir `View::Battle` a `pallet_state.h`: `wIsInBattle` distinto de cero,
-  `wLinkState` cero, `wBattleType` distinto del tutorial, LCD activa y retrato
-  del rival presente en `wTileMap`. Hasta que el retrato aparece, se conserva
-  la transición 2D original.
-- `src/battle3d.h`: arena con suelo derivado del terreno donde empezó el
-  combate, leído del tile de la casilla del jugador en el mapa anterior:
-  hierba, tierra, agua, cueva o interior de gimnasio. Dos plataformas, una
-  lejana para el rival y otra cercana para el jugador.
-- Decodificar el retrato frontal del rival y el trasero del jugador desde VRAM
-  siguiendo los rectángulos de `wTileMap` que pinta el motor. Verificar esos
-  rectángulos en `engine/battle/core.asm` y documentarlos como constantes.
-  Colorear con la paleta por especie de la ROM cuando esté disponible;
-  escala de grises del juego en caso contrario.
-- Billboards de ambos retratos orientados a la cámara; cámara detrás y por
-  encima del jugador mirando al rival, con un balanceo lento en reposo.
-- Marcadores con ImGui: mote, nivel, barra de vida con el color que decide el
-  juego, estado, barra de experiencia y bolas de equipo en combates de
-  entrenador, todo leído de WRAM.
-- Componer desde el framebuffer las seis filas inferiores del LCD como textura
-  al pie de la pantalla. Cuando el juego abre la lista de equipo, la mochila o
-  un menú que ocupa toda la pantalla, componer la pantalla entera.
-- Cambio de Pokémon y derrota: al cambiar la especie o llegar la vida a cero,
-  el billboard se desvanece y el nuevo aparece; la silueta no se inventa.
+- Add `View::Battle` to `pallet_state.h`: `wIsInBattle` nonzero, `wLinkState`
+  zero, `wBattleType` other than the tutorial, LCD active, and the
+  opponent's portrait present in `wTileMap`. Until the portrait appears, the
+  original 2D transition is kept.
+- `src/battle3d.h`: arena with a floor derived from the terrain where the
+  battle started, read from the tile of the player's square on the previous
+  map: grass, dirt, water, cave, or gym interior. Two platforms, one distant
+  for the opponent and one near for the player.
+- Decode the opponent's front portrait and the player's back portrait from
+  VRAM following the rectangles the engine paints in `wTileMap`. Verify
+  those rectangles in `engine/battle/core.asm` and document them as
+  constants. Color with the ROM's per-species palette when available;
+  grayscale from the game otherwise.
+- Billboards for both portraits facing the camera; camera behind and above
+  the player looking at the opponent, with a slow idle sway.
+- ImGui markers: nickname, level, health bar with the color the game
+  chooses, status, experience bar, and party balls in trainer battles, all
+  read from WRAM.
+- Composite the LCD's bottom six rows from the framebuffer as a texture at
+  the foot of the screen. When the game opens the party list, the bag, or a
+  full-screen menu, composite the whole screen.
+- Pokémon switch and fainting: when the species changes or HP reaches zero,
+  the billboard fades out and the new one appears; the silhouette is not
+  invented.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [x] Un encuentro salvaje en Ruta 1 se presenta en 3D con ambos retratos correctos y sus marcadores coincidentes con los valores de WRAM.
-- [x] Menú de lucha, elección de movimiento, mochila, lista de equipo y huida son operables y legibles.
-- [x] El cambio de Pokémon, la derrota de un rival y el fin del combate no dejan frames con retrato equivocado.
-- [x] El recorrido `journey` gana su combate con la escena 3D activa y vuelve a Ruta 1 en 3D.
-- [x] Cero errores OpenGL y WRAM, VRAM y framebuffer intactos en cada frame.
+- [x] A wild encounter on Route 1 is presented in 3D with both portraits correct and their markers matching WRAM values.
+- [x] The fight menu, move selection, bag, party list, and run are operable and legible.
+- [x] Switching Pokémon, an opponent fainting, and the end of the battle leave no frames with the wrong portrait.
+- [x] The `journey` run wins its battle with the 3D scene active and returns to Route 1 in 3D.
+- [x] Zero OpenGL errors and WRAM, VRAM, and framebuffer intact on every frame.
 
-### Fase B2: animaciones y feedback
+### Phase B2: animations and feedback
 
-Trabajo:
+Work:
 
-- Verificar la dirección de `wAnimationID` y de los contadores de subanimación
-  en `wram.asm`, y detectar el inicio y el fin de cada animación de movimiento.
-- Primera entrega: durante una animación se compone la pantalla original
-  completa sobre el 3D, con un fundido de entrada y salida. Es fiel, cubre los
-  165 movimientos y las capturas de Poké Ball, y no requiere clasificar nada.
-- Segunda entrega: efectos 3D por categoría, derivados del tipo del movimiento
-  leído de la tabla `Moves` de la ROM y de si el objetivo es el rival o uno
-  mismo: golpe físico con embestida del billboard, proyectil con estela,
-  estado con destello sobre el objetivo, movimiento propio con brillo. Los
-  movimientos no clasificados conservan la primera entrega.
-- Feedback de daño: sacudida del billboard y parpadeo cuando la vida baja;
-  animación de la barra al ritmo del juego.
-- Captura de Pokémon salvajes: trayectoria de la bola y sacudidas siguiendo el
-  texto y el estado del motor, con la primera entrega como respaldo.
-- Combates de entrenador: retrato del entrenador desde VRAM durante la
-  presentación, con la clase leída de `wTrainerClass`.
+- Verify the address of `wAnimationID` and of the sub-animation counters in
+  `wram.asm`, and detect the start and end of each movement animation.
+- First delivery: during an animation, composite the full original screen
+  over the 3D view, with a fade-in and fade-out. This is faithful, covers
+  all 165 moves and the Poké Ball captures, and requires no classification.
+- Second delivery: 3D effects by category, derived from the move's type
+  read from the ROM's `Moves` table and from whether the target is the
+  opponent or the user: physical hit with a billboard lunge, projectile
+  with a trail, status with a flash over the target, self-move with a
+  glow. Unclassified moves keep the first delivery.
+- Damage feedback: billboard shake and flicker when HP drops; the bar
+  animates at the game's pace.
+- Wild Pokémon capture: ball trajectory and shakes following the text and
+  the engine's state, with the first delivery as a fallback.
+- Trainer battles: the trainer's portrait from VRAM during the intro, with
+  the class read from `wTrainerClass`.
 
-Criterios de aceptación:
+Acceptance criteria:
 
-- [x] Toda animación de movimiento se ve completa, en 2D compuesto o en 3D, sin frames negros ni retratos duplicados.
-- [x] Al menos las cuatro categorías básicas tienen efecto 3D y las capturas revisadas muestran cada una.
-- [x] Una captura de Pokémon salvaje y un combate de entrenador pasan en `pallet_render_smoke` con la escena activa.
-- [x] Ningún efecto depende de escribir el estado de la máquina.
+- [x] Every movement animation displays fully, either composited 2D or 3D, with no black frames or duplicated portraits.
+- [x] At least the four basic categories have a 3D effect and reviewed captures show each one.
+- [x] A wild Pokémon capture and a trainer battle pass in `pallet_render_smoke` with the scene active.
+- [x] No effect depends on writing machine state.
 
-## Limitaciones asumidas
+## Accepted limitations
 
-- Los Pokémon son retratos planos del juego orientados a la cámara, no modelos.
-  Es coherente con los actores del prototipo y con la resolución original.
-- Los interiores tienen alturas y muebles interpretados; los tiles sin regla se
-  ven planos hasta que se clasifiquen.
-- Texto y menús son la imagen original ampliada. Mantienen su tipografía y su
-  ritmo de escritura.
-- Combates link, tutorial del anciano y Safari permanecen en 2D.
-- Las cuevas se aceptan como escenas de interior con reglas mínimas; su
-  fidelidad artística no bloquea la entrega.
+- Pokémon are flat portraits from the game facing the camera, not models.
+  This is consistent with the prototype's actors and with the original
+  resolution.
+- Interiors have interpreted heights and furniture; tiles without a rule
+  are shown flat until classified.
+- Text and menus are the enlarged original image. They keep their typeface
+  and their typing pace.
+- Link battles, the old man tutorial, and the Safari Zone remain in 2D.
+- Caves are accepted as interior scenes with minimal rules; their artistic
+  fidelity does not block delivery.
 
-## Validación y entrega
+## Validation and delivery
 
-- Ejecutar CTest y los modos actuales de `pallet_render_smoke` antes y después
-  de cada fase. Las capturas de exterior deben seguir siendo equivalentes.
-- Nuevos modos de `pallet_render_smoke`: `interior` para casa y laboratorio,
-  `town` para el recorrido por Ciudad Verde, `battle3d` para encuentro,
-  captura y entrenador. Cada modo comprueba modo presentado, GL y memoria
-  intacta por frame y deja capturas en `build/qa/logs/`.
-- Pruebas unitarias del clasificador de interior, de la selección `Battle` y de
-  la lectura de rectángulos de retrato con savestates locales.
-- Fixtures privadas bajo `build/qa/`: savestate en la casa del jugador, en el
-  centro Pokémon de Ciudad Verde, al inicio de un encuentro y frente a un
-  entrenador de Ruta 22. No se incorporan al repositorio.
-- Entregar `build/pokeyellow3d`, `PALLET3D.md` actualizado con el alcance de
-  interiores y combates, el informe CSV de interiores y las capturas.
-- Marcar las casillas solo con evidencia registrada.
+- Run CTest and the current `pallet_render_smoke` modes before and after
+  each phase. Outdoor captures must remain equivalent.
+- New `pallet_render_smoke` modes: `interior` for the house and the
+  laboratory, `town` for the Viridian City route, `battle3d` for
+  encounter, capture, and trainer. Each mode checks the presented mode, GL,
+  and memory intact per frame, and leaves captures in `build/qa/logs/`.
+- Unit tests for the interior classifier, the `Battle` selection, and
+  reading portrait rectangles with local savestates.
+- Private fixtures under `build/qa/`: a savestate in the player's house, in
+  Viridian City's Pokémon Center, at the start of an encounter, and facing
+  a Route 22 trainer. Not added to the repository.
+- Deliver `build/pokeyellow3d`, `PALLET3D.md` updated with the scope of
+  interiors and battles, the interiors CSV report, and captures.
+- Only check off boxes with recorded evidence.
 
-## Orden recomendado
+## Recommended order
 
-1. Fase A1, porque reutiliza el lector y las mallas existentes y tiene fixture.
-2. Fase B1, porque desbloquea la parte más visible con riesgo acotado.
-3. Fase A2 y fase B2 en paralelo si hay dos ventanas de trabajo; si no, A2
-   antes, porque su auditoría también sirve al plan de Kanto.
+1. Phase A1, because it reuses the existing reader and meshes and has a fixture.
+2. Phase B1, because it unlocks the most visible part with bounded risk.
+3. Phase A2 and phase B2 in parallel if two work streams are available; otherwise A2 first, because its audit also serves the Kanto plan.
 
-## Referencias técnicas
+## Technical references
 
-- [Headers de tilesets y colisiones](https://github.com/pret/pokeyellow/blob/master/data/tilesets/tileset_headers.asm).
-- [Constantes de tilesets](https://github.com/pret/pokeyellow/blob/master/constants/tileset_constants.asm).
-- [Warps y objetos de mapa](https://github.com/pret/pokeyellow/blob/master/macros/scripts/maps.asm).
-- [Núcleo de combate y dibujo de retratos](https://github.com/pret/pokeyellow/blob/master/engine/battle/core.asm).
-- [Animaciones de movimiento](https://github.com/pret/pokeyellow/blob/master/engine/battle/animations.asm).
-- [Paletas por especie](https://github.com/pret/pokeyellow/blob/master/data/pokemon/palettes.asm).
-- [Memoria del juego](https://github.com/pret/pokeyellow/blob/master/ram/wram.asm).
+- [Tileset and collision headers](https://github.com/pret/pokeyellow/blob/master/data/tilesets/tileset_headers.asm).
+- [Tileset constants](https://github.com/pret/pokeyellow/blob/master/constants/tileset_constants.asm).
+- [Map warps and objects](https://github.com/pret/pokeyellow/blob/master/macros/scripts/maps.asm).
+- [Battle core and portrait drawing](https://github.com/pret/pokeyellow/blob/master/engine/battle/core.asm).
+- [Move animations](https://github.com/pret/pokeyellow/blob/master/engine/battle/animations.asm).
+- [Per-species palettes](https://github.com/pret/pokeyellow/blob/master/data/pokemon/palettes.asm).
+- [Game memory](https://github.com/pret/pokeyellow/blob/master/ram/wram.asm).
 
-## Registro de ejecución
+## Execution log
 
-### A1: casa del jugador y laboratorio, 2026-09-20
+### A1: player's house and laboratory, 2026-09-20
 
-- Catálogo bajo demanda, títulos de constantes, escenas aisladas y atlas por
-  tileset. `LAST_MAP` y el destino dinámico del ascensor Silph no se instancian.
-- `interior_test`: clasificador, puertas/escaleras planas, muebles de ambas
-  plantas, selección de vista y recursos disponibles en la ROM del runtime.
-  Como preparación de A2, el recorrido recursivo encuentra 221 mapas y 25
-  tilesets; falta su auditoría artística y la integración completa de A2.
-- `interior` e `interior-fp`: recorrido por ambas plantas, conversación con la
-  madre, regreso a Paleta, laboratorio de Oak y salida. Movimiento real del
-  motor, sin modificar la partida; GL y WRAM/VRAM/framebuffer comprobados en
-  cada frame. Evidencias en `build/qa/interiors/logs/interior-a1*.log` y
-  capturas `reds-house-*.ppm`, `mother-dialogue*.ppm`, `oaks-lab*.ppm`.
+- On-demand catalog, constant-derived titles, isolated scenes, and a
+  per-tileset atlas. `LAST_MAP` and the Silph elevator's dynamic
+  destination are not instantiated.
+- `interior_test`: classifier, flat doors/stairs, furniture on both floors,
+  view selection, and resources available in the runtime ROM. As
+  preparation for A2, the recursive walk finds 221 maps and 25 tilesets;
+  its artistic audit and A2's full integration are still missing.
+- `interior` and `interior-fp`: a run through both floors, the conversation
+  with the mother, the return to Pallet Town, Professor Oak's laboratory,
+  and exit. Real engine movement, without modifying the save; GL and
+  WRAM/VRAM/framebuffer checked on every frame. Evidence in
+  `build/qa/interiors/logs/interior-a1*.log` and captures
+  `reds-house-*.ppm`, `mother-dialogue*.ppm`, `oaks-lab*.ppm`.
 - CTest 5/5: `build/qa/interiors/logs/a1-ctest.log`.
-- Regresión completa Kanto: `build/qa/kanto-02mrNg/`; primera persona:
-  `build/qa/firstperson-VRYzJq/`. Ambas PASS. Las 38 capturas de exterior son
-  idénticas byte a byte a la referencia anterior a A1 `kanto-Jth3Ld`;
-  comprobación en `build/qa/interiors/logs/a1-exterior-comparison.txt`.
-- Ejecutable `build/pokeyellow3d` compilado. Estos resultados cierran A1;
-  no acreditan los criterios de A2, B1 ni B2.
+- Full Kanto regression: `build/qa/kanto-02mrNg/`; first person:
+  `build/qa/firstperson-VRYzJq/`. Both PASS. The 38 outdoor captures are
+  byte-for-byte identical to the reference before A1, `kanto-Jth3Ld`;
+  verification in `build/qa/interiors/logs/a1-exterior-comparison.txt`.
+- Executable `build/pokeyellow3d` compiled. These results close A1; they do
+  not certify the criteria for A2, B1, or B2.
 
-### B1: primer encuentro y menús, 2026-09-20 (fase incompleta)
+### B1: first encounter and menus, 2026-09-20 (incomplete phase)
 
-- `src/battle_state.h` verifica el combate normal, el HUD y los rectángulos
-  de retrato. `init_battle.asm` confirma columnas de siete tiles, rival en
-  (12,0), jugador en (1,5). La ventana LCD usa normalmente 9C00 con WX=7/WY=0;
-  comprobar solo el mapa de fondo 9800 impediría validar los retratos.
-- `src/battle3d.h` presenta arena, plataformas, cámara propia, retratos de VRAM
-  con paletas CGB de la ROM, nombres, nivel, estado, HP y experiencia. Conserva
-  la imagen original durante menús extensos y animaciones. Se corrigió la
-  transparencia del torso blanco en retratos traseros recortados por abajo.
-- `battle_state_test` verifica selección, rechazo de link/tutorial/Safari,
-  lectura de marcadores, orden de tiles, transparencia, paletas, experiencia,
-  disponibilidad en el manifiesto y que `wAnimationID` por sí solo no indica
-  animación. Se verifica el retorno de `PlayMoveAnimation` en la pila activa;
-  los contadores y el ID tienen alias y persisten fuera de la animación.
-- `build/qa/interiors/logs/battle-probe-3d.log`: encuentro real completo,
-  913 frames con escena de combate, 529 con arena visible; GL y todas las
-  regiones WRAM/VRAM/framebuffer intactas en cada frame. Captura revisada:
+- `src/battle_state.h` verifies the normal battle, the HUD, and the
+  portrait rectangles. `init_battle.asm` confirms seven-tile columns,
+  opponent at (12,0), player at (1,5). The LCD window normally uses 9C00
+  with WX=7/WY=0; checking only the 9800 background map would fail to
+  validate the portraits.
+- `src/battle3d.h` presents the arena, platforms, its own camera, VRAM
+  portraits with the ROM's CGB palettes, names, level, status, HP, and
+  experience. It keeps the original image during long menus and
+  animations. Fixed the transparency of the white torso in back portraits
+  cropped at the bottom.
+- `battle_state_test` verifies selection, rejection of link/tutorial/Safari
+  battles, marker reading, tile order, transparency, palettes, experience,
+  availability in the manifest, and that `wAnimationID` alone does not
+  indicate an animation. The return of `PlayMoveAnimation` on the active
+  stack is verified; the counters and the ID are aliased and persist
+  outside the animation.
+- `build/qa/interiors/logs/battle-probe-3d.log`: a full real encounter, 913
+  frames with the battle scene, 529 with the arena visible; GL and all
+  WRAM/VRAM/framebuffer regions intact on every frame. Reviewed capture:
   `build/qa/interiors/logs/battle-arena.ppm`.
-- `build/qa/interiors/logs/b1-menus.log`: lucha, movimientos, mochila, equipo,
-  huida y regreso a Ruta 1, mediante botones originales. Capturas y estados
-  privados `battle-{fight,moves,bag,party,escaped}.*` en la misma carpeta.
-- `build/qa/interiors/logs/b1-journey.log`: victoria real, 446 frames con escena
-  de combate activa y regreso al exterior, sin cambios del renderer en memoria.
-- **Pendiente para cerrar B1:** validar cambios de Pokémon, derrota del jugador
-  y reemplazo de rival sin retratos antiguos. B2 sigue pendiente: el respaldo original
-  no equivale a tener los cuatro efectos 3D, captura ni introducción de entrenador.
-- Regresiones de esta versión: CTest 6/6 y Kanto completo en
-  `build/qa/kanto-N2q3I6/`; primera persona completa en
-  `build/qa/firstperson-OIbyVs/`, incluyendo paridad exacta del estado final
-  entre ambas cámaras y controles SDL. Las 38 capturas de exterior siguen
-  idénticas a la referencia anterior a A1; resultado en
+- `build/qa/interiors/logs/b1-menus.log`: fight, moves, bag, party, run,
+  and return to Route 1, using the original buttons. Captures and private
+  states `battle-{fight,moves,bag,party,escaped}.*` in the same folder.
+- `build/qa/interiors/logs/b1-journey.log`: a real victory, 446 frames with
+  the battle scene active, and a return to the outdoors, with no renderer
+  changes in memory.
+- **Still needed to close B1:** validate Pokémon switches, the player
+  fainting, and opponent replacement without stale portraits. B2 remains
+  pending: the original fallback is not equivalent to having the four 3D
+  effects, capture, or the trainer intro.
+- Regressions for this version: CTest 6/6 and the full Kanto suite in
+  `build/qa/kanto-N2q3I6/`; full first person in
+  `build/qa/firstperson-OIbyVs/`, including exact final-state parity
+  between both cameras and SDL controls. The 38 outdoor captures remain
+  identical to the reference before A1; result in
   `build/qa/interiors/logs/b1-exterior-comparison.txt`.
-- Se corrigió una expectativa del helper: un diálogo superpuesto mantiene
-  viva la cámara en primera persona, mientras que la escena de combate usa
-  otra cámara. La comprobación de orientación al regresar distingue ambos casos.
+- Fixed a helper expectation: an overlaid dialogue keeps the first-person
+  camera alive, while the battle scene uses a different camera. The
+  orientation check on return distinguishes both cases.
 
-### A2: catálogo, Ciudad Verde y transiciones, 2026-09-20
+### A2: catalog, Viridian City, and transitions, 2026-09-20
 
-- `tests/interiors_qa.sh` reproduce A1 y A2 con copias privadas de ROM y
-  estados. Ejecución completa PASS en `build/qa/interiors-fJDbZk/`, registro
-  `build/qa/interiors/logs/a2-suite.log`; CTest 7/7. Los hashes de las entradas
-  se verifican al terminar y no se invoca el guardado de batería.
-- `interior_audit`: 221 mapas alcanzados, 179 interiores y 25 tilesets, con
-  límite de profundidad 32. CSV en `build/qa/logs/interiors.csv` y en la carpeta
-  de la batería. Cero gráficos fuera de rango o warps elevados. Se registran
-  **2.960 casillas sin clasificación artística en 104 interiores**: conservan
-  su textura plana. No se confunde decodificación completa con arte completo.
-- Reglas por familia de tileset para estanterías, mostradores, mesas, plantas,
-  equipo de curación, puertas de gimnasio, paredes y roca. Los muebles del
-  perímetro se clasifican antes de aplicar la pared genérica. Los casos no
-  reconocidos ya no reciben automáticamente una caja de mueble.
-- `town`: cura de 18 a 21 HP, primera visita a la tienda, entrega del paquete
-  y obtención de la Pokédex, compra de diez Poké Balls, segunda visita al
-  centro y vuelta a Ruta 1. Todo mediante movimiento y botones originales;
-  termina en `logs/town-route1.state` con diez bolas. El diálogo de la Pokédex
-  se espera hasta que el script devuelve el control, con límite de seguridad.
-- `interior-transitions`: escaleras 1F–2F–1F del centro comercial, giro/zoom de
-  sala grande, entrada al ascensor, selección real de 2F y salida a la planta
-  elegida. Cueva Diglett: entrada, cambio a la cueva principal y regreso.
-  La preparación de estas fixtures solicita un warp al motor; los cruces
-  evaluados y el menú de ascensor usan controles normales.
-- Revisadas las capturas de centro, tienda y gimnasio de Ciudad Verde, las
-  plantas y el menú del ascensor. Contactos en
-  `build/qa/interiors/logs/a2-{viridian,elevator}-review.png`. Captura adicional
-  mirando hacia el pasillo de la cueva:
-  `build/qa/interiors/logs/diglett-cave-fp.png`, con techo oscuro y niebla.
-- `interior-catalog` construye las 179 mallas con el mismo renderer, comprueba
-  expulsión de caché hasta una malla residente, GL y todas las regiones de
-  WRAM, VRAM y framebuffer intactas. Los recorridos comprueban los mismos
-  invariantes por frame, incluidos diálogos y transiciones.
-- Los interiores reutilizan la lectura e invalidación de bloques vivos de la
-  escena actual. La regresión de Corte/carga sigue verificando ese mecanismo
-  común; no se afirma haber accionado cada puerta de Silph o cada script.
-- Regresión completa de Kanto PASS en `build/qa/kanto-0dH5RK/`; primera persona
-  PASS en `build/qa/firstperson-9cB3FJ/`, incluida paridad del estado del motor.
-  Las 38 capturas exteriores son idénticas byte a byte a `kanto-Jth3Ld`, según
+- `tests/interiors_qa.sh` reproduces A1 and A2 with private copies of the
+  ROM and states. Full run PASS in `build/qa/interiors-fJDbZk/`, log
+  `build/qa/interiors/logs/a2-suite.log`; CTest 7/7. Input hashes are
+  verified at the end and the battery save is never invoked.
+- `interior_audit`: 221 maps reached, 179 interiors, and 25 tilesets, with
+  a depth limit of 32. CSV in `build/qa/logs/interiors.csv` and in the
+  batch's folder. Zero out-of-range graphics or raised warps. **2,960
+  tiles with no artistic classification across 104 interiors** are logged:
+  they keep their flat texture. Full decoding is not conflated with
+  complete art.
+- Per-tileset-family rules for shelves, counters, tables, plants, healing
+  equipment, gym doors, walls, and rock. Perimeter furniture is classified
+  before applying the generic wall. Unrecognized cases no longer
+  automatically receive a furniture box.
+- `town`: healing from 18 to 21 HP, first visit to the mart, delivering the
+  package and getting the Pokédex, buying ten Poké Balls, a second visit to
+  the center, and returning to Route 1. All via original movement and
+  buttons; ends at `logs/town-route1.state` with ten balls. The Pokédex
+  dialogue is awaited until the script returns control, with a safety
+  limit.
+- `interior-transitions`: 1F-2F-1F stairs at the department store,
+  rotation/zoom in a large room, entering the elevator, real selection of
+  2F, and exiting to the chosen floor. Diglett's Cave: entry, switching to
+  the main cave, and return. Setting up these fixtures requests a warp from
+  the engine; the evaluated crossings and the elevator menu use normal
+  controls.
+- Reviewed captures of the center, mart, and gym in Viridian City, the
+  floors, and the elevator menu. Contact sheets in
+  `build/qa/interiors/logs/a2-{viridian,elevator}-review.png`. Additional
+  capture looking down the cave corridor:
+  `build/qa/interiors/logs/diglett-cave-fp.png`, with dark ceiling and fog.
+- `interior-catalog` builds the 179 meshes with the same renderer, checks
+  cache eviction down to one resident mesh, and GL and all WRAM, VRAM, and
+  framebuffer regions intact. The journeys check the same per-frame
+  invariants, including dialogues and transitions.
+- Interiors reuse the current scene's live-block reading and invalidation.
+  The Cut/reload regression keeps checking that shared mechanism; it is not
+  claimed that every door in Silph Co. or every script has been triggered.
+- Full Kanto regression PASS in `build/qa/kanto-0dH5RK/`; first person PASS
+  in `build/qa/firstperson-9cB3FJ/`, including engine state parity. The 38
+  outdoor captures are byte-for-byte identical to `kanto-Jth3Ld`, per
   `build/qa/interiors/logs/a2-exterior-comparison.txt`.
-- `build/pokeyellow3d` compilado. A2 queda cerrada con las limitaciones artísticas
-  anteriores. El objetivo completo sigue pendiente de B1 y B2.
+- `build/pokeyellow3d` compiled. A2 is closed with the artistic limitations
+  above. The full goal still awaits B1 and B2.
 
-### Preparación de B1/B2: captura real, 2026-09-20
+### B1/B2 preparation: real capture, 2026-09-20
 
-- Nuevo modo de prueba `battle-capture`, a partir de `town-route1.state`.
-  Encuentro salvaje por movimiento normal, apertura de mochila y lanzamiento
-  de las Poké Balls compradas. Se captura un Pidgey de nivel 4 tras cuatro
-  intentos y el equipo pasa de uno a dos miembros, sin conceder Pokémon ni
-  modificar inventario o RNG desde el helper.
-- Evidencia PASS: `build/qa/interiors/logs/b2-capture-probe.log`, con 1.573 frames
-  de escena de combate y memoria/GL comprobados por frame. Revisión visual en
-  `build/qa/interiors/logs/b2-capture-review.png`. Estado privado del equipo
-  resultante: `build/qa/interiors/logs/capture-complete.state`.
-- La animación de captura sigue siendo la original en 2D. Esta prueba prepara
-  la validación de cambios de equipo y no acredita aún los efectos 3D ni el
-  combate de entrenador exigidos por B2.
+- New test mode `battle-capture`, starting from `town-route1.state`. A wild
+  encounter by normal movement, opening the bag, and throwing the
+  purchased Poké Balls. A level 4 Pidgey is captured after four attempts
+  and the party goes from one to two members, without granting a Pokémon
+  or modifying inventory or RNG from the helper.
+- PASS evidence: `build/qa/interiors/logs/b2-capture-probe.log`, with 1,573
+  frames of the battle scene and memory/GL checked per frame. Visual
+  review in `build/qa/interiors/logs/b2-capture-review.png`. Resulting
+  private party state: `build/qa/interiors/logs/capture-complete.state`.
+- The capture animation is still the original 2D one. This test prepares
+  the validation of party changes and does not yet certify the 3D effects
+  or the trainer battle required by B2.
 
-### B1 y B2: cambios, entrenador, captura y efectos, 2026-09-20
+### B1 and B2: switches, trainer, capture, and effects, 2026-09-20
 
-Batería reproducible:
+Reproducible batch:
 
 ```sh
 tests/battles_qa.sh build/roms/pokeyellow.gbc \
@@ -391,95 +408,100 @@ tests/battles_qa.sh build/roms/pokeyellow.gbc \
   build/qa/firstperson-9cB3FJ/route.state
 ```
 
-Resultado **PASS** en `build/qa/battles-xtPavN/`; resumen en
-`build/qa/logs/b2-battles-final.log`. Esta ejecución resuelve los pendientes de
-B1 y B2 de las entradas históricas anteriores.
+Result **PASS** in `build/qa/battles-xtPavN/`; summary in
+`build/qa/logs/b2-battles-final.log`. This run resolves the outstanding
+items from B1 and B2 in the earlier historical entries.
 
-- `battle3d` encadena una captura real de Rattata tras dos lanzamientos, con
-  891 frames de escena y 537 de Poké Ball; intercambios Pikachu/reserva con
-  555 comprobaciones exactas de los retratos subidos a GPU contra VRAM;
-  curación; aproximación y combate contra el rival de Ruta 22. No depende
-  de capturar una especie concreta ni concede Pokémon en estas pruebas.
-- El rival presenta su retrato de entrenador, envía Spearow y Eevee y se
-  verifica el reemplazo. Pikachu cae, se elige la reserva mediante el menú
-  original y el jugador gana. Hay 3.448 frames de arena comprobados y se
-  termina también el diálogo posterior antes de acreditar 90 frames de
-  mundo 3D estable. `trainer-result.ppm` muestra ese regreso.
-- La prueba anterior `build/qa/interiors/logs/b1-trainer.log` cubrió además
-  la derrota de ambos miembros: retorno a Ciudad Verde y curación original
-  del equipo (26/17 HP). El helper distingue ese teletransporte de una
-  conexión de borde y comprueba el destino de curación.
-- Cuatro efectos derivados de la tabla `Moves` de ROM: golpe físico,
-  proyectil con estela, estado sobre el rival y brillo propio. En la prueba
-  integrada se observan respectivamente 32, 136, 90 y 24 frames; los dos
-  ataques dañinos muestran además 24 frames de sacudida/parpadeo con barra
-  interpolada dentro de los límites de HP del motor.
-- Agilidad tiene un destello original de dos frames. Se conserva su evento y
-  se añade una estela cosmética de hasta 0,55 s, sin ralentizar el juego.
-  Las Poké Balls usan el contador original de subanimación para la trayectoria
-  y las sacudidas; el motor decide fuga, fallo y éxito.
-- Las llamadas vivas a `PlayMoveAnimation`, su limpieza, `MoveAnimation` y
-  `TossBallAnimation` delimitan la presentación. El ID y los contadores de
-  animación son alias; su persistencia aislada no activa efectos.
-- Los 165 registros están presentes en el manifiesto y tienen una ruta de
-  presentación: 45 físicos, 26 proyectiles, 24 de estado, 20 propios y 50 que
-  conservan el LCD original. El test unitario comprueba la propiedad y salida
-  de la animación para los 165 IDs aun con el tilemap borrado y la paleta
-  destellando. Las animaciones especiales fuera de esa tabla también usan
-  el respaldo original. No se afirma haber jugado 165 combates diferentes.
-- Vuelo verifica el respaldo durante una animación real de dos turnos: 79
-  frames de composición opaca y **cero diferencias entre los 23.040 píxeles
-  del LCD y su imagen presentada**. El fundido oculta los billboards mientras
-  compone el LCD, evitando duplicar los retratos. Las capturas de ambas rutas
-  se han revisado en `logs/b2-review.png` de la carpeta de esta ejecución.
-- `battle-effects` prepara movimientos únicamente en estados privados de QA;
-  los ejecuta a través del menú original. Producción no escribe WRAM, VRAM ni
-  framebuffer. `QaWalk` compara los 32 KiB, 16 KiB y 23.040 píxeles completos
-  antes y después de cada frame presentado y exige cero errores GL.
-- Se corrige la invalidación del terreno al cargar otro combate: volver a
-  la fixture de Ruta 1 desde Ruta 22 recupera hierba. Se verifica expresamente.
-- Se corrige el reloj de las entradas de QA: el contador SDL sobrevive a
-  varias instancias de helper y el reloj de CPU tiene 32 bits. Las pulsaciones
-  quedan activas hasta su liberación explícita, incluso al cruzar ese límite.
-  Los cambios afectan al helper, no al runtime descargado ni al C generado.
+- `battle3d` chains a real Rattata capture after two throws, with 891
+  frames of the scene and 537 of the Poké Ball; Pikachu/reserve swaps with
+  555 exact checks of the portraits uploaded to the GPU against VRAM;
+  healing; approaching and battling the Route 22 rival. It does not depend
+  on capturing a specific species and does not grant Pokémon in these
+  tests.
+- The rival shows their trainer portrait, sends out Spearow and Eevee, and
+  the replacement is verified. Pikachu faints, the reserve is chosen via
+  the original menu, and the player wins. There are 3,448 frames of arena
+  checked, and the following dialogue is also finished before certifying
+  90 frames of stable 3D world. `trainer-result.ppm` shows that return.
+- The earlier test `build/qa/interiors/logs/b1-trainer.log` also covered
+  both party members fainting: return to Viridian City and original
+  healing of the party (26/17 HP). The helper distinguishes that teleport
+  from an edge connection and checks the healing destination.
+- Four effects derived from the ROM's `Moves` table: physical hit,
+  projectile with trail, status on the opponent, and glow on self. In the
+  integrated test, 32, 136, 90, and 24 frames are observed respectively;
+  the two damaging attacks also show 24 frames of shake/flicker with the
+  bar interpolated within the engine's HP bounds.
+- Agility has a two-frame original flash. Its event is kept and a cosmetic
+  trail of up to 0.55 s is added, without slowing down the game. Poké
+  Balls use the original sub-animation counter for the trajectory and
+  shakes; the engine decides escape, failure, and success.
+- Live calls to `PlayMoveAnimation`, its cleanup, `MoveAnimation`, and
+  `TossBallAnimation` bound the presentation. The animation ID and
+  counters are aliased; their isolated persistence does not trigger
+  effects.
+- All 165 entries are present in the manifest and have a presentation
+  path: 45 physical, 26 projectile, 24 status, 20 self, and 50 that keep
+  the original LCD. The unit test checks the animation's ownership and
+  exit for all 165 IDs even with the tilemap cleared and the palette
+  flashing. Special animations outside that table also use the original
+  fallback. It is not claimed that 165 different battles were played.
+- Fly verifies the fallback during a real two-turn animation: 79 frames of
+  opaque composite and **zero differences across the 23,040 pixels** of
+  the LCD and its presented image. The fade hides the billboards while
+  compositing the LCD, avoiding duplicated portraits. Captures of both
+  paths have been reviewed in `logs/b2-review.png` in this run's folder.
+- `battle-effects` prepares moves only in private QA states; it triggers
+  them through the original menu. Production does not write WRAM, VRAM, or
+  the framebuffer. `QaWalk` compares the full 32 KiB, 16 KiB, and 23,040
+  pixels before and after each presented frame and requires zero GL
+  errors.
+- Fixed the terrain invalidation when loading another battle: returning to
+  the Route 1 fixture from Route 22 recovers grass. This is explicitly
+  verified.
+- Fixed the QA input clock: the SDL counter survives several helper
+  instances and the CPU clock is 32 bits. Presses stay active until
+  explicitly released, even across that boundary. The changes affect the
+  helper, not the downloaded runtime or the generated C.
 
-Validaciones finales ya superadas: CTest 7/7; Kanto completo en
-`build/qa/kanto-PW04nG/`; primera persona y paridad del motor en
-`build/qa/firstperson-uorAnd/`; combate en `build/qa/battles-xtPavN/`.
-Las 38 capturas de exterior siguen idénticas byte a byte a la referencia
-anterior a A1, según `build/qa/logs/b2-exterior-comparison.txt`.
-La repetición completa de interiores también pasa en
-`build/qa/interiors-VfIUU4/`: casa en ambas cámaras, centro y tienda, entrega
-del paquete, compra, regreso a Ruta 1, escaleras, ascensor, cueva y catálogo de
-179 mallas. En la cueva se produce un encuentro real: el helper huye mediante
-el menú original antes de capturar el pasillo en primera persona y regresar
-por la escalera. No se suprime el encuentro ni se modifica el RNG.
+Final validations already passed: CTest 7/7; full Kanto in
+`build/qa/kanto-PW04nG/`; first person and engine parity in
+`build/qa/firstperson-uorAnd/`; battle in `build/qa/battles-xtPavN/`.
+The 38 outdoor captures remain byte-for-byte identical to the reference
+before A1, per `build/qa/logs/b2-exterior-comparison.txt`.
+The full interiors repeat run also passes in
+`build/qa/interiors-VfIUU4/`: the house in both cameras, center and mart,
+delivering the package, buying, returning to Route 1, stairs, elevator,
+cave, and the 179-mesh catalog. A real encounter occurs in the cave: the
+helper flees via the original menu before capturing the corridor in first
+person and returning via the stairs. The encounter is not suppressed and
+the RNG is not modified.
 
-### Auditoría de entrega, 2026-09-20
+### Delivery audit, 2026-09-20
 
-| Requisito | Evidencia final inspeccionada |
+| Requirement | Final inspected evidence |
 | --- | --- |
-| A1: ambas plantas, mobiliario, NPC, laboratorio, cámara y retorno | `interiors-VfIUU4/logs/house.log`, `house-fp.log`, `final-review.png`; `interior_test` |
-| A2: catálogo completo, clasificación, warps planos y límites | `interiors-VfIUU4/logs/interiors.csv`, `catalog.log`; `interior_audit` y `interior_test` |
-| A2: curar, comprar, escaleras, ascensor y cueva | `interiors-VfIUU4/logs/{town,elevator,cave}.log`, sus capturas y `result.txt` |
-| B1: retratos, marcadores, menús, cambio, debilitamiento y rival nuevo | `battles-xtPavN/logs/{menus,battle3d}.log`, `b2-review.png`; `battle_state_test` |
-| B1: victoria y regreso al mapa | `kanto-PW04nG/logs/journey.log`, `battles-xtPavN/logs/trainer-result.ppm` |
-| B2: categorías, respaldo LCD, captura y entrenador | `battles-xtPavN/logs/battle3d.log`, trazas `effect-*.csv` y `b2-review.png` |
-| Invariantes de memoria, GL, caché y selección de escena | Comprobaciones por frame de `QaWalk`/`ReadOnlyMemory` en las cuatro baterías; catálogos completos |
-| Regresión de exteriores y primera persona | `kanto-PW04nG/`, `firstperson-uorAnd/`; 38/38 imágenes idénticas en `logs/b2-exterior-comparison.txt` |
-| Unitarias y compilación | CTest 7/7 en `logs/b2-interiors-final.log`; `build/pokeyellow3d` compilado |
-| Fixtures locales requeridas | `interiors-VfIUU4/logs/{reds-house-1f,viridian-center}.state`; `battles-xtPavN/logs/{capture-start,route22-trainer}.state` |
-| CSV y documentación | `build/qa/logs/interiors.csv`, `PALLET3D.md`, `README.md` y este plan |
+| A1: both floors, furniture, NPCs, laboratory, camera, and return | `interiors-VfIUU4/logs/house.log`, `house-fp.log`, `final-review.png`; `interior_test` |
+| A2: full catalog, classification, flat warps, and limits | `interiors-VfIUU4/logs/interiors.csv`, `catalog.log`; `interior_audit` and `interior_test` |
+| A2: healing, shopping, stairs, elevator, and cave | `interiors-VfIUU4/logs/{town,elevator,cave}.log`, their captures, and `result.txt` |
+| B1: portraits, markers, menus, switch, fainting, and new rival | `battles-xtPavN/logs/{menus,battle3d}.log`, `b2-review.png`; `battle_state_test` |
+| B1: victory and return to the map | `kanto-PW04nG/logs/journey.log`, `battles-xtPavN/logs/trainer-result.ppm` |
+| B2: categories, LCD fallback, capture, and trainer | `battles-xtPavN/logs/battle3d.log`, `effect-*.csv` traces, and `b2-review.png` |
+| Memory, GL, cache, and scene-selection invariants | Per-frame checks by `QaWalk`/`ReadOnlyMemory` across all four batches; full catalogs |
+| Outdoor and first-person regression | `kanto-PW04nG/`, `firstperson-uorAnd/`; 38/38 images identical in `logs/b2-exterior-comparison.txt` |
+| Unit tests and build | CTest 7/7 in `logs/b2-interiors-final.log`; `build/pokeyellow3d` compiled |
+| Required local fixtures | `interiors-VfIUU4/logs/{reds-house-1f,viridian-center}.state`; `battles-xtPavN/logs/{capture-start,route22-trainer}.state` |
+| CSV and documentation | `build/qa/logs/interiors.csv`, `PALLET3D.md`, `README.md`, and this plan |
 
-Las rutas abreviadas de la tabla parten de `build/qa/`. Los hashes de ROM y
-fixtures de entrada de las baterías siguen intactos. El runtime descargado
-sigue limpio y fijado a `6581880fce60e6f139901a5942fc984e9c1db8ab`; no se
-modificó el C generado del juego.
+The abbreviated paths in the table start from `build/qa/`. The ROM and
+input-fixture hashes for the batches remain intact. The downloaded runtime
+remains untouched and pinned to `6581880fce60e6f139901a5942fc984e9c1db8ab`;
+the generated game C was not modified.
 
-Los límites asumidos siguen vigentes: 2.960 casillas de interior sin regla
-artística permanecen planas (cero índices gráficos inválidos); los Pokémon son
-billboards; las cuevas tienen geometría básica; link, tutorial y Safari
-conservan 2D. Las animaciones complejas usan el LCD original. Las verificaciones
-jugables son representativas y se complementan con auditorías del catálogo y
-de los 165 registros de movimientos; no se afirma haber terminado la historia.
-No quedan criterios pendientes dentro del alcance de este plan.
+The accepted limitations still stand: 2,960 interior tiles with no artistic
+rule remain flat (zero invalid graphics indices); Pokémon are billboards;
+caves have basic geometry; link, tutorial, and Safari battles keep 2D.
+Complex animations use the original LCD. The playable checks are
+representative and are complemented by catalog audits and audits of the
+165 move entries; it is not claimed that the story has been finished. No
+criteria remain pending within the scope of this plan.

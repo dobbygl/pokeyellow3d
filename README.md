@@ -212,7 +212,7 @@ cmake -S . -B build -DGBRT_REF=6581880fce60e6f139901a5942fc984e9c1db8ab
 
 ## Documentation
 
-The detailed engineering notes and plans are currently written in Spanish.
+The detailed engineering notes and plans are written in English; `PALLET3D.md`, `PLAN_KANTO_3D.md`, and `PLAN_MENUS_TITULO_TRANSICIONES.md` are still being translated from Spanish.
 
 - [Technical guide, QA procedures, and measured performance](PALLET3D.md)
 - [Kanto world plan and implementation evidence](PLAN_KANTO_3D.md)
@@ -227,7 +227,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) and Windows (MSVC) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. macOS runs best-effort and does not block merges. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. Windows (MSVC) and macOS run best-effort and do not block merges: the pinned gb-recompiled runtime is not portable to MSVC yet, and macOS lacks the GLES2 headers. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel
@@ -240,4 +240,4 @@ ctest --test-dir build -LE rom --output-on-failure
 > [!NOTE]
 > Tests tagged `rom` register only when `build/roms/pokeyellow.gbc` and, for some journeys, private save states are present at configure time; without them they are simply never registered, not failed. `-LE rom` additionally excludes them when a ROM is present, so a local run with the ROM stays comparable to CI. The ROM and any save state are never part of this repository or of the CI environment.
 
-Tagging a commit `vX.Y.Z` triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds Linux and Windows and publishes `pokeyellow3d` packages (with `PALLET3D.md`, `README.md`, and a `RUN.md`) to the GitHub release. It never bundles a ROM either.
+Tagging a commit `vX.Y.Z` triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds Linux and publishes `pokeyellow3d` packages (with `PALLET3D.md`, `README.md`, and a `RUN.md`) to the GitHub release. It never bundles a ROM either.

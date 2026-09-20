@@ -32,5 +32,6 @@ struct PalletBattleInfo {
     uint64_t player_image,enemy_image; // Fingerprints of the uploaded portraits.
     int effect;bool capture;float effect_time;int effect_actor;float overlay_alpha;
     int trainer_class;
+    float player_hp,enemy_hp,player_damage,enemy_damage;
 };
 PalletBattleInfo pallet3d_battle();

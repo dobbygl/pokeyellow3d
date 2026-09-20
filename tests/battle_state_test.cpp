@@ -80,7 +80,22 @@ int main(int argc,char** argv) {
     set(0xdff0,0x9e);set(0xdff1,0x70);
     check(battle::animation_running(&ctx),"live animation return address survives a sound bank switch");
     ctx.sp=0xdff2;check(!battle::animation_running(&ctx),"popped stack bytes cannot keep an animation active");
-    for(int id=1;id<=165;id++)check(battle::move(&ctx,id).id==id,"all 165 move records are resident and valid");
+    int categories[5]{};
+    for(int id=1;id<=165;id++) {
+        auto move=battle::move(&ctx,id);
+        check(move.id==id,"all 165 move records are resident and valid");
+        ++categories[int(move.presentation)];
+        // Every move must retain ownership through the wrapper's cleanup,
+        // including erased VRAM rectangles and a fully flashed palette.
+        ctx.sp=0xdff0;set(0xdff0,0xa6);set(0xdff1,0x70);
+        set(battle::Animation,id);io[0x47]=0xff;set(battle::TileMap+12,0x7f);
+        check(battle::animation_running(&ctx)&&battle::ready(&ctx),"all move IDs retain the compositor during animation cleanup");
+        ctx.sp=0xdff2;
+        check(!battle::animation_running(&ctx)&&!battle::ready(&ctx),"completed moves cannot retain the animation compositor");
+    }
+    io[0x47]=0xe4;draw_rect(battle::Enemy);
+    std::printf("Move coverage: original=%d physical=%d projectile=%d status=%d self=%d total=165\n",
+        categories[0],categories[1],categories[2],categories[3],categories[4]);
     check(battle::move(&ctx,33).presentation==battle::Effect::Physical,"Tackle uses physical effect");
     check(battle::move(&ctx,84).presentation==battle::Effect::Projectile&&battle::move(&ctx,84).type==23,"Thundershock uses Electric projectile");
     check(battle::move(&ctx,45).presentation==battle::Effect::Status,"Growl targets opponent");

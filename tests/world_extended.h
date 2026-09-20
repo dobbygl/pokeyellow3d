@@ -16,10 +16,10 @@ struct QaWalk {
         }
     }
     void input(const char* button) {
-        // The SDL frame counter persists across helpers and state loads, while
-        // this helper's frame starts at zero. Anchor input to the machine's
-        // current cycle instead, so long combined scenarios cannot expire it.
-        std::string script="c"+std::to_string(ctx->cycles)+":"+(button?button:"")+":1404480000";
+        // Hold until the next explicit input()/release. SDL's frame counter
+        // outlives individual helpers and the guest cycle clock wraps at 32
+        // bits. Cover its entire domain so neither can expire held controls.
+        std::string script=std::string("c0:")+(button?button:"")+":4294967296";
         gb_platform_set_input_script(button?script.c_str():nullptr);
         require(gb_platform_poll_events(ctx),"input polling");
     }

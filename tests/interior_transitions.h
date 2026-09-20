@@ -38,16 +38,45 @@ inline int interior_transitions(GBContext* ctx) {
         run.move(123,1,1,"D");room(123,"elevator-2f");
         std::puts("PASS: real stairs, wide-room camera and elevator selection; GL, bounded cache and read-only memory");
     } else if(run.read(pallet::Map)==46) {
+        auto leave_encounter=[&]() {
+            run.input(nullptr);bool encountered=false;
+            for(int i=0;i<6000;i++) {
+                run.tick();
+                encountered|=run.read(pallet::Battle)!=0;
+                if(!run.read(pallet::Battle)&&pallet::view(ctx)==pallet::View::Overworld) {
+                    run.input(nullptr);if(i>60)break;continue;
+                }
+                if(battle_menu_visible(ctx)) {
+                    run.input(nullptr);run.press("D");run.press("R");run.press("A");
+                } else {
+                    if(i%20==0)run.input("A");if(i%20==6)run.input(nullptr);
+                }
+            }
+            run.input(nullptr);run.wait(20);
+            run.require(!run.read(pallet::Battle)&&run.read(pallet::Map)==197&&pallet3d_active(),"cave encounter ends through original Run menu");
+            if(encountered)std::puts("PASS: cave wild encounter escaped through original controls");
+        };
+        auto cave_move=[&](int map,int x,int y,const char* direction) {
+            run.input(direction);
+            for(int i=0;i<1500;i++) {
+                run.tick();
+                if(run.read(pallet::Battle)){leave_encounter();run.input(direction);}
+                if(run.read(pallet::Map)==map&&run.read(pallet::X)==x&&run.read(pallet::Y)==y&&!run.read(pallet::Walk)) {
+                    run.input(nullptr);return;
+                }
+            }
+            run.require(false,"cave walking waypoint");
+        };
         room(46,"cave-entrance");
-        run.move(46,2,5,"U");run.move(46,4,5,"R");run.move(197,5,5,"U");room(197,"diglett-cave");
+        run.move(46,2,5,"U");run.move(46,4,5,"R");cave_move(197,5,5,"U");leave_encounter();room(197,"diglett-cave");
         // Face into the corridor so the capture verifies ceiling and depth fog,
         // rather than merely showing the wall immediately beside the ladder.
-        run.move(197,5,6,"D");
+        cave_move(197,5,6,"D");leave_encounter();
         SDL_Event event{};event.type=SDL_KEYDOWN;event.key.keysym.scancode=SDL_SCANCODE_F3;
         pallet3d_event(&event,false);run.wait(35);capture("diglett-cave-fp");
-        run.require(pallet3d_firstperson(),"cave first person active");
+        run.require(pallet3d_firstperson()&&pallet3d_active()&&pallet::view(ctx)==pallet::View::Overworld,"cave first person active");
         pallet3d_event(&event,false);run.wait(5);
-        run.move(46,4,4,"U");room(46,"cave-return");
+        cave_move(46,4,4,"U");room(46,"cave-return");
         std::puts("PASS: real cave round trip and dark first-person interior; GL, bounded cache and read-only memory");
     } else run.require(false,"supported transition fixture");
     return 0;

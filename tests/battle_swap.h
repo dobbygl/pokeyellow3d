@@ -38,7 +38,7 @@ inline int battle_swap(GBContext* ctx) {
         await_menu();
         run.require(run.read(0xcc2f)==slot,"requested party member is sent out");
         run.require(pallet3d_battle().active&&!pallet3d_battle().full_overlay,"new Pokemon visible in arena");
-        capture(slot?"swap-pidgey":"swap-pikachu");
+        capture(slot?"swap-reserve":"swap-pikachu");
     }
     // Escape after the reversible swaps; a separate scenario covers fainting.
     run.press("D");run.press("R");run.press("A");
@@ -47,5 +47,5 @@ inline int battle_swap(GBContext* ctx) {
     }
     run.input(nullptr);run.wait(50);capture("swap-return");
     run.require(!run.read(pallet::Battle)&&pallet3d_active()&&checked>30,"swap journey returns to world with verified portraits");
-    std::fprintf(stderr,"PASS: real Pikachu/Pidgey swaps, %d exact VRAM portrait checks, original menus, GL and read-only memory\n",checked);return 0;
+    std::fprintf(stderr,"PASS: real Pikachu/captured-party swaps, %d exact VRAM portrait checks, original menus, GL and read-only memory\n",checked);return 0;
 }

@@ -17,13 +17,23 @@ inline int battle_effects(GBContext* ctx,const char* original) {
         run.require(pallet3d_battle().terrain==1,"loading Route 1 battle restores grass rather than the previous scene terrain");
         run.press("U");run.press("L");run.press("A");run.wait(25);
         for(int i=0;i<(test==4?0:test);i++)run.press("D");
-        run.press("A");bool captured=false,started=false;int visible=0;
+        run.press("A");bool captured=false,started=false,damage_captured=false;int visible=0,damage_frames=0;
         std::string trace_path=std::string("logs/effect-")+names[test]+".csv";
         FILE* trace=std::fopen(trace_path.c_str(),"w");run.require(trace,"effect trace");
         std::fputs("frame,animation,running,category,actor,overlay,alpha,time,view,enemyrect,playerrect\n",trace);
         for(int i=0;i<2500;i++) {
             if(i%20==0)run.input("A");if(i%20==6)run.input(nullptr);run.tick();
             auto info=pallet3d_battle();
+            if(info.active&&!info.full_overlay&&info.enemy_damage>0) {
+                ++damage_frames;
+                auto enemy=battle::mon(ctx,true);
+                run.require(std::isfinite(info.enemy_hp)&&info.enemy_hp>=enemy.hp&&info.enemy_hp<=enemy.max_hp,
+                    "damage HP interpolation stays between live HP and maximum");
+                if(!damage_captured) {
+                    std::string path=std::string("logs/effect-")+names[test]+"-damage.ppm";
+                    capture_surface(path.c_str());damage_captured=true;
+                }
+            }
             std::fprintf(trace,"%d,%d,%d,%d,%d,%d,%.3f,%.3f,%d,%d,%d\n",i,run.read(battle::Animation),battle::animation_running(ctx),info.effect,info.effect_actor,info.full_overlay,info.overlay_alpha,info.effect_time,int(pallet::view(ctx)),battle::rectangle(ctx,battle::Enemy,true),battle::rectangle(ctx,battle::Player,true));
             bool presentation=test==4?(info.full_overlay&&info.overlay_alpha==1&&battle::animation_running(ctx)&&run.read(battle::Animation)==19):(!info.full_overlay&&info.effect==test+1);
             if(info.active&&presentation&&info.effect_actor==0) {
@@ -51,6 +61,10 @@ inline int battle_effects(GBContext* ctx,const char* original) {
         run.input(nullptr);
         std::fclose(trace);
         std::fprintf(stderr,"[EFFECT] %s frames=%d captured=%d\n",names[test],visible,captured);
+        if(test<2) {
+            std::fprintf(stderr,"[EFFECT] %s damage feedback frames=%d\n",names[test],damage_frames);
+            run.require(damage_frames>0,"real damaging attack produces visible shake/blink feedback and bounded HP bar");
+        }
         run.require(captured&&visible>5,"3D effect visible during actual engine animation");
         run.require(!battle::animation_running(ctx),"animation completes before advancing to next fixture");
     }

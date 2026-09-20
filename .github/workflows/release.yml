@@ -1,6 +1,6 @@
 name: Release
 
-# Phase 4 of PLAN_API_CI.md. Publishes Linux and Windows binaries for every
+# Phase 4 of PLAN_API_CI.md. Publishes Linux binaries for every
 # `vX.Y.Z` tag. It never packages the ROM: the package only carries the
 # executable, the documentation, and a RUN.md explaining where to place the
 # user's own ROM.
@@ -63,7 +63,18 @@ jobs:
           SDL_VIDEODRIVER: offscreen
           SDL_AUDIODRIVER: dummy
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a ctest --test-dir build -LE rom --output-on-failure
+        run: xvfb-run -a ctest --test-dir build -LE rom --output-on-failure --output-junit "$PWD/build/ctest.xml"
+
+      - name: Require software rendering coverage
+        run: |
+          python3 - <<'PYCODE'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("build/ctest.xml").getroot()
+          preview = root.find(".//testcase[@name='render_preview_synthetic']")
+          assert preview is not None and preview.find("skipped") is None, "Renderer test must run, not skip"
+          output = preview.findtext("system-out", "").lower()
+          assert "llvmpipe" in output or "softpipe" in output, "Renderer must run on software Mesa"
+          PYCODE
 
       - name: Package
         run: |
@@ -72,19 +83,28 @@ jobs:
           mkdir -p "dist/$pkg"
           cp build/pokeyellow3d "dist/$pkg/"
           cp PALLET3D.md README.md "dist/$pkg/"
+          ldd build/pokeyellow3d > "dist/$pkg/DEPENDENCIES.txt"
+          if grep -q 'not found' "dist/$pkg/DEPENDENCIES.txt"; then
+            cat "dist/$pkg/DEPENDENCIES.txt"
+            exit 1
+          fi
           cat > "dist/$pkg/RUN.md" <<'EOF'
           # Running pokeyellow3d
 
+          This Linux x86_64 binary is built on Ubuntu 24.04. It requires
+          compatible system libraries: SDL2, libcurl, OpenGL/GLES2, and a
+          graphics driver. DEPENDENCIES.txt records the linked libraries.
+          This is a dynamic binary, not a self-contained AppImage.
+
           This package does not include the Pokemon Yellow ROM. Supply your
-          own legally obtained copy:
+          own copy:
 
           1. Create a `roms` folder next to the `pokeyellow3d` executable
-             (Linux) or `pokeyellow3d.exe` (Windows).
+             in the extracted package.
           2. Copy your ROM into it as `roms/pokeyellow.gbc`. The build
              targets the 1 MiB English USA/Europe ROM, SHA-1
              `cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1`.
-          3. Run the executable from this folder (double-click, or `cd`
-             into it and run `./pokeyellow3d` / `pokeyellow3d.exe`).
+          3. Open a terminal in this folder and run `./pokeyellow3d`.
 
           On first launch the game extracts its assets into an `assets/`
           folder next to the executable; later launches reuse them. Saves

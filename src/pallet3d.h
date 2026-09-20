@@ -2,6 +2,7 @@
 
 #include "gbrt.h"
 #include <SDL.h>
+#include <array>
 
 // Presentation only: these functions never write to the emulated machine.
 void pallet3d_draw(GBContext* ctx, int width, int height, bool menu_open);
@@ -31,6 +32,16 @@ uint8_t pallet3d_input_mask();
 bool pallet3d_dialogue_overlay();
 struct PalletMenuInfo {bool active,full,blurred;int regions;};
 PalletMenuInfo pallet3d_menu();
+struct PalletDexInfo {
+    bool active,verified;int species;uint64_t image;size_t uploads;
+    bool list;int registration,number,seen,caught;size_t cached,decodes;int row;
+};
+PalletDexInfo pallet3d_dex();
+struct PalletPCInfo {
+    bool active,open,monitor;int mode,map,x,z;float progress;
+    std::array<float,16> matrix;std::array<float,8> screen;
+};
+PalletPCInfo pallet3d_pc();
 bool pallet3d_warp_overlay();
 struct PalletBattleTransitionInfo {bool active,arena;int phase;float wipe;};
 PalletBattleTransitionInfo pallet3d_battle_transition();

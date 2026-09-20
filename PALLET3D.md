@@ -69,9 +69,10 @@ ctest --test-dir build --output-on-failure
 
 Se necesitan las dependencias habituales del proyecto, SDL2 y OpenGL ES 2.
 `POKEYELLOW_3D=OFF` produce el ejecutable original `pokeyellow`.
-CTest registra siete pruebas sin ROM: controles, disposiciones de menús y
-cinco pruebas sintéticas. Al configurar con la ROM local en
-`build/roms/pokeyellow.gbc` añade siete pruebas, para un total de catorce.
+CTest registra pruebas de controles, menús, fundidos y escenarios sintéticos.
+Al configurar con la ROM local en `build/roms/pokeyellow.gbc` añade las
+comprobaciones del cartucho. La equivalencia de retratos con VRAM requiere
+generar primero la evidencia privada con `tests/dex_portraits_qa.sh`.
 `ctest --test-dir build -LE rom --output-on-failure` ejecuta el grupo sin ROM;
 no se distribuye esa ROM.
 
@@ -429,7 +430,10 @@ desarrollo de la validación final y sus regresiones.
 | --- | --- |
 | Mundo exterior e interiores compatibles | 3D, ortográfica o primera persona |
 | Texto inferior, Start, guardar, curar y comprar | Ventanas originales sobre el mundo 3D |
-| Equipo, resumen, mochila, PC, ficha, opciones, Pokédex y nombres desde el mundo | LCD original enmarcado sobre la última escena atenuada y desenfocada |
+| Equipo, resumen, mochila, PC, ficha, opciones y nombres desde el mundo | LCD original enmarcado sobre la última escena atenuada y desenfocada |
+| Ficha de datos de la Pokédex desde su lista | Dispositivo rojo 3D, texto original y retrato verificado; fase A1 completada |
+| Lista de la Pokédex | Dispositivo 3D con retrato, silueta o pantalla vacía según capturado/visto/ausente; fase A2 completada |
+| AREA de la Pokédex | LCD original enmarcado; fase A3 pendiente |
 | Disposición de menú desconocida con escena residente | Mismo encuadre completo; no se descarta texto |
 | Savestate de menú completo cargado sin escena previa | LCD original hasta disponer de una escena válida |
 | Combate normal y presentación del entrenador | Arena 3D y compositor de combate existente |
@@ -477,3 +481,55 @@ La batería `tests/ui_crossfade_qa.sh ROM PALLET_9_7 READY_BATTLE` pasa en
 `build/qa/ui-crossfade-5bOG41/`, con seis escenarios en ambas cámaras y CTest
 16/16. C3 sigue abierta: faltan viajes reales, revisión visual y regresión
 completa. El punto de reanudación está registrado en el plan.
+
+### Pokédex y PC: plan en ejecución
+
+La ficha de datos de la Pokédex tiene una presentación propia con dos
+pantallas. La izquierda compone los píxeles originales del número, nombre,
+categoría, medidas y descripción; la derecha muestra el retrato con su paleta
+del cartucho. La detección verifica una llamada viva del motor y el rectángulo
+de tiles ya transferido a VRAM. Una especie o transferencia no reconocida
+mantiene la presentación de respaldo.
+
+El descompresor de lectura se ha contrastado con los 151 retratos cargados
+por el juego: 47 de 5×5, 46 de 6×6 y 58 de 7×7 tiles, los tres modos de
+compresión, con 118.384 bytes idénticos. La prueba compara también con la ROM
+parcial que utiliza el runtime. Los archivos de referencia permanecen privados
+en `build/qa/`; no se añaden gráficos ni ROM al repositorio.
+
+```sh
+tests/dex_portraits_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-R28lDE/pallet.state dex-data
+ctest --test-dir build --output-on-failure -R 'mon_pic|dex_state'
+```
+
+El script prepara una copia con los bits de Pokédex vistos/capturados para
+recorrer las 151 fichas mediante los menús originales. No altera sus gráficos.
+El modo `dex-screen` del helper abre una ficha privada para comprobar carga
+independiente, texturas estables y respaldo ante una transferencia incompleta;
+`dex-screen-fp` repite la comprobación con la preferencia de primera persona.
+
+La lista también utiliza el dispositivo: conserva sus opciones originales,
+muestra retratos de capturados, siluetas de vistos y deja vacía la pantalla
+para especies ausentes. Los contadores del cuerpo son los glifos originales
+del juego. Una caché LRU mantiene como máximo 32 retratos y precarga los
+vecinos vistos. El retrato se sincroniza con el número y cursor visibles del
+LCD, que pueden llegar hasta tres frames después del cambio de WRAM.
+
+```sh
+tests/dex_list_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-R28lDE/pallet.state
+```
+
+La prueba recorre los 151 números tres veces por cámara, distingue las tres
+marcas de registro, comprueba los contadores, abre CRY y vuelve al mundo
+con su cámara y mallas intactas. Capturas:
+`build/qa/logs/dex-a2-list-final.png`.
+
+AREA y las escenas del PC siguen pendientes. La ficha
+original usa A/B para salir; para cambiar de especie se vuelve a su lista,
+sin añadir controles nuevos al juego. El estado de cada fase y sus pruebas
+se registra en `PLAN_POKEDEX_PC.md`. A1/A2 quedan validadas con CTest 19/19,
+las tres regresiones generales y la batería de menús aprobadas, y las
+38 capturas exteriores sin cambios. Capturas de las fichas:
+`build/qa/logs/dex-a1-data-review.png`.

@@ -58,7 +58,7 @@ struct QaWalk {
         require(before.unchanged(ctx),"read-only WRAM, VRAM and framebuffer");
         if(pallet3d_warp_overlay())require((fade::warp(ctx)||state==pallet::View::Transition)&&!read(pallet::Battle),"warp identified by a live ROM-validated CALL");
         auto blend=pallet3d_blend();
-        require(pallet3d_active()==(blend.active||(render_enabled&&(state==pallet::View::Overworld || state==pallet::View::Battle || pallet3d_battle_transition().active || pallet3d_warp_overlay() || pallet3d_menu().active || (state==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx))))),"scene selection");
+        require(pallet3d_active()==(blend.active||(render_enabled&&(state==pallet::View::Overworld || state==pallet::View::Battle || state==pallet::View::Pokedex || pallet3d_pc().active || pallet3d_battle_transition().active || pallet3d_warp_overlay() || pallet3d_menu().active || (state==pallet::View::Dialogue&&pallet::bottom_dialogue(ctx))))),"scene selection");
         if(pallet3d_menu().active)require(!read(pallet::Battle)&&pallet3d_world_frame().map==read(pallet::Map)&&
             (menu_state::running(ctx)||state==pallet::View::Dialogue||state==pallet::View::Transition),"menu has a valid retained scene and positive lifetime");
         require(pallet3d_stats().resident_maps<=5,"bounded mesh cache");

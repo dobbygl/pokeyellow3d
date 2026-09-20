@@ -8,6 +8,7 @@ extern "C" {
 #include "pallet3d.h"
 #include "pallet_state.h"
 #include "assets_manifest_pokeyellow.h"
+#include "mon_pic_cache.h"
 #include <SDL_opengles2.h>
 #include <cstdio>
 #include <cstdlib>
@@ -40,6 +41,7 @@ static void capture_surface(const char* path) {
 #include "ui_transitions.h"
 #include "battle_transition_trace.h"
 #include "presentation_integration.h"
+#include "dex_integration.h"
 
 int main(int argc,char** argv) {
     if(argc<3) { std::fprintf(stderr,"Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");return 1; }
@@ -66,6 +68,18 @@ int main(int argc,char** argv) {
     std::fprintf(stderr,"[SMOKE] party=%u hp=%u level=%u script=%u/%u font=%u\n",pallet::read(ctx,0xd162),pallet::read(ctx,0xd16b)*256+pallet::read(ctx,0xd16c),pallet::read(ctx,0xd18b),pallet::read(ctx,0xd5f0),pallet::read(ctx,0xd5ef),pallet::read(ctx,pallet::Font));
     if(argc>3&&(!std::strcmp(argv[3],"crossfade")||!std::strcmp(argv[3],"crossfade-fp"))) {
         int result=presentation_qa::run(ctx,!std::strcmp(argv[3],"crossfade-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&!std::strcmp(argv[3],"dex-portraits")) {
+        int result=dex_qa::portraits(ctx);gb_platform_shutdown();return result;
+    }
+    if(argc>3&&!std::strcmp(argv[3],"dex-data")) {
+        int result=dex_qa::portraits(ctx,true);gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"dex-list")||!std::strcmp(argv[3],"dex-list-fp"))) {
+        int result=dex_qa::lists(ctx,!std::strcmp(argv[3],"dex-list-fp"));gb_platform_shutdown();return result;
+    }
+    if(argc>3&&(!std::strcmp(argv[3],"dex-screen")||!std::strcmp(argv[3],"dex-screen-fp"))) {
+        int result=dex_qa::screen(ctx,!std::strcmp(argv[3],"dex-screen-fp"));gb_platform_shutdown();return result;
     }
     if(argc>3&&(!std::strcmp(argv[3],"crossfade-warp")||!std::strcmp(argv[3],"crossfade-warp-fp"))) {
         int result=presentation_qa::warp(ctx,!std::strcmp(argv[3],"crossfade-warp-fp"));gb_platform_shutdown();return result;

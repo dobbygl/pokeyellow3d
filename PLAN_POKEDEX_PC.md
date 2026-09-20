@@ -1,6 +1,6 @@
 # Plan: Pokédex and PC in 3D
 
-Date: 2026-09-20. Status: proposal; no phase started.
+Date: 2026-09-20. Status: A1 and A2 completed and verified; B1 in progress; A3 and B2/B3 pending. Goal paused at the user's request.
 
 ## Goal and scope
 
@@ -34,13 +34,14 @@ downloaded runtime or the generated C.
   `wListScrollOffset` (CC36), `wMaxMenuItem` (CC28), `wListMenuID` (CF93),
   and `wListPointer` (CF8A) for every list; `wWhichPokemon` (CF91) and
   `wCurPartySpecies` (CF90) for the selected Pokémon; `wPartyMons` (D16A);
-  `wBoxMons` (DA95) and `wCurrentBoxNum` (DA9F) for the active box;
+  `wBoxMons` (DA95) and `wCurrentBoxNum` (D59F) for the active box;
   `wBoxItems` (D53A) and `wNumBoxItems` (D539) for item storage;
-  `wNumHoFTeams` (DAA1) and `wHallOfFameCurScript` (D64A).
-- The species shown on the Pokédex data screen is in `wd11e` according to
-  pret. It is not exported in the internal header; it must be verified
-  against `wram.asm` and fixed as a documented constant, as was done for
-  the facing direction.
+  `wNumHoFTeams` (D5A1) and `wHallOfFameCurScript` (D64A).
+- The species shown on the Pokédex data screen is `wPokedexNum` at D11D
+  in canonical Yellow UE. Its meaning changes between list construction
+  (dex number) and the data screen (internal species). D11E is not the
+  Yellow address. Verified against the local symbols and the original
+  `engine/menus/pokedex.asm`; detect the screen before interpreting it.
 - Cartridge RAM accessible as `ctx->eram`. Boxes 1 through 12 and the Hall
   of Fame have the symbols `sBox1` through `sBox12` and `sHallOfFame`. Only
   the active box is in WRAM; the rest require reading `eram` with the
@@ -126,10 +127,10 @@ Work:
 
 Acceptance criteria:
 
-- [ ] The twenty comparisons against VRAM are byte-for-byte identical and the test is part of CTest.
-- [ ] Opening Pikachu's data screen from the Start menu shows the device with the correct portrait and the original text.
-- [ ] Paging through several data screens with left and right changes the portrait with no frames showing the previous one.
-- [ ] Zero OpenGL errors and WRAM, VRAM, cartridge RAM, and framebuffer intact per frame.
+- [x] The twenty comparisons against VRAM are byte-for-byte identical and the test is part of CTest.
+- [x] Opening Pikachu's data screen from the Start menu shows the device with the correct portrait and the original text.
+- [x] Visiting successive data screens through the original list updates the portrait without showing a previous species. (Yellow exits data with A/B; left/right do not page data, as verified in the original routine.)
+- [x] Zero OpenGL errors and WRAM, VRAM, cartridge RAM, and framebuffer intact per frame.
 
 ### Phase A2: list with portrait under the cursor
 
@@ -148,9 +149,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] Scrolling the list updates the portrait at the same pace as the original cursor.
-- [ ] Seen, caught, and absent species are distinguished according to the bitmaps and match the game's counters.
-- [ ] The cache does not grow when paging through the 151 numbers from end to end several times.
+- [x] Scrolling the list updates the portrait at the same pace as the original cursor.
+- [x] Seen, caught, and absent species are distinguished according to the bitmaps and match the game's counters.
+- [x] The cache does not grow when paging through the 151 numbers from end to end several times.
 
 ### Phase A3: area over the 3D world
 
@@ -275,13 +276,159 @@ Acceptance criteria:
 
 ## Technical references
 
-- [Pokédex: list, data screen, and area](https://github.com/pret/pokeyellow/blob/master/engine/pokedex/pokedex.asm).
+- [Pokédex: list, data screen, and area](https://github.com/pret/pokeyellow/blob/master/engine/menus/pokedex.asm).
 - [Image decompression](https://github.com/pret/pokeyellow/blob/master/home/uncompress.asm).
-- [Loading front portraits](https://github.com/pret/pokeyellow/blob/master/engine/gfx/sprites.asm).
-- [Town map and nests](https://github.com/pret/pokeyellow/blob/master/engine/menus/town_map.asm).
+- [Loading front portraits](https://github.com/pret/pokeyellow/blob/master/home/pics.asm).
+- [Town map and nests](https://github.com/pret/pokeyellow/blob/master/engine/items/town_map.asm).
 - [Encounter tables](https://github.com/pret/pokeyellow/blob/master/data/wild/grass_water.asm).
 - [Bill's PC](https://github.com/pret/pokeyellow/blob/master/engine/pokemon/bills_pc.asm).
 - [Player's PC](https://github.com/pret/pokeyellow/blob/master/engine/menus/players_pc.asm).
-- [Hall of Fame](https://github.com/pret/pokeyellow/blob/master/engine/events/hall_of_fame.asm).
+- [Hall of Fame](https://github.com/pret/pokeyellow/blob/master/engine/movie/hall_of_fame.asm).
 - [Game memory and cartridge RAM](https://github.com/pret/pokeyellow/blob/master/ram/wram.asm).
 - `src/battle_state.h`: `portrait`, `palette`, `dex`, and `live_return`.
+
+## Execution record
+
+### A1 started, 2026-09-20
+
+- Baseline before production changes: CTest 16/16; world
+  `build/qa/kanto-miIHwE/`, first person `build/qa/firstperson-E9MrJ4/`,
+  interiors `build/qa/interiors-uQmhLs/`, all PASS. Logs under
+  `build/qa/logs/dex-a1-before-*.log`.
+- Corrected two PC addresses against `pokeyellow_internal.h`: D59F and
+  D5A1, not DA9F and DAA1 (which are inside box-mon data).
+- Current upstream source paths are `engine/menus/pokedex.asm` and
+  `home/pics.asm`; the old paths in the proposal return 404. Read-only
+  reference copies are under `build/qa/dex/references/`.
+- Yellow's `GetMonHeader` uses the ordinary 151-entry BaseStats table for
+  Mew, unlike Red/Blue. The data portrait starts at tile (1,1), mirrored;
+  the original data screen exits with A/B and does not page with left/right.
+  Paging acceptance will therefore exercise the original list controls
+  between data screens without adding new engine controls.
+- Added the read-only decoder and a private QA path that grants dex flags
+  solely to visit all 151 entries with the original menu. Equivalence is
+  still being established; no phase is marked complete yet.
+- Extended the per-frame memory guard to include cartridge RAM as required
+  by this plan, in addition to WRAM, VRAM and the framebuffer.
+
+### A1 completed, 2026-09-20
+
+- `src/mon_pic.h` decodes all 151 front portraits using private buffers,
+  bounds-checked bit reads, both planes, all three blend modes, differential
+  decoding, alignment and mirrored orientation. It neither calls the engine
+  decompressor nor changes a bank or an emulated byte.
+- Original UI replay: `build/qa/dex-portraits-mV2lhb/`. The engine's own dex
+  menus load every portrait; the test compares all 784 bytes of each
+  `vFrontPic`. **118,384 bytes identical**, covering 47 portraits of 5x5,
+  46 of 6x6 and 58 of 7x7; modes 0/1/2 occur 5/61/85 times.
+- `mon_pic` checks canonical/sparse runtime ROM equivalence and malformed
+  input. `mon_pic_vram` repeats the original-engine comparisons from private
+  evidence at `build/qa/dex/front-vram.bin` (explicit skip if not generated).
+  `dex_state` checks the live call, popped stack, invalid species, palette,
+  battle exclusion, mirrored layout and visible BG/window tilemap.
+- `src/dex_state.h` identifies the data screen through the verified live
+  call at 0x40104 and its mirrored rectangle (1,1). `View::Pokedex` hands it
+  to `src/dex3d.h`. Text regions retain the original number, name, category,
+  measurements, description and page arrow. The right screen uses the
+  original palette and transparent portrait. The cry stays in the engine.
+- Full device replay: `build/qa/dex-portraits-nR5VsH/`, all 151 original
+  entries from Start with a per-frame stale-image assertion, GL checks,
+  neutral relative controls and full memory guard. Its saved VRAM evidence
+  is byte-identical to the original presentation replay above. Captures
+  reviewed at `build/qa/logs/dex-a1-data-review.png`, including all three
+  sizes, Pikachu and Mew. The original Mew category is `NEW SPECIE`.
+- Independent saved-data loads in both camera preferences pass in
+  `build/qa/dex/device/logs/{run,run-fp}.log`. Repeated frozen frames upload
+  no new textures. A controlled selection/VRAM mismatch displays the
+  original-image fallback, never a cached previous portrait.
+- After-phase validation: **CTest 19/19**, world `build/qa/kanto-Y0MSxV/`,
+  first person `build/qa/firstperson-QO5KGi/`, interiors
+  `build/qa/interiors-EdQKAF/`, all PASS. All **38 exterior captures are
+  byte-identical** to the before-phase baseline; report at
+  `build/qa/logs/dex-a1-exterior-comparison.txt`. Runtime remains unmodified.
+- `build/pokeyellow3d` and `PALLET3D.md` updated. This completes A1 only.
+  The next implementation is A2's list selection, caught/seen/absent states
+  and bounded portrait cache; then B1/B2, A3 and B3 remain in full scope.
+
+### A2 in progress, 2026-09-20
+
+- A1's final three regression runs above are the unchanged before-A2 baseline.
+- Added a fixed 32-entry LRU cache (<27 KiB of portrait data), keyed by
+  species/orientation and reset when the ROM buffer changes. `mon_pic` tests
+  repeated complete traversals, eviction, hits and ROM invalidation.
+- The original list and side-menu calls determine selection; the side-menu
+  cursor is separate from the selected Pokémon. Original list pixels remain
+  on the left; the right shows caught/seen/absent as portrait/silhouette/empty.
+  The body displays the original seen/owned counter glyphs.
+- Initial three-traversal runs pass in `build/qa/dex/list-{ortho,fp}/`, but
+  additional timing instrumentation found WRAM scroll changes precede the
+  actual LCD by up to three frames. The renderer now checks the displayed
+  number glyphs and cursor before publishing a new selection. A partial LCD
+  transfer leaves the portrait empty unless its previous cursor is still
+  visibly selected. Final timing tests and after-phase regressions are pending.
+
+### A2 completed, 2026-09-20
+
+- Final list QA **PASS**: `build/qa/dex-list-eD1XZk/`, with ortho and FP
+  preferences, three complete traversals of all 151 entries per camera,
+  original side-menu/CRY actions and return to the resident world. Input ROM
+  and state hashes remain unchanged. Repeat with `tests/dex_list_qa.sh ROM
+  WORLD_WITH_POKEDEX`.
+- The private bitmap fixture uses Bulbasaur caught, Ivysaur seen, Venusaur
+  absent and Mew seen to make number 151 reachable. Selected portraits,
+  silhouettes and empty images match these bits; original displayed counters
+  are 3 seen / 1 owned. No list, cursor or portrait bytes are injected.
+- Each camera encounters **1,336 LCD-transfer frames** during traversal.
+  The per-frame observer checks that any displayed portrait matches its
+  actually visible original number and cursor, and that a ready new cursor
+  updates immediately. No stale or premature portrait passes this check.
+- Cache unit tests cover four full traversals, both orientations, hits,
+  actual least-recently-used eviction, fixed 32-entry residency and ROM
+  invalidation. Rendering preserves WRAM, VRAM, cartridge RAM and framebuffer;
+  the original world matrix and resident meshes survive the complete menu.
+- Final captures reviewed at `build/qa/logs/dex-a2-list-final.png`.
+  A1's complete 151-entry device replay also passes again in
+  `build/qa/dex-portraits-R5ZynC/`. All its VRAM records and the five reviewed
+  device captures are byte-identical to A1; report:
+  `build/qa/logs/dex-a2-data-comparison.txt`.
+- After-phase validation **PASS**: CTest 19/19; world
+  `build/qa/kanto-nIUnWo/`, first person `build/qa/firstperson-cr3myd/`,
+  interiors `build/qa/interiors-ABONC4/`, and the eight general menu scenarios
+  in `build/qa/ui-menus-eqZtuv/`. The generic menu test now verifies the
+  dedicated dex handoff while preserving original tilemap classification.
+  All 38 exterior captures remain byte-identical to the before-A2 baseline
+  (`build/qa/logs/dex-a2-exterior-comparison.txt`).
+- Build and documentation updated; runtime and generated game C untouched.
+  The goal remains active with B1/B2, A3 and B3 still required.
+
+### Next: B1 preparation
+
+- Original PC references downloaded read-only to `build/qa/dex/references/`:
+  `engine_menus_pc.asm`, `engine_menus_players_pc.asm`,
+  `engine_pokemon_bills_pc.asm`, `engine_menus_oaks_pc.asm` and related files.
+- Home text-script entries are 33EF (item PC), 33F9 (Bill), 340E (Center).
+  Their dispatch shares CALL 3408 → 3E84, including the vending-machine
+  branch: a live return alone cannot identify a PC. Confirm the adjacent
+  furniture/tileset and the relevant menu context. The bank-5 submenu calls
+  use `LD B,bank; LD HL,target; CALL Bankswitch`, in the opposite order to
+  the existing battle detector. These anchors are present in the sparse ROM.
+- Center fixture/actions already exist in `tests/menu_integration.h`:
+  map 41, player (13,4), facing north. Bedroom must use its own original
+  item-PC menu, rather than inventing access to Bill/Oak there.
+- Current interior geometry extrudes furniture but paints its graphic on top.
+
+### Paused checkpoint: B1 in progress, 2026-09-20
+
+- Initial PC detection, monitor presentation, camera approach/return and
+  diagnostic integration are implemented in `src/pc_state.h`, `src/pc3d.h`
+  and the renderer. They compile but are not yet validated end to end.
+- CTest currently fails `pc_state` with `each original submenu is detected`.
+  The terminal locator matches furniture at map 41, (0,6), while the known
+  Center PC is used from player (13,4), facing north. Verify its actual ROM
+  tiles and correct detection before continuing the presentation tests.
+- A1/A2's successful regressions above predate these B1 changes. PC monitor
+  pixel checks, camera timing, submenu integration and the after-B1 world,
+  first-person and interior regressions remain pending.
+- Preserve this as a work-in-progress checkpoint. Resume with the terminal
+  locator and failing test, then finish B1, B2, A3 and B3; the full goal is
+  not complete.

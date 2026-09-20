@@ -96,7 +96,12 @@ inline int menus_journey(GBContext* ctx,bool fp) {
     choose(2);capture("bag",2);
     choose(3);capture("trainer-card",2);
     choose(5);capture("options",2);
-    choose(0);capture("pokedex",2);
+    choose(0);
+    run.require(pallet3d_dex().active&&pallet3d_dex().list,"Pokedex hands off to its own device");
+    capture_surface("logs/pokedex.ppm");
+    run.require(gb_context_save_state_file(ctx,"logs/pokedex.state"),"private Pokedex list fixture");
+    FILE* dex_tiles=std::fopen("logs/pokedex.tiles","wb");run.require(dex_tiles,"private original Pokedex tilemap");
+    std::fwrite(ctx->wram+0x3a0,1,360,dex_tiles);std::fclose(dex_tiles);
     choose(4);run.wait(180);capture("save-question",1);
     std::vector<uint8_t> old_save(ctx->eram,ctx->eram+ctx->eram_size);
     for(int i=0;i<4&&std::equal(old_save.begin(),old_save.end(),ctx->eram);i++) {run.press("A");run.wait(180);}

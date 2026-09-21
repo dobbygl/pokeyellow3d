@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, B1, C1, C2 y C3 completadas y verificadas; B2 pendiente.
+Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. Plan de menús cerrado: A1, A2, A3, B1, B2, C1, C2 y C3 completadas y verificadas. El goal integrado continúa con la fase 5 de API/CI.
 
 ## Análisis del estado actual
 
@@ -192,8 +192,8 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] La secuencia completa desde el arranque hasta el mapa se graba y revisa sin cortes bruscos.
-- [ ] `pallet_render_smoke` incorpora un modo `boot` que arranca desde ROM sin savestate y llega al menú principal.
+- [x] La secuencia completa desde el arranque hasta el mapa se graba y revisa sin cortes bruscos.
+- [x] `pallet_render_smoke` incorpora un modo `boot` que arranca desde ROM sin savestate y llega al menú principal.
 
 ## Bloque C: transiciones
 
@@ -864,3 +864,128 @@ Directorios privados de evidencia:
 
 Se cierran las cuatro casillas B1. B2 sigue pendiente y empieza después de
 fusionar esta PR; no se declara todavía cerrado el plan de menús.
+
+### B2 en curso: arranque completo y grabación — 2026-09-21
+
+Rama `boot-sequence-b2`, después de fusionar B1. El arranque conserva el
+copyright, Game Freak y la animación de Pikachu originales: son objetos
+propios de la intro, sin una escena de mapa que reconstruir. El fundido de
+200 ms ya existente toma el último frame completo antes del título como
+origen y mezcla la escena 3D cuando B1 la reconoce. La detección de Continuar
+se amplía al bucle de confirmación y a su salida a blanco; el runtime y el C
+generado no cambian.
+
+`pallet_render_smoke ROM boot` arranca una máquina nueva sin savestate,
+deja terminar toda la intro, pulsa Start desde el título y termina tras 90
+frames de menú. Sus variantes `new` y `continue` llegan al mundo mediante
+botones del motor; solo Continuar carga una copia de batería. La prueba
+verifica los píxeles nativos anteriores al título, el origen y progreso del
+fundido, la llegada al mundo, los controles relativos neutrales y la memoria
+WRAM/VRAM/RAM de cartucho/framebuffer intacta en cada presentación.
+
+Primera batería `build/qa/boot-EQzrWN/`: menú en 2.234 frames, nueva partida
+en 6.544 y Continuar en 2.463. Los tres conservan los 1.846 frames originales
+anteriores al título, con cero diferencias de píxeles. Nueva partida llega
+al dormitorio y Continuar a Paleta. Los vídeos completos conservan cada
+frame a 60 fps, tanto en la imagen compuesta como en el LCD original; son
+grabaciones sin audio. Los hashes de ROM y batería quedan intactos.
+
+Revisión visual privada: `build/qa/logs/boot-b2-focused-review-new-00.png`
+hasta `-06.png`, y `boot-b2-focused-review-continue-00.png` hasta `-03.png`.
+Cubren cada segundo de ambas secuencias y los frames de los fundidos. La
+entrada al título mezcla gradualmente el blanco final de la intro con
+Paleta; la aparición del retrato y la caída del logo conservan la secuencia
+del motor. Oak y los nombres siguen sobre el fondo atenuado; el paso al
+mundo conserva el blanco original de carga y la entrada gradual de C1/A3.
+Los blancos y los cambios entre viñetas de la intro pertenecen al juego
+original, comprobado por el oráculo de píxeles previo al título.
+
+La revisión ampliada de `boot-b2-focused-continue-world-fade.png` encontró
+un defecto entre el resumen de Continuar y la carga: al volver de
+`DisplayContinueGameInfo`, el bucle A/B ya no tenía el retorno reconocido
+por B1. El compositor mezclaba durante unos frames el panel pequeño con
+el LCD ampliado. La primera regresión completa se interrumpió con salida
+143 para corregirlo; no sirve como aceptación.
+
+La corrección reconoce las llamadas verificadas de ese bucle, el fundido a
+blanco, el borrado y su espera, además de sus PC de instrucciones con pila
+vacía y banco 1, cotejando los bytes de ROM. No basta un PC dentro de un
+intervalo ni un retorno antiguo. Las pruebas sintéticas y con ROM rechazan
+otro banco, bytes alterados y PC de operandos. El modo `boot` exige que el
+LCD original ya sea blanco cuando se abandona Continuar/Nueva partida:
+una futura regresión del menú duplicado falla automáticamente.
+
+Comandos reproducibles:
+
+```sh
+tests/boot_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-FzHv3Q/menus/logs/menu-battery.sav
+bash build/qa/logs/run-boot-b2-acceptance-regressions.sh
+```
+
+El segundo comando ejecuta CTest completo, el directorio independiente sin
+ROM, clang-format 18.1.8, las 18 baterías `tests/*_qa.sh` y la comparación
+exacta de las 38 referencias exteriores. Las dos casillas B2 permanecen
+pendientes hasta completar esta regresión y CI sobre la PR.
+
+### B2 cerrada: intro original y arranque hasta el mundo — 2026-09-21
+
+- PR [#10](https://github.com/dobbygl/pokeyellow3d/pull/10), implementación
+  `3d45c37`; GCC, Clang, 2D y formato aprobados en
+  [35575385836](https://github.com/dobbygl/pokeyellow3d/actions/runs/35575385836).
+- CTest **28/28**, directorio independiente sin ROM **11/11**, formato
+  18.1.8 y **las 18 baterías `tests/*_qa.sh` aprobadas**. Las **38 referencias
+  exteriores coinciden byte a byte**, sin excepciones. Comando reproducible:
+  `bash build/qa/logs/run-boot-b2-final-regressions.sh`. Salida y log en
+  `build/qa/logs/boot-b2-final-regressions.{exit,log}`; informe estructurado
+  en `build/qa/logs/boot-b2-acceptance.json`.
+- El modo público `ROM boot` llega al menú sin savestate en
+  2.234 frames. Nueva partida recorre Oak y ambos nombres y
+  alcanza el dormitorio en 6.544; Continuar alcanza Paleta en
+  2.463. Cada recorrido conserva los **1.846 frames de intro
+  originales, cero diferencias de píxeles**, sin pulsar ningún botón hasta
+  llegar al título. El primer frame de título conserva exactamente la última
+  imagen nativa y el fundido progresa hasta presentar Paleta.
+- Grabaciones completas compuestas y LCD original, sin audio, bajo
+  `build/qa/boot-ERc6My/{new,continue}/logs/boot-{composed,original}.mp4`.
+  Las dos secuencias se revisaron completas mediante capturas a cada segundo
+  y secuencias densas de sus fundidos. Evidencia privada:
+  `build/qa/logs/boot-b2-final-review-*.png`, con hashes de los vídeos y lista
+  de imágenes revisadas en `boot-b2-final-reviewed.json`.
+- La revisión ampliada encontró y corrigió la confirmación de Continuar:
+  su bucle A/B permanecía vivo después de mostrar el resumen. Ahora sigue
+  enmarcado hasta que el LCD original se vuelve blanco, sin mezclarlo con
+  una segunda copia ampliada. El detector exige banco, pila, PC de una
+  instrucción y bytes de ROM válidos; las pruebas rechazan las variantes
+  negativas y el arranque exige un LCD blanco antes de abandonar el menú.
+- En cada frame se comprueban WRAM, VRAM, RAM de cartucho y framebuffer
+  intactos y controles relativos neutrales. La ROM y la batería copiadas
+  conservan sus hashes. No se modifican el C generado ni el runtime.
+- La regresión anterior se detuvo deliberadamente para esa corrección y
+  no cuenta como aceptación. La ejecución final se repitió íntegra sobre
+  `3d45c37`; el commit de cierre documental también debe pasar CI antes
+  de la fusión.
+
+Directorios privados de evidencia:
+
+- `battles`: `build/qa/battles-eKXoHa/`.
+- `boot`: `build/qa/boot-ERc6My/`.
+- `dex_area`: `build/qa/dex-area-feTt0x/`.
+- `dex_list`: `build/qa/dex-list-arx9YH/`.
+- `dex_portraits`: `build/qa/dex-portraits-xaki8v/`.
+- `firstperson`: `build/qa/firstperson-Z838S4/`.
+- `interiors`: `build/qa/interiors-lvVAXS/`.
+- `pc_details`: `build/qa/pc-details-5unbK2/`.
+- `pc_focus`: `build/qa/pc-focus-wqcDpF/`.
+- `pc_storage`: `build/qa/pc-storage-vklXko/`.
+- `tile_animation`: `build/qa/tile-animation-XVsuv1/`.
+- `title`: `build/qa/title-YviIDY/`.
+- `ui_battles`: `build/qa/ui-battles-op1KUh/`.
+- `ui_crossfade`: `build/qa/ui-crossfade-KzzEiV/`.
+- `ui_menus`: `build/qa/ui-menus-DUkcJQ/`.
+- `ui_special_transitions`: `build/qa/ui-special-transitions-iJrE5a/`.
+- `ui_transitions`: `build/qa/ui-transitions-572YHJ/`.
+- `world`: `build/qa/kanto-9ZrDaB/`.
+
+Se cierran las dos casillas B2 y las 26 del plan de menús. El siguiente
+punto del goal es la fase 5 de API/CI, después de fusionar esta PR.

@@ -20,9 +20,16 @@ int main(int argc, char **argv) {
             rom[i] = uint8_t(i * 17 + i / 13);
         constexpr uint8_t audio_loop[]{0xfa, 0xc6, 0xcf, 0xa7, 0x20, 0xfa, 0xc3, 0x10, 0x1d};
         std::memcpy(rom.data() + 0x4321, audio_loop, sizeof(audio_loop));
+        constexpr uint8_t confirm_loop[]{0x21, 0x25, 0xd1, 0xcb, 0xee, 0xaf, 0xe0, 0xb3, 0xe0, 0xb2,
+                                         0xe0, 0xb4, 0xcd, 0xb9, 0x01, 0xf0, 0xb4, 0xcb, 0x47, 0x20,
+                                         0x07, 0xcb, 0x4f, 0xc2, 0xbb, 0x5b, 0x18, 0xe9};
+        std::memcpy(rom.data() + 0x5c67, confirm_loop, sizeof(confirm_loop));
         for (auto call : {title_state::Call{0x42aa, 0x1e64},
                           {0x5c36, 0x3aab},
                           {0x5c64, 0x5d1f},
+                          {0x5c83, 0x3dd8},
+                          {0x5c86, 0x16dd},
+                          {0x5c90, 0x372f},
                           {0x5cd7, 0x5e85}}) {
             rom[call.address] = 0xcd;
             rom[call.address + 1] = uint8_t(call.target);
@@ -81,8 +88,30 @@ int main(int argc, char **argv) {
     check(title_state::sample(&ctx) == Phase::Menu, "menu with a saved game");
     root(0x5c67);
     check(title_state::sample(&ctx) == Phase::Continue, "saved-game summary");
+    for (uint16_t return_address : {0x5c76, 0x5c86, 0x5c89, 0x5c93}) {
+        root(return_address);
+        check(title_state::sample(&ctx) == Phase::Continue,
+              "confirmation and white-out keep the summary framed");
+    }
+    ctx.sp = 0xdfff;
+    for (uint16_t pc : {0x5c67, 0x5c6a, 0x5c6c, 0x5c6d, 0x5c6f, 0x5c71, 0x5c73, 0x5c76, 0x5c78,
+                        0x5c7a, 0x5c7c, 0x5c7e, 0x5c81}) {
+        ctx.pc = pc;
+        check(title_state::sample(&ctx) == Phase::Continue, "live A/B wait has no outer CALL");
+    }
+    hram[0x38] = 2;
+    check(title_state::sample(&ctx) == Phase::None, "confirmation loop requires bank 1");
+    hram[0x38] = 1;
+    rom[0x5c82] ^= 1;
+    check(title_state::sample(&ctx) == Phase::None, "confirmation loop verifies ROM bytes");
+    rom[0x5c82] ^= 1;
+    ctx.pc = 0x5c80;
+    check(title_state::sample(&ctx) == Phase::None, "operand address is not an executing loop PC");
+    ctx.pc = 0x5c81;
     wram[0x1087] = 1;
     check(title_state::sample(&ctx) == Phase::None, "continue requires a valid saved game");
+    ctx.sp = 0xdff9;
+    ctx.pc = 0;
     root(0x5cda);
     check(title_state::sample(&ctx) == Phase::NewGame, "Oak speech and naming lifetime");
     root(0x5cfb);

@@ -106,9 +106,9 @@ With the lighting from point 3, the cost is low.
 
 Acceptance criteria:
 
-- [ ] Dawn, noon, dusk, and night are reviewed in Pallet Town, Route 1, and Viridian City.
-- [ ] An application setting allows fixing the time or disabling the cycle.
-- [ ] Encounters, scripts, and RNG do not change with the time of day.
+- [x] Dawn, noon, dusk, and night are reviewed in Pallet Town, Route 1, and Viridian City.
+- [x] An application setting allows fixing the time or disabling the cycle.
+- [x] Encounters, scripts, and RNG do not change with the time of day.
 
 ### Phase 4A: presentational clock and lighting
 
@@ -124,9 +124,9 @@ Work:
 
 Acceptance criteria:
 
-- [ ] Unit tests cover midnight wrap, dawn/noon/dusk/night and fixed/disabled settings.
-- [ ] Both cameras expose the settings and preserve them across application restarts.
-- [ ] Sun, sky, fog and window light respond continuously; disabled mode preserves the reference captures.
+- [x] Unit tests cover midnight wrap, dawn/noon/dusk/night and fixed/disabled settings.
+- [x] Both cameras expose the settings and preserve them across application restarts.
+- [x] Sun, sky, fog and window light respond continuously; disabled mode preserves the reference captures.
 
 ### Phase 4B: visual and engine parity gate
 
@@ -143,32 +143,92 @@ Work:
 
 Acceptance criteria:
 
-- [ ] All 24 location/time/camera captures are reviewed under `build/qa/logs/`.
-- [ ] Engine states and RNG are identical for the time-of-day replay variants.
-- [ ] All regression suites pass; capture comparisons and reproducible commands are recorded.
+- [x] All 24 location/time/camera captures are reviewed under `build/qa/logs/`.
+- [x] Engine states and RNG are identical for the time-of-day replay variants.
+- [x] All regression suites pass; capture comparisons and reproducible commands are recorded.
 
-### 4A/4B execution record — in progress, 2026-09-21
+### 4A/4B execution record — 2026-09-21
 
-Branch `day-night-4ab`, based on completed 5B PR #12 merged as
-`8ac62d4200961eb453c2baeed51c5ab57bd565a7`. The implementation adds a pure
-local-clock/palette module, directional surface lighting and original-window
-emission. Settings append to the runtime's existing ImGui settings window
-through the presentation frame callback; no runtime or generated code change
-is needed. `lighting.cfg` uses SDL's application preference directory, separate
-from cartridge data. Default and unrecognized preferences disable the cycle.
+Branch `day-night-4ab`, [PR #13](https://github.com/dobbygl/pokeyellow3d/pull/13),
+implementation `2ef3242674696593eec462a325814c9a18f959dd`, based on completed
+5B PR #12 merged as `8ac62d4200961eb453c2baeed51c5ab57bd565a7`.
+The runtime remains pinned to `00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e`.
+The upstream CI blocker recorded in `PLAN_API_CI.md` remains open; this
+acceptance does not close that separate requirement.
 
-Initial evidence: 30/30 local CTest including midnight continuity and preference
-round trips, GPU time-of-day changes and exact disabled restoration. The 38
-original exterior references remain byte-identical in the disabled mode.
-The first 24 captures have been reviewed at 06:00, 12:00, 18:00 and 00:00,
-including visible warm window panes at night and continuous directional light.
-Private initial evidence: `build/qa/logs/daylight-initial-review.json` and
-`daylight-initial-exterior-comparison.json`. Fresh-process preference reloads
-passed for all six location/camera scenarios. Full natural-encounter replay
-parity, independent ROM-free checks, complete regression, final review and CI
-are still pending; all nine acceptance boxes remain open.
+`src/daylight.h` converts local time into a continuous sun direction and
+sky, fog, ambient/direct light and original-window emission. Settings append
+to the runtime's existing ImGui window through the presentation callback;
+no runtime or generated code changes are needed. `lighting.cfg` uses SDL's
+application preference directory, separately from cartridge data. Automatic,
+fixed and disabled modes persist independently; missing or invalid preferences
+select disabled lighting. Interiors preserve their previous lighting and the
+title retains its fixed sunset.
 
-Focused reproduction commands are in the 4A/4B section of `PALLET3D.md`.
+Validation completed against frozen game and runtime sources:
+
+- 30/30 full CTest, 13/13 tests in the independent ROM-free directory, and
+  clang-format 18.1.8 passed. No renderer test was skipped. Unit tests cover
+  local time, all lighting keyframes, midnight continuity, every mode,
+  preference round trips, malformed input and failed writes.
+- All 20 `tests/*_qa.sh` suites passed, followed by full CTest again. This
+  includes boot, title, both animation suites, daylight, PC details, world,
+  first person, interiors, battles, battle UI, crossfades, special transitions,
+  menus, UI transitions, Dex list/portraits/area and PC focus/storage.
+- The 24 final captures in `build/qa/daylight-1HnG07` were reviewed at 06:00,
+  12:00, 18:00 and 00:00 in Pallet, Route 1 and Viridian, in both cameras.
+  Dawn/dusk have warm horizons and different facade illumination; night
+  retains legible terrain with warm original window panes. Both settings
+  screens were reviewed. All six scenarios reload the fixed preference in a
+  fresh process and restore the disabled image byte for byte.
+- Each camera replays 3,933 frames from the same fixture and input, disabled
+  and at each of the four hours. All 31,464 complete frame-state comparisons
+  are byte-identical, including scripts, a natural encounter, battle menus,
+  escape, RNG and cartridge RAM. Lossless gzip streams keep the complete
+  baseline bounded on disk; every decoded byte is compared, not just hashes.
+  Per-presentation guards protect WRAM, VRAM, cartridge RAM and framebuffer.
+- The new title guard tests four world hours against an identical frozen
+  title image in New Game, Continue and idle/intro-return scenarios.
+- All 38 original exterior references are byte-identical with the cycle
+  disabled. Of 2,077 captures compared with 5B, 2,043 are exact, including all
+  215 interior views, 374 tile/world animation captures and 486 battle/UI
+  captures. All 34 differences were visually reviewed: four settings screens
+  include the new controls; 29 captures differ in host-timed intermediate
+  fade intensity; one first-person F2-return capture differs in 112 distant
+  grass pixels after the host-timed wait advances the guest. Stable endpoints
+  and all fixed catalog references remain exact. The enabled lighting views
+  are separate from this unchanged reference gate.
+- [Implementation CI](https://github.com/dobbygl/pokeyellow3d/actions/runs/35595769175)
+  passed Linux GCC, Clang, 2D-only, format and native Windows/MSVC with ANGLE.
+  The documentation commit must retain green CI before merging.
+
+Private evidence under `build/qa/logs/`: `daylight-regression-evidence.json`,
+`daylight-final-regressions.log`, `daylight-final-exterior-comparison.txt`,
+`daylight-source-snapshot.json`, `daylight-final-visual-review.json` and
+`daylight-baseline-differences-review.json`. The review manifests hash the
+actual captures and the contact pages, including `daylight-final-*-review.png`
+and `daylight-baseline-*.png`. The acceptance verifier checks the complete
+suite inventory, unchanged sources, code CI, reference images, replay bytes
+and both visual-review records. ROMs, states and captures stay private.
+
+Reproduction (existing private fixtures):
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 4
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+tests/daylight_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/interiors-fJDbZk/city.state
+bash build/qa/logs/run-daylight-final-regressions.sh
+python3 build/qa/logs/check-daylight-regressions.py
+```
+
+The private driver configures/builds the independent no-ROM directory,
+checks format, runs every QA suite serially, then repeats CTest and compares
+the 38 exterior references. Fixture paths and commands for the focused suite
+are also documented in `PALLET3D.md`.
 
 ## 5. Animated world
 

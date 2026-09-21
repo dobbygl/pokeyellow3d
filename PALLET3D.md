@@ -770,7 +770,11 @@ repite un encuentro salvaje, los menús originales y la huida a cada hora,
 comparando todos los bytes de cada estado completo con el recorrido sin
 ciclo. La referencia comprimida con gzip permite comparar los bytes sin
 guardar miles de estados completos en memoria. Las evidencias privadas
-quedan en `build/qa/daylight-*/`; el cierre se registra en `PLAN_MEJORAS.md`.
+quedan en `build/qa/daylight-*/`. La validación de 4A/4B completó las 20
+baterías, 30/30 pruebas CTest, 13/13 sin ROM y 31.464 comparaciones de estados
+completos. Las 38 referencias exteriores siguen idénticas. Las 24 vistas y
+ambos paneles de ajustes revisados están en `build/qa/logs/daylight-final-*-review.png`;
+`PLAN_MEJORAS.md` registra el cierre, la CI y las comparaciones adicionales.
 
 ### Título y menú principal
 

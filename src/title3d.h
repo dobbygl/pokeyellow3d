@@ -19,7 +19,9 @@ inline void shutdown() {
 }
 inline firstperson::Matrix camera(float aspect, Vec &position) {
     double phase = seconds * (2 * firstperson::Pi / 80);
-    position = {10 + float(std::sin(phase)) * 1.25f, 4.8f, 21 + float(std::cos(phase))};
+    // Keep the portrait inside the title's fixed logo/copyright margins for
+    // the entire loop, including the near end of the travelling path.
+    position = {10 + float(std::sin(phase)) * 1.25f, 4.8f, 22 + float(std::cos(phase)) * .25f};
     const float ex = position.x, ey = position.y, ez = position.z;
     const float s = .22f, c = std::sqrt(1 - s * s);
     const float f = 1 / std::tan(65.f * firstperson::Pi / 360);

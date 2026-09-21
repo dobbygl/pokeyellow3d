@@ -745,7 +745,7 @@ audio. El helper limita el avance a 60 fps; el fundido conserva su reloj
 real, por lo que su número de frames depende del tiempo de renderizado.
 No cambia el reloj ni el ejecutable jugable.
 
-La batería deja vídeos, capturas, traza CSV y estado final en
+La batería de vídeos requiere `ffmpeg` y `ffprobe`. Deja vídeos, capturas, traza CSV y estado final en
 `build/qa/boot-*/`. Cada frame anterior al título se compara con los píxeles
 del LCD original, sin pulsaciones; la primera imagen del fundido coincide
 con el último frame de la intro. También se comprueban la finalización del

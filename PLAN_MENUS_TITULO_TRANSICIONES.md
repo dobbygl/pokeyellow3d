@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, B1, C1, C2 y C3 completadas y verificadas; B2 pendiente.
+Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. Plan de menús cerrado: A1, A2, A3, B1, B2, C1, C2 y C3 completadas y verificadas. El goal integrado continúa con la fase 5 de API/CI.
 
 ## Análisis del estado actual
 
@@ -192,8 +192,8 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] La secuencia completa desde el arranque hasta el mapa se graba y revisa sin cortes bruscos.
-- [ ] `pallet_render_smoke` incorpora un modo `boot` que arranca desde ROM sin savestate y llega al menú principal.
+- [x] La secuencia completa desde el arranque hasta el mapa se graba y revisa sin cortes bruscos.
+- [x] `pallet_render_smoke` incorpora un modo `boot` que arranca desde ROM sin savestate y llega al menú principal.
 
 ## Bloque C: transiciones
 
@@ -927,3 +927,65 @@ El segundo comando ejecuta CTest completo, el directorio independiente sin
 ROM, clang-format 18.1.8, las 18 baterías `tests/*_qa.sh` y la comparación
 exacta de las 38 referencias exteriores. Las dos casillas B2 permanecen
 pendientes hasta completar esta regresión y CI sobre la PR.
+
+### B2 cerrada: intro original y arranque hasta el mundo — 2026-09-21
+
+- PR [#10](https://github.com/dobbygl/pokeyellow3d/pull/10), implementación
+  `3d45c37`; GCC, Clang, 2D y formato aprobados en
+  [35575385836](https://github.com/dobbygl/pokeyellow3d/actions/runs/35575385836).
+- CTest **28/28**, directorio independiente sin ROM **11/11**, formato
+  18.1.8 y **las 18 baterías `tests/*_qa.sh` aprobadas**. Las **38 referencias
+  exteriores coinciden byte a byte**, sin excepciones. Comando reproducible:
+  `bash build/qa/logs/run-boot-b2-final-regressions.sh`. Salida y log en
+  `build/qa/logs/boot-b2-final-regressions.{exit,log}`; informe estructurado
+  en `build/qa/logs/boot-b2-acceptance.json`.
+- El modo público `ROM boot` llega al menú sin savestate en
+  2.234 frames. Nueva partida recorre Oak y ambos nombres y
+  alcanza el dormitorio en 6.544; Continuar alcanza Paleta en
+  2.463. Cada recorrido conserva los **1.846 frames de intro
+  originales, cero diferencias de píxeles**, sin pulsar ningún botón hasta
+  llegar al título. El primer frame de título conserva exactamente la última
+  imagen nativa y el fundido progresa hasta presentar Paleta.
+- Grabaciones completas compuestas y LCD original, sin audio, bajo
+  `build/qa/boot-ERc6My/{new,continue}/logs/boot-{composed,original}.mp4`.
+  Las dos secuencias se revisaron completas mediante capturas a cada segundo
+  y secuencias densas de sus fundidos. Evidencia privada:
+  `build/qa/logs/boot-b2-final-review-*.png`, con hashes de los vídeos y lista
+  de imágenes revisadas en `boot-b2-final-reviewed.json`.
+- La revisión ampliada encontró y corrigió la confirmación de Continuar:
+  su bucle A/B permanecía vivo después de mostrar el resumen. Ahora sigue
+  enmarcado hasta que el LCD original se vuelve blanco, sin mezclarlo con
+  una segunda copia ampliada. El detector exige banco, pila, PC de una
+  instrucción y bytes de ROM válidos; las pruebas rechazan las variantes
+  negativas y el arranque exige un LCD blanco antes de abandonar el menú.
+- En cada frame se comprueban WRAM, VRAM, RAM de cartucho y framebuffer
+  intactos y controles relativos neutrales. La ROM y la batería copiadas
+  conservan sus hashes. No se modifican el C generado ni el runtime.
+- La regresión anterior se detuvo deliberadamente para esa corrección y
+  no cuenta como aceptación. La ejecución final se repitió íntegra sobre
+  `3d45c37`; el commit de cierre documental también debe pasar CI antes
+  de la fusión.
+
+Directorios privados de evidencia:
+
+- `battles`: `build/qa/battles-eKXoHa/`.
+- `boot`: `build/qa/boot-ERc6My/`.
+- `dex_area`: `build/qa/dex-area-feTt0x/`.
+- `dex_list`: `build/qa/dex-list-arx9YH/`.
+- `dex_portraits`: `build/qa/dex-portraits-xaki8v/`.
+- `firstperson`: `build/qa/firstperson-Z838S4/`.
+- `interiors`: `build/qa/interiors-lvVAXS/`.
+- `pc_details`: `build/qa/pc-details-5unbK2/`.
+- `pc_focus`: `build/qa/pc-focus-wqcDpF/`.
+- `pc_storage`: `build/qa/pc-storage-vklXko/`.
+- `tile_animation`: `build/qa/tile-animation-XVsuv1/`.
+- `title`: `build/qa/title-YviIDY/`.
+- `ui_battles`: `build/qa/ui-battles-op1KUh/`.
+- `ui_crossfade`: `build/qa/ui-crossfade-KzzEiV/`.
+- `ui_menus`: `build/qa/ui-menus-DUkcJQ/`.
+- `ui_special_transitions`: `build/qa/ui-special-transitions-iJrE5a/`.
+- `ui_transitions`: `build/qa/ui-transitions-572YHJ/`.
+- `world`: `build/qa/kanto-9ZrDaB/`.
+
+Se cierran las dos casillas B2 y las 26 del plan de menús. El siguiente
+punto del goal es la fase 5 de API/CI, después de fusionar esta PR.

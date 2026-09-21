@@ -159,7 +159,7 @@ Why: bring the ROM's tile and actor animation into the 3D presentation.
 Acceptance criteria:
 
 - [x] Water and flowers animate at the original game's cadence.
-- [ ] An NPC walking outside the original screen shows its walking frames.
+- [x] An NPC walking outside the original screen shows its walking frames.
 - [x] The regression journeys keep passing with memory intact.
 
 ### Phase 5A: original tileset animation
@@ -263,14 +263,15 @@ Work:
 
 Acceptance criteria:
 
-- [ ] A walking NPC outside the LCD shows the ROM walking frames matching its live state; stationary actors stay stationary.
-- [ ] Reviewed grass wind, walking particles and surf particles work in both cameras, with bounded memory.
-- [ ] Identical input yields identical engine state with effects enabled or disabled, including RNG and cartridge RAM.
-- [ ] Full CTest, ROM-free CTest and every QA suite pass. All 38 exterior reference captures remain byte-identical at their fixed reference animation phase; separate frame sequences prove the animation, without relaxing the reference gate.
+- [x] A walking NPC outside the LCD shows the ROM walking frames matching its live state; stationary actors stay stationary.
+- [x] Reviewed grass wind, walking particles and surf particles work in both cameras, with bounded memory.
+- [x] Identical input yields identical engine state with effects enabled or disabled, including RNG and cartridge RAM.
+- [x] Full CTest, ROM-free CTest and every QA suite pass. All 38 exterior reference captures remain byte-identical at their fixed reference animation phase; separate frame sequences prove the animation, without relaxing the reference gate.
 
-### 5B execution record — in progress, 2026-09-21
+### 5B execution record — 2026-09-21
 
-Branch `world-animations-5b`, based on API/Windows PR #11 merged as
+Branch `world-animations-5b`, [PR #12](https://github.com/dobbygl/pokeyellow3d/pull/12),
+implementation `7b48b43dd8e0698b851416673bef5748bc570812`, based on API/Windows PR #11 merged as
 `f1ab11a08f9e1d0768ac0f6653820f134624cd61`. The upstream CI requirement is
 still externally blocked as recorded in `PLAN_API_CI.md`; the integrated
 objective explicitly authorizes continuing with the next point in this case.
@@ -289,18 +290,66 @@ Wind changes only grass-tip vertices. Grass and surf trails use a fixed
 varies particles without accessing game RNG. Pause freezes effects, while
 loads and map changes reset them. Catalog rendering selects phase zero.
 
-Initial local evidence (not the complete acceptance gate): 29/29 CTest,
-38 exterior reference images byte-identical, all four original walking
-frames verified against resident VRAM, and an engine-driven off-LCD NPC
-walk covering four phases and 31 positions. Grass and surf replays each
-matched all 300 complete serialized engine states with effects on/off.
-The six-scenario battery in `tests/world_animation_qa.sh` exercises both
-cameras. Full regression, independent ROM-free build, final visual review
-and PR CI are still required; acceptance checkboxes remain open.
+Validation completed against the frozen implementation and runtime sources:
 
-Reproducible focused commands and private fixture paths are in the 5B
-section of `PALLET3D.md`. Initial reports and captures are under
-`build/qa/world-animation-preflight/` and `build/qa/logs/5b-*.log`.
+- 29/29 full CTest and 12/12 tests in the independent ROM-free build,
+  with no skipped renderer test; clang-format 18.1.8 passed.
+- All 19 `tests/*_qa.sh` suites passed, followed by another full CTest.
+  The inventory includes boot, title, tile/world animation, world, first
+  person, interiors, battles, battle UI, crossfade, special transitions,
+  menus, transitions, Dex list/portraits/area and PC details/focus/storage.
+- The six focused scenarios in `build/qa/world-animation-GGh8J7` verify
+  all four original walking frames against resident VRAM and actual GPU
+  pixels. The scripted off-LCD walk covers four phases and 31 positions
+  in each camera. Stationary/frozen actor checks use live counters.
+- Grass and surf replays in both cameras compare every byte of 300 complete
+  serialized engine snapshots per scenario: 1,200 matching pairs with
+  effects on/off, including CPU, cartridge RAM, WRAM, VRAM, OAM, HRAM, I/O,
+  PPU and APU state. Per-frame guards also reject presentation writes to
+  WRAM, VRAM, cartridge RAM or the original framebuffer. Pause, immediate
+  reload, real map crossings and the bounded pool pass their checks.
+- Reviewed separate NPC, stationary-wind, walking-grass and surf sequences
+  in both cameras. The fixed pool holds at most 96 particles; this journey
+  reaches 21 grass and 15 surf particles. Review sheets and their input
+  manifests are `5b-final-*-review.png` and `5b-final-visual-review.json`
+  under `build/qa/logs/`.
+- All 38 exterior references in `build/qa/kanto-HdtWld/logs/catalog` match
+  `build/qa/kanto-hvoPvo/logs/catalog` byte for byte. All 179 interior catalog
+  views also match. Across 1,895 prior journey/catalog captures, 1,695 match
+  exactly and 200 differ. Reviewed comparisons show animated grass in live
+  or retained world scenes and host-timed fade opacity in transitional
+  boot/title/crossfade frames, preserving scene geometry and UI content.
+  These extra journey comparisons do not relax the fixed-reference gate.
+  `5b-broad-visual-review.json` records the reviewed samples explicitly.
+- [Implementation CI](https://github.com/dobbygl/pokeyellow3d/actions/runs/35591205727)
+  passed Linux GCC, Clang, 2D-only, format and native Windows MSVC. Windows
+  ran all 12 ROM-free tests, including ANGLE rendering; macOS remains disabled.
+  The documentation commit must also pass CI before merge.
+
+`build/qa/logs/5b-regression-evidence.json` ties results to the implementation,
+runtime, input directories and reviewed image hashes. `5b-source-snapshot.json`
+checks source identity; `5b-final-regressions.log` and its exit file record
+the complete run. ROMs, states and captures remain private and ignored.
+
+Reproducible commands (focused fixture paths are also in `PALLET3D.md`):
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 4
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+tests/world_animation_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/kanto-Eqy7Ry/surf-active.state
+bash build/qa/logs/run-5b-final-regressions.sh
+python3 build/qa/logs/check-5b-regressions.py
+```
+
+The private regression driver configures/builds the independent no-ROM
+directory, checks the format and full suite inventory, runs every QA script
+serially and verifies all 38 exterior references. The acceptance verifier
+also checks source hashes, complete replay parity, visual-review hashes and
+the successful implementation CI response saved as `5b-code-ci.json`.
 
 ### Execution and validation order for points 5 and 4
 

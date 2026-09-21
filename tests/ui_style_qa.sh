@@ -20,6 +20,13 @@ echo "QA output: $qa_dir"
 "$project/tests/ui_menus_qa.sh" "$rom" "$world" > "$qa_dir/logs/menus.log" 2>&1
 "$project/tests/ui_battles_qa.sh" "$rom" "$wild" "$trainer" > "$qa_dir/logs/battles.log" 2>&1
 "$project/tests/ui_crossfade_qa.sh" "$rom" "$pallet" "$battle" > "$qa_dir/logs/crossfade.log" 2>&1
+for style in classic integrated; do
+    for operation in write read; do
+        SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
+            "$project/build/pallet_render_smoke" "$rom" "$world" "preferences-$operation" \
+            "$qa_dir/logs/preferences.cfg" "$style" > "$qa_dir/logs/preferences-$operation-$style.log" 2>&1
+    done
+done
 python3 - "$qa_dir" <<'CHECK'
 import json
 import re

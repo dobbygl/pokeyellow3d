@@ -22,16 +22,22 @@ endforeach()
 add_executable(render_preview_synthetic tests/render_preview_synthetic.cpp)
 target_include_directories(render_preview_synthetic PRIVATE src)
 target_link_libraries(render_preview_synthetic PRIVATE gbrt)
+target_compile_definitions(render_preview_synthetic PRIVATE SDL_MAIN_HANDLED)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(render_preview_synthetic PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME render_preview_synthetic COMMAND render_preview_synthetic)
 # Exit 77 means no OpenGL ES 2 context was available (a `dummy` video driver,
 # for instance); the test reports the reason and CTest records it as skipped.
+if(WIN32)
+    set(preview_environment "SDL_VIDEODRIVER=windows;SDL_AUDIODRIVER=dummy;SDL_OPENGL_ES_DRIVER=1")
+else()
+    set(preview_environment "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy")
+endif()
 set_tests_properties(render_preview_synthetic PROPERTIES
     LABELS synthetic
     SKIP_RETURN_CODE 77
-    ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy")
+    ENVIRONMENT "${preview_environment}")
 
 foreach(rom_test interior interior_audit battle_state fade_state battle_transition pallet_state kanto_geometry kanto_rom)
     if(TEST ${rom_test})

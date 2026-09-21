@@ -65,16 +65,16 @@ int main(int argc, char **argv) {
     check(pallet::view(nullptr) == pallet::View::Unsupported, "No context during launcher");
     // A bottom dialogue is distinct from menus drawn elsewhere on the screen.
     for (int x = 0; x < 20; x++) {
-        set(0xc3a0 + 12 * 20 + x, 0x7a);
-        set(0xc3a0 + 17 * 20 + x, 0x7a);
+        set(uint16_t(0xc3a0 + 12 * 20 + x), 0x7a);
+        set(uint16_t(0xc3a0 + 17 * 20 + x), 0x7a);
     }
     set(0xc3a0 + 12 * 20, 0x79);
     set(0xc3a0 + 12 * 20 + 19, 0x7b);
     set(0xc3a0 + 17 * 20, 0x7d);
     set(0xc3a0 + 17 * 20 + 19, 0x7e);
     for (int y = 13; y < 17; y++) {
-        set(0xc3a0 + y * 20, 0x7c);
-        set(0xc3a0 + y * 20 + 19, 0x7c);
+        set(uint16_t(0xc3a0 + y * 20), 0x7c);
+        set(uint16_t(0xc3a0 + y * 20 + 19), 0x7c);
     }
     check(pallet::bottom_dialogue(&ctx), "Recognize complete lower text frame");
     set(0xc3a0, 0x79);
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     set(0xc3a0 + 12 * 20 + 5, 0);
     check(!pallet::bottom_dialogue(&ctx), "Reject partial text frame during transition");
     for (int i = 0; i < 360; i++)
-        set(0xc3a0 + i, 0);
+        set(uint16_t(0xc3a0 + i), 0);
     const auto &valid_blocks = pallet::tileset(*pallet::scene(0)).valid_blocks;
     int invalid = 0;
     while (invalid < 256 && valid_blocks[invalid])

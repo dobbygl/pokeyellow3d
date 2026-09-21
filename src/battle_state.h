@@ -267,7 +267,7 @@ inline Image portrait(const GBContext *ctx, Rect r, int species) {
             int row = at + (y % 8) * 2, bit = 7 - x % 8;
             int v = ((ctx->vram[row] >> bit) & 1) | (((ctx->vram[row + 1] >> bit) & 1) << 1);
             int i = y * 56 + x;
-            indices[i] = v;
+            indices[i] = uint8_t(v);
             for (int c = 0; c < 3; c++)
                 out[i * 4 + c] = colors[v][c];
             out[i * 4 + 3] = 255;

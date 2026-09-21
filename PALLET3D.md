@@ -39,8 +39,8 @@ Safari y estados no reconocidos siguen en
 2D. Los cuadros de diálogo inferiores reconocidos se superponen al mundo
 3D en ambas cámaras, con el HUD oculto mientras se lee. Los warps reconocidos
 conservan la escena saliente y siguen el fundido BGP del motor; la carga de un
-savestate en otro mapa hace un fundido breve a negro. El resto de la
-ampliación de menús, título y transiciones está en curso en
+savestate en otro mapa hace un fundido breve a negro. El título 3D, los menús
+y las transiciones especiales están verificados y registrados en
 `PLAN_MENUS_TITULO_TRANSICIONES.md`.
 
 | Tecla | Acción |
@@ -63,13 +63,15 @@ ampliación de menús, título y transiciones está en curso en
 ## Compilar y probar
 
 ```sh
-cmake -S . -B build -G Ninja -DPOKEYELLOW_3D=ON \
-  -DGBRT_REF=6581880fce60e6f139901a5942fc984e9c1db8ab
+cmake -S . -B build -G Ninja -DPOKEYELLOW_3D=ON
 cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure
 ```
 
 Se necesitan las dependencias habituales del proyecto, SDL2 y OpenGL ES 2.
+La revisión inmutable del runtime se declara en `CMakeLists.txt`. Si una
+compilación anterior fijó otro runtime, elimina las opciones de caché con
+`-U GBRT_REF -U GBRT_URL -U FETCHCONTENT_SOURCE_DIR_GB_RECOMPILED` al configurar.
 `POKEYELLOW_3D=OFF` produce el ejecutable original `pokeyellow`.
 CTest registra pruebas de controles, menús, fundidos y escenarios sintéticos.
 Al configurar con la ROM local en `build/roms/pokeyellow.gbc` añade las
@@ -77,6 +79,12 @@ comprobaciones del cartucho. La equivalencia de retratos con VRAM requiere
 generar primero la evidencia privada con `tests/dex_portraits_qa.sh`.
 `ctest --test-dir build -LE rom --output-on-failure` ejecuta el grupo sin ROM;
 no se distribuye esa ROM.
+
+Windows/MSVC también compila y pasa los once tests sin ROM, incluido el renderer
+sintético con el controlador Windows de SDL2 y ANGLE. Los comandos de compilación
+con las dependencias fijadas están en [README.md](README.md#building-on-windows).
+Los recorridos con ROM y las comparaciones de capturas se validan en Linux/Mesa;
+la CI no equivale a una partida completa en Windows.
 
 Para repetir la integración completa con las fixtures locales verificadas:
 
@@ -226,7 +234,7 @@ Esto no equivale a haber jugado 165 combates distintos.
 - `cmake/Pallet3D.cmake` comprueba la versión de `gb_presentation.h` y añade
   el renderer y su adaptador. El launcher registra los callbacks antes de
   arrancar SDL. No genera copias del frontend ni modifica fuentes descargadas.
-  El runtime se fija al tag `presentation-api-v1` de `dobbygl/gb-recompiled`.
+  El runtime se fija a una revisión inmutable de `dobbygl/gb-recompiled` en `CMakeLists.txt`. La contribución a upstream está en [GB-Recomp/gb-recompiled#2](https://github.com/GB-Recomp/gb-recompiled/pull/2).
 
 Las listas de colisión, hierba, cornisas y pares de tiles se leen de la ROM.
 La colisión del juego sigue siendo la única autoridad. Las cornisas originales

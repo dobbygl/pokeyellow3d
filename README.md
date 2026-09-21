@@ -54,7 +54,9 @@ Download [v0.1.0 for Linux x86_64](https://github.com/dobbygl/pokeyellow3d/relea
 
 ### Requirements
 
-The current build and graphics checks have been run on Linux with Mesa. Other platforms have not been validated for this fork.
+ROM-backed journeys and capture comparisons run on Linux with Mesa. Native
+Windows/MSVC builds and all eleven ROM-independent tests, including the
+Windows/ANGLE renderer, pass in CI. macOS has not been validated.
 
 - Git and CMake **3.18 or newer**.
 - A compiler with **C11 and C++17** support, plus Make or Ninja.
@@ -87,6 +89,34 @@ cd build
 On first launch, the runtime extracts the required assets into `assets/pokeyellow/` inside the build directory. Later launches reuse those assets. The launcher starts Pokémon Yellow automatically when its ROM or extracted assets are available.
 
 Run the executable from `build/` so its relative paths resolve correctly. Battery saves are written to `build/pokeyellow.sav`; `Esc` opens runtime settings, including save states and **Restart Game**. Close other instances before using the same save.
+
+### Building on Windows
+
+Use an x64 Developer PowerShell for Visual Studio 2022 with the C++ tools,
+Git, CMake and Ninja. The Windows CI configuration uses the pinned vcpkg
+manifest in `.github/windows` to build SDL2, CURL and ANGLE (GLES2/EGL).
+From the repository root:
+
+```powershell
+git clone https://github.com/microsoft/vcpkg build/qa/vcpkg
+git -C build/qa/vcpkg checkout 5f96cd15fd745122cf27e0524606d6c1efc5fd07
+./build/qa/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+cmake -S . -B build/windows -G Ninja `
+  "-DCMAKE_TOOLCHAIN_FILE=$PWD/build/qa/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+  "-DVCPKG_MANIFEST_DIR=$PWD/.github/windows" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel
+cmake --build build/windows --parallel 4
+$env:PATH = "$PWD/build/windows/vcpkg_installed/x64-windows/bin;$env:PATH"
+ctest --test-dir build/windows -LE rom --output-on-failure
+New-Item -ItemType Directory -Force build/windows/roms
+Copy-Item C:/path/to/pokeyellow.gb build/windows/roms/pokeyellow.gbc
+Set-Location build/windows
+./pokeyellow3d.exe
+```
+
+The first dependency build takes longer; subsequent builds reuse it. Saves,
+extracted assets and runtime settings live in the chosen build directory.
+No Windows binary package is included in the Linux `v0.1.0` release.
 
 <details>
 <summary><strong>Build the original 2D executable</strong></summary>
@@ -134,14 +164,14 @@ First person follows the original movement grid; it does not provide free moveme
 | First person | Movement, turning, transitions, dialogue overlays, and camera parity have dedicated checks. |
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
 | Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
-| Menus and transitions | A1/A2/A3 and C1/C2 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle transitions, and save-state transitions. Title-screen and special travel transitions remain pending. |
+| Menus and transitions | A1/A2/A3, B1/B2 and C1/C2/C3 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle/save-state transitions, original boot into the 3D title, and Fly/Teleport/Dig travel. |
 | Pokédex and PC | 3D list/data device, ROM-verified portraits, AREA overview and Bill’s twelve-box storage are implemented. The item PC and Oak show live counters; the Hall of Fame reads saved teams from cartridge RAM into a pedestal gallery. |
 
 The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, grass wind and particles remain pending, and neighboring-map NPCs are not simulated. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
 
 ## Development and validation
 
-The 3D layer reads the game state to draw the scene; it does not run a second gameplay simulation. The SDL integration registers the versioned runtime presentation API through [`src/pallet_presentation.cpp`](src/pallet_presentation.cpp). [`cmake/Pallet3D.cmake`](cmake/Pallet3D.cmake) checks API compatibility and adds the renderer without rewriting runtime sources or generated game C. The default runtime is the `presentation-api-v1` tag of `dobbygl/gb-recompiled`; `GBRT_URL` and `GBRT_REF` are configurable.
+The 3D layer reads the game state to draw the scene; it does not run a second gameplay simulation. The SDL integration registers the versioned runtime presentation API through [`src/pallet_presentation.cpp`](src/pallet_presentation.cpp). [`cmake/Pallet3D.cmake`](cmake/Pallet3D.cmake) checks API compatibility and adds the renderer without rewriting runtime sources or generated game C. The default runtime is an immutable revision of `dobbygl/gb-recompiled`, pinned in `CMakeLists.txt`; `GBRT_URL` and `GBRT_REF` are configurable. The upstream contribution is [GB-Recomp/gb-recompiled#2](https://github.com/GB-Recomp/gb-recompiled/pull/2).
 
 | Location | Purpose |
 | --- | --- |
@@ -210,14 +240,15 @@ Link `pokeyellow_cart` into your launcher and register `pokeyellow_main(argc, ar
 | ROM is missing or the launcher stays open | Start from `build/` and check `roms/pokeyellow.gbc`. |
 | ROM hash mismatch | Verify the revision against the SHA-1 above; renaming a different ROM does not make it compatible. |
 | CMake cannot find SDL2, CURL, or GLES | Install the corresponding development packages, then reconfigure. |
-| `Pallet 3D: runtime integration point changed` | Use the pinned `GBRT_REF` below; a cached override may select an incompatible runtime. |
+| Runtime presentation API mismatch | Restore the runtime defaults below; a cached override may select an incompatible runtime. |
 | A menu or scene appears in 2D | Original interfaces and unsupported states intentionally use the 2D framebuffer. Press `F2` to check your presentation preference. |
 | CTest omits the cartridge-backed tests | Add the matching ROM to `build/roms/`, then rerun CMake configuration. |
 
-The current runtime pin is `6581880fce60e6f139901a5942fc984e9c1db8ab`. Restore it with:
+The immutable runtime revision is declared in `CMakeLists.txt`. Clear cached
+runtime overrides to restore that revision and its repository:
 
 ```sh
-cmake -S . -B build -DGBRT_REF=6581880fce60e6f139901a5942fc984e9c1db8ab
+cmake -S . -B build -G Ninja -U GBRT_REF -U GBRT_URL -U FETCHCONTENT_SOURCE_DIR_GB_RECOMPILED
 ```
 
 ## Documentation
@@ -237,7 +268,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The Windows (MSVC) and macOS jobs are defined but disabled for now: the pinned gb-recompiled runtime is not portable to MSVC yet, and macOS lacks the GLES2 headers. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all eleven ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel

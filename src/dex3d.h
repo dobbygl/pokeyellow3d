@@ -106,9 +106,9 @@ bool draw(GBContext *ctx, int w, int h, bool) {
         lcd_valid = true;
         std::array<uint8_t, 160 * 144 * 4> rgba{};
         for (size_t i = 0; i < lcd.size(); i++) {
-            rgba[i * 4] = lcd[i] >> 16;
-            rgba[i * 4 + 1] = lcd[i] >> 8;
-            rgba[i * 4 + 2] = lcd[i];
+            rgba[i * 4] = uint8_t(lcd[i] >> 16);
+            rgba[i * 4 + 1] = uint8_t(lcd[i] >> 8);
+            rgba[i * 4 + 2] = uint8_t(lcd[i]);
             rgba[i * 4 + 3] = 255;
         }
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 64, 160, 144, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());

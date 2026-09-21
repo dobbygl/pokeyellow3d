@@ -57,10 +57,11 @@ int main(int argc, char **argv) {
         check(rom[call] == pair[2] && (rom[call + 1] | rom[call + 2] << 8) == target,
               "canonical CALL target");
         ram[0x1fea] = ret & 255;
-        ram[0x1feb] = ret >> 8;
+        ram[0x1feb] = uint8_t(ret >> 8);
         check(fade::warp(&ctx), "live aligned warp return");
         rom[call] = 0;
-        check(!fade::home_call(&ctx, call, target, uint8_t(pair[2])), "ROM instruction validation");
+        check(!fade::home_call(&ctx, call, uint16_t(target), uint8_t(pair[2])),
+              "ROM instruction validation");
         rom[call] = uint8_t(pair[2]);
         ctx.sp = 0xdff0;
         check(!fade::warp(&ctx), "popped return ignored");
@@ -98,7 +99,7 @@ int main(int argc, char **argv) {
               "canonical text dispatch CALL");
         int ret = call + 3;
         ram[0x1fea] = ret & 255;
-        ram[0x1feb] = ret >> 8;
+        ram[0x1feb] = uint8_t(ret >> 8);
         check(menu_state::running(&ctx), "live world menu lifetime");
         ram[0x1fec] = 0;
         ram[0x1fed] = 2;

@@ -1,4 +1,5 @@
 #include "title_state.h"
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -88,14 +89,15 @@ int main(int argc, char **argv) {
     check(title_state::sample(&ctx) == Phase::Menu, "menu with a saved game");
     root(0x5c67);
     check(title_state::sample(&ctx) == Phase::Continue, "saved-game summary");
-    for (uint16_t return_address : {0x5c76, 0x5c86, 0x5c89, 0x5c93}) {
+    for (uint16_t return_address : std::array<uint16_t, 4>{0x5c76, 0x5c86, 0x5c89, 0x5c93}) {
         root(return_address);
         check(title_state::sample(&ctx) == Phase::Continue,
               "confirmation and white-out keep the summary framed");
     }
     ctx.sp = 0xdfff;
-    for (uint16_t pc : {0x5c67, 0x5c6a, 0x5c6c, 0x5c6d, 0x5c6f, 0x5c71, 0x5c73, 0x5c76, 0x5c78,
-                        0x5c7a, 0x5c7c, 0x5c7e, 0x5c81}) {
+    for (uint16_t pc :
+         std::array<uint16_t, 13>{0x5c67, 0x5c6a, 0x5c6c, 0x5c6d, 0x5c6f, 0x5c71, 0x5c73, 0x5c76,
+                                  0x5c78, 0x5c7a, 0x5c7c, 0x5c7e, 0x5c81}) {
         ctx.pc = pc;
         check(title_state::sample(&ctx) == Phase::Continue, "live A/B wait has no outer CALL");
     }

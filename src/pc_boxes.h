@@ -138,9 +138,9 @@ void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next)
     float side = std::max(30.f, left - 3 * pad), row = 144 * scale / 6.f;
     for (int i = 0; i < 12; i++) {
         float x = i < 6 ? pad : w - pad - side, y = top + (i % 6) * row + pad;
-        bool active = i == data.active;
+        bool current_box = i == data.active;
         block(geometry, x, y, side, row - 2 * pad,
-              active ? Color{.39f, .37f, .20f} : Color{.17f, .21f, .23f});
+              current_box ? Color{.39f, .37f, .20f} : Color{.17f, .21f, .23f});
         char name[20];
         std::snprintf(name, sizeof(name), "BOX %02d", i + 1);
         float glyph = font;
@@ -148,7 +148,7 @@ void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next)
         std::snprintf(name, sizeof(name), "%02d", data.boxes[i].count);
         label(geometry, name, x + 5, y + glyph + 10, glyph);
         panel(geometry, x + side - 12, y + row - 2 * pad - 10, 6, 3,
-              active ? Color{.83f, .73f, .36f} : Color{.36f, .53f, .52f});
+              current_box ? Color{.83f, .73f, .36f} : Color{.36f, .53f, .52f});
     }
     float bottom = h - top + pad;
     block(geometry, pad, bottom, w - 2 * pad, top - 2 * pad, {.16f, .20f, .24f});
@@ -197,9 +197,9 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
     glUniform1i(glGetUniformLocation(program, "image"), 0);
-    auto draw_vertices = [&](const std::vector<Vertex> &vertices) {
+    auto draw_vertices = [&](const std::vector<Vertex> &mesh_vertices) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(),
+        glBufferData(GL_ARRAY_BUFFER, mesh_vertices.size() * sizeof(Vertex), mesh_vertices.data(),
                      GL_STREAM_DRAW);
         for (int i = 0; i < 3; i++)
             glEnableVertexAttribArray(i);
@@ -209,7 +209,7 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
                               (void *)offsetof(Vertex, u));
         glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                               (void *)offsetof(Vertex, c));
-        glDrawArrays(GL_TRIANGLES, 0, GLsizei(vertices.size()));
+        glDrawArrays(GL_TRIANGLES, 0, GLsizei(mesh_vertices.size()));
     };
     draw_vertices(geometry);
     if (selected.index >= 0) {

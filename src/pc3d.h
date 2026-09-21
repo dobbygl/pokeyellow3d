@@ -30,40 +30,39 @@ void shutdown() {
 }
 void upload(const GBContext *ctx, const uint32_t *original) {
     if (!texture) {
-        std::vector<uint8_t> pixels(AW * AH * 4);
+        std::vector<uint8_t> rgba(AW * AH * 4);
         for (int glyph = 0; glyph < 128; glyph++)
             for (int y = 0; y < 8; y++)
                 for (int x = 0; x < 8; x++) {
                     size_t dest = ((256 + glyph / 16 * 8 + y) * AW + glyph % 16 * 8 + x) * 4;
                     bool ink = ctx->rom[0x10600 + glyph * 8 + y] & (1 << (7 - x));
                     for (int c = 0; c < 3; c++)
-                        pixels[dest + c] = 255;
-                    pixels[dest + 3] = ink ? 255 : 0;
+                        rgba[dest + c] = 255;
+                    rgba[dest + 3] = ink ? 255 : 0;
                 }
         for (int i = 0; i < 4; i++)
-            pixels[((AH - 1) * AW + AW - 1) * 4 + i] = 255;
+            rgba[((AH - 1) * AW + AW - 1) * 4 + i] = 255;
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, AW, AH, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                     pixels.data());
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, AW, AH, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
     }
     if (!original || (lcd_valid && !std::memcmp(lcd.data(), original, sizeof(lcd))))
         return;
     std::copy_n(original, lcd.size(), lcd.begin());
     lcd_valid = true;
-    std::array<uint8_t, 160 * 144 * 4> pixels{};
+    std::array<uint8_t, 160 * 144 * 4> rgba{};
     for (size_t i = 0; i < lcd.size(); i++) {
-        pixels[i * 4] = lcd[i] >> 16;
-        pixels[i * 4 + 1] = lcd[i] >> 8;
-        pixels[i * 4 + 2] = lcd[i];
-        pixels[i * 4 + 3] = 255;
+        rgba[i * 4] = uint8_t(lcd[i] >> 16);
+        rgba[i * 4 + 1] = uint8_t(lcd[i] >> 8);
+        rgba[i * 4 + 2] = uint8_t(lcd[i]);
+        rgba[i * 4 + 3] = 255;
     }
     glBindTexture(GL_TEXTURE_2D, texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 160, 144, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 160, 144, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
 }
 void draw(GBContext *ctx, int w, int h, bool menu_open) {
     stored_items =

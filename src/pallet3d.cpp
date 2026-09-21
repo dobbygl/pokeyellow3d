@@ -455,7 +455,7 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
         make_house(scene, h, blocks);
     for (int iz = 0; iz < scene.height; iz++)
         for (int ix = 0; ix < scene.width; ix++) {
-            float x = ix + scene.origin_x, z = iz + scene.origin_z;
+            float x = float(ix + scene.origin_x), z = float(iz + scene.origin_z);
             auto type = pallet::terrain(ctx->rom, scene, ix, iz, &blocks);
             UV foliage = tile_uv(scene, scene.tileset == 3 ? 0x16 : 0x41);
             UV stone = tile_uv(scene, scene.tileset == 23 ? 0x28 : 0x3a);
@@ -532,8 +532,8 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                     }
             }
         }
-    box(scenery, scene.origin_x, scene.origin_z, float(scene.width), float(scene.height), -.8f,
-        -.015f, {.42f, .48f, .34f});
+    box(scenery, float(scene.origin_x), float(scene.origin_z), float(scene.width),
+        float(scene.height), -.8f, -.015f, {.42f, .48f, .34f});
 }
 
 void update_meshes(const GBContext *ctx) {
@@ -852,10 +852,11 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
         // its open-top cutaway. The shell is outside all playable map cells.
         Color wall = interior::cave(current) ? Color{.25f, .30f, .28f} : Color{.68f, .68f, .59f};
         UV texture = tile_uv(current, pallet::map_tile(ctx->rom, current, current.width, 0));
-        box(vertices, -.12f, 0, .12f, current.height, 0, 2.6f, wall, texture);
-        box(vertices, current.width, 0, .12f, current.height, 0, 2.6f, wall, texture);
+        box(vertices, -.12f, 0, .12f, float(current.height), 0, 2.6f, wall, texture);
+        box(vertices, float(current.width), 0, .12f, float(current.height), 0, 2.6f, wall, texture);
         box(vertices, -.12f, -.12f, current.width + .24f, .12f, 0, 2.6f, wall, texture);
-        box(vertices, -.12f, current.height, current.width + .24f, .12f, 0, 2.6f, wall, texture);
+        box(vertices, -.12f, float(current.height), current.width + .24f, .12f, 0, 2.6f, wall,
+            texture);
         quad(vertices, {0, 2.6f, 0}, {float(current.width), 2.6f, 0},
              {float(current.width), 2.6f, float(current.height)}, {0, 2.6f, float(current.height)},
              shade(wall, .65f));

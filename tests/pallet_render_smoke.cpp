@@ -58,6 +58,7 @@ static void capture_surface(const char *path) {
 #include "title_integration.h"
 #include "boot_integration.h"
 #include "world_animation_integration.h"
+#include "daylight_integration.h"
 
 int main(int argc, char **argv) {
     SDL_SetMainReady();
@@ -122,6 +123,23 @@ int main(int argc, char **argv) {
         stderr, "[SMOKE] party=%u hp=%u level=%u script=%u/%u font=%u\n", pallet::read(ctx, 0xd162),
         pallet::read(ctx, 0xd16b) * 256 + pallet::read(ctx, 0xd16c), pallet::read(ctx, 0xd18b),
         pallet::read(ctx, 0xd5f0), pallet::read(ctx, 0xd5ef), pallet::read(ctx, pallet::Font));
+    if (argc > 3 && (!std::strcmp(argv[3], "daylight") || !std::strcmp(argv[3], "daylight-fp"))) {
+        int result = daylight_qa::captures(ctx, !std::strcmp(argv[3], "daylight-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 4 && !std::strcmp(argv[3], "daylight-reload")) {
+        int result = daylight_qa::reload(ctx, argv[4]);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 4 &&
+        (!std::strcmp(argv[3], "daylight-replay") || !std::strcmp(argv[3], "daylight-replay-fp"))) {
+        int result =
+            daylight_qa::replay(ctx, std::strstr(argv[3], "-fp") != nullptr, std::atoi(argv[4]));
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 3 && (!std::strcmp(argv[3], "world-animation-grass") ||
                      !std::strcmp(argv[3], "world-animation-grass-fp") ||
                      !std::strcmp(argv[3], "world-animation-surf") ||

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gbrt.h"
+#include "daylight.h"
 #include <SDL.h>
 #include <array>
 
@@ -153,3 +154,11 @@ struct PalletWorldAnimationInfo {
 PalletWorldAnimationInfo pallet3d_world_animation();
 // Presentation preference and replay comparison; never changes engine state.
 void pallet3d_world_effects(bool enabled);
+
+// Preferences are separate from cartridge data. A private path also permits
+// process-restart QA without touching the player's preferences.
+void pallet3d_load_preferences(const char *path);
+bool pallet3d_daylight(daynight::Settings settings, bool persist = false);
+daynight::Settings pallet3d_daylight_settings();
+daynight::Light pallet3d_daylight_frame();
+void pallet3d_settings_ui(bool menu_open);

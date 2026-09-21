@@ -12,6 +12,7 @@ bool begin(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
 }
 bool frame(GBContext *ctx, int width, int height, bool menu_open) {
     pallet3d_draw(ctx, width, height, menu_open);
+    pallet3d_settings_ui(menu_open);
     return pallet3d_active();
 }
 void before_swap(int width, int height, bool menu_open) {
@@ -36,6 +37,12 @@ GBPresentationHooks pallet3d_presentation_hooks() {
 }
 
 bool pallet3d_register() {
+    char *preferences = SDL_GetPrefPath("pokeyellow3d", "pokeyellow3d");
+    if (preferences) {
+        std::string path = std::string(preferences) + "lighting.cfg";
+        pallet3d_load_preferences(path.c_str());
+        SDL_free(preferences);
+    }
     auto hooks = pallet3d_presentation_hooks();
     return gb_platform_set_presentation(&hooks);
 }

@@ -738,6 +738,40 @@ recorrido y cámara con efectos activados/desactivados. No se publican las
 partidas ni las capturas. El cierre y la regresión de 5B se registran en
 `PLAN_MEJORAS.md`.
 
+### Hora local e iluminación (4A/4B)
+
+Pulsa **Esc** y usa **Hora del mundo**, al principio de los ajustes. Está
+disponible en ambas cámaras: **Desactivada** conserva el aspecto anterior,
+**Hora local** sigue el reloj y la zona horaria del sistema, y **Hora fija**
+permite elegir un minuto del día. El ciclo viene desactivado por defecto.
+La selección se guarda en `lighting.cfg` dentro del directorio que devuelve
+`SDL_GetPrefPath("pokeyellow3d", "pokeyellow3d")`, aparte de la partida.
+
+`src/daylight.h` convierte la hora en dirección del sol, colores del cielo y
+la niebla, luz ambiental y directa, y emisión de ventanas. Los materiales
+existentes reciben iluminación por sus normales; el tile de ventana original
+`0x0a` del tileset exterior conserva el marco y enciende solo sus cristales.
+Los interiores conservan su iluminación actual y el título su atardecer fijo.
+No cambia el motor, sus encuentros, scripts ni RNG. Preferencias ausentes o
+no reconocidas conservan el modo desactivado.
+
+```sh
+ctest --test-dir build -R 'daylight_test|render_preview_synthetic' --output-on-failure
+tests/daylight_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/interiors-fJDbZk/city.state
+```
+
+La batería prepara 24 vistas: 06:00, 12:00, 18:00 y 00:00 en Paleta,
+Ruta 1 y Ciudad Verde, en ambas cámaras. Comprueba la recuperación exacta
+del modo desactivado y la carga de preferencias en procesos nuevos. Además
+repite un encuentro salvaje, los menús originales y la huida a cada hora,
+comparando todos los bytes de cada estado completo con el recorrido sin
+ciclo. La referencia comprimida con gzip permite comparar los bytes sin
+guardar miles de estados completos en memoria. Las evidencias privadas
+quedan en `build/qa/daylight-*/`; el cierre se registra en `PLAN_MEJORAS.md`.
+
 ### Título y menú principal
 
 El título muestra Paleta del catálogo sin actores, con un travelling lento

@@ -156,12 +156,15 @@ This produces the original `pokeyellow` executable in a separate build directory
 
 First person follows the original movement grid; it does not provide free movement or mouse look. Dialogues and menus retain the original game controls. Small interiors use a fixed overhead framing; larger rooms allow limited rotation and zoom.
 
+In `Esc` settings, **Hora del mundo** selects disabled lighting, your local clock, or a fixed time. Daylight changes the sun direction, sky, fog and window light in both cameras. It starts disabled and stores its preference separately from cartridge saves; encounters and game time remain under the original engine's control. The title keeps its fixed sunset.
+
 ## Development status
 
 | Area | Current scope |
 | --- | --- |
 | Outdoor world | 36 connected maps, Viridian Forest, and Vermilion Dock; geometry audits and representative journeys are implemented. |
 | First person | Movement, turning, transitions, dialogue overlays, and camera parity have dedicated checks. |
+| Day/night lighting | Local or fixed time, directional light, sky, fog and illuminated original windows; separately persisted settings and disabled rendering parity. Full acceptance is tracked in `PLAN_MEJORAS.md`. |
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
 | Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
 | Menus and transitions | A1/A2/A3, B1/B2 and C1/C2/C3 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle/save-state transitions, original boot into the 3D title, and Fly/Teleport/Dig travel. |
@@ -188,7 +191,7 @@ The 3D layer reads the game state to draw the scene; it does not run a second ga
 
 ### Tests
 
-CMake registers twelve ROM-independent checks, including title lifetimes, first-person controls, menus, presentation blending, tile animation and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, seventeen additional tests cover game data and presentation, for 29 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
+CMake registers thirteen ROM-independent checks, including title lifetimes, first-person controls, menus, presentation blending, tile animation, daylight/settings and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, seventeen additional tests cover game data and presentation, for 30 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON

@@ -147,6 +147,29 @@ Acceptance criteria:
 - [ ] Engine states and RNG are identical for the time-of-day replay variants.
 - [ ] All regression suites pass; capture comparisons and reproducible commands are recorded.
 
+### 4A/4B execution record — in progress, 2026-09-21
+
+Branch `day-night-4ab`, based on completed 5B PR #12 merged as
+`8ac62d4200961eb453c2baeed51c5ab57bd565a7`. The implementation adds a pure
+local-clock/palette module, directional surface lighting and original-window
+emission. Settings append to the runtime's existing ImGui settings window
+through the presentation frame callback; no runtime or generated code change
+is needed. `lighting.cfg` uses SDL's application preference directory, separate
+from cartridge data. Default and unrecognized preferences disable the cycle.
+
+Initial evidence: 30/30 local CTest including midnight continuity and preference
+round trips, GPU time-of-day changes and exact disabled restoration. The 38
+original exterior references remain byte-identical in the disabled mode.
+The first 24 captures have been reviewed at 06:00, 12:00, 18:00 and 00:00,
+including visible warm window panes at night and continuous directional light.
+Private initial evidence: `build/qa/logs/daylight-initial-review.json` and
+`daylight-initial-exterior-comparison.json`. Fresh-process preference reloads
+passed for all six location/camera scenarios. Full natural-encounter replay
+parity, independent ROM-free checks, complete regression, final review and CI
+are still pending; all nine acceptance boxes remain open.
+
+Focused reproduction commands are in the 4A/4B section of `PALLET3D.md`.
+
 ## 5. Animated world
 
 What: water and flower tileset animations driven by the ROM flag; grass

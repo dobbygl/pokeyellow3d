@@ -151,6 +151,26 @@ int main() {
         };
 
         preview(plan.home, "outdoor");
+        const auto disabled = rgba;
+        auto lit = [&](double hour) {
+            check(pallet3d_daylight({daynight::Mode::Fixed, hour}), "set fixed presentation hour");
+            Snapshot before{machine};
+            frame();
+            check(before.unchanged(machine), "lighting wrote to the emulated machine");
+            check(glGetError() == GL_NO_ERROR, "lighting raised an OpenGL error");
+            auto light = pallet3d_daylight_frame();
+            check(light.enabled && light.hour == hour,
+                  "rendered frame contains requested lighting");
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            return rgba;
+        };
+        auto noon = lit(12), night = lit(0);
+        check(noon != night && noon != disabled && night != disabled,
+              "actual GPU pixels respond to time of day");
+        check(pallet3d_daylight({}), "disable cycle");
+        frame();
+        glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+        check(rgba == disabled, "disabled cycle recovers every original pixel");
         preview(plan.interior, "interior");
         preview(plan.east, "neighbour");
 

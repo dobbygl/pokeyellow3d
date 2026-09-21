@@ -7,7 +7,7 @@ get_target_property(gbrt_runtime_dir gbrt SOURCE_DIR)
 
 # Header-only state tests: kanto_rom.h, world_scene.h, pallet_state.h and
 # battle_state.h, the last two of which need the runtime's gbrt.h.
-foreach(synthetic_test rom_reader_synthetic terrain_synthetic view_synthetic battle_state_synthetic pc_details_test tile_animation_test world_animation_test)
+foreach(synthetic_test rom_reader_synthetic terrain_synthetic view_synthetic battle_state_synthetic pc_details_test tile_animation_test world_animation_test daylight_test)
     add_executable(${synthetic_test} tests/${synthetic_test}.cpp)
     target_include_directories(${synthetic_test} PRIVATE src "${gbrt_runtime_dir}/include")
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

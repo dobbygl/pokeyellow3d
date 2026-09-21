@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
                                                          {0x7ae, 0x7c4, 0xcd},
                                                          {0x20d, 0x3e84, 0xcd}}}) {
         int call = pair[0], target = pair[1], ret = call + 3;
+        ram[0x1731] = call == 0x20d ? 8 : 0;
         check(rom[call] == pair[2] && (rom[call + 1] | rom[call + 2] << 8) == target,
               "canonical CALL target");
         ram[0x1fea] = ret & 255;
@@ -66,6 +67,12 @@ int main(int argc, char **argv) {
         ctx.sp = 0xdfea;
         ram[0x1fea] = ram[0x1feb] = 0;
     }
+    ram[0x1fea] = 0x10;
+    ram[0x1feb] = 2;
+    ram[0x1731] = 1;
+    check(!fade::field_arrival(&ctx) && !fade::warp(&ctx),
+          "Venusaur DATA register pair 0210 is not a field arrival");
+    ram[0x1fea] = ram[0x1feb] = 0;
     ram[0x1731] = 9;
     hram[0x38] = 1;
     check(!fade::field_loading(&ctx), "field warp flags alone cannot select loading");

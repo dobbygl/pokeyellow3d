@@ -699,3 +699,21 @@ tests/ui_special_transitions_qa.sh build/roms/pokeyellow.gbc \
   build/qa/firstperson-9cB3FJ/route.state
 bash build/qa/logs/run-ui-c3-regressions.sh
 ```
+
+#### C3: regresión de DATA encontrada y corregida durante el cierre
+
+La primera ejecución completa se detuvo en la tercera ficha de Pokédex:
+`build/qa/dex-portraits-JDjShl/logs/run.log`. Venusaur guarda `0x0210` como
+registro en la pila, coincidiendo con el retorno de `EnterMapAnim`, mientras
+`wStatusFlags6` vale `01`. La detección exige ahora además el bit 3 que el motor
+comprueba antes de llamar a la animación y limpia al volver. El retorno vivo
+verificado y ese flag son necesarios juntos; ninguno basta por sí solo.
+
+Se añadió el caso negativo al test de fundidos y diagnóstico privado al test
+de las fichas. La repetición específica recorrió **151/151 retratos** con los
+bytes originales de VRAM idénticos y el dispositivo presentado, en
+`build/qa/dex-portraits-YCBoKU/`. CTest **26/26** aprobado; ficha de Venusaur
+revisada en `build/qa/logs/ui-c3-venusaur-regression-review.png`. Se repite la
+regresión completa sobre esta corrección con
+`bash build/qa/logs/run-ui-c3-final-regressions.sh`; la ejecución anterior se
+conserva con salida 40 como evidencia del fallo y no cuenta como aceptación.

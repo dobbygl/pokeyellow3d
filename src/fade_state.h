@@ -39,9 +39,12 @@ inline bool field_departure(const GBContext *ctx) {
     return home_call(ctx, 0x7ab, 0x7bc) || home_call(ctx, 0x7ae, 0x7c4);
 }
 inline bool field_arrival(const GBContext *ctx) {
-    // EnterMap's far call: LD B,$1c; LD HL,$4567; CALL Bankswitch.
-    return home_call(ctx, 0x20d, 0x3e84) && ctx->rom[0x208] == 6 && ctx->rom[0x209] == 0x1c &&
-           ctx->rom[0x20a] == 0x21 && ctx->rom[0x20b] == 0x67 && ctx->rom[0x20c] == 0x45;
+    // EnterMap's far call: LD B,$1c; LD HL,$4567; CALL Bankswitch. Bit 3
+    // guards this call and is cleared only after it returns. Require it too:
+    // the word $0210 also occurs as a saved register pair in Venusaur's DATA.
+    return home_call(ctx, 0x20d, 0x3e84) && (ctx->wram[0x1731] & 8) && ctx->rom[0x208] == 6 &&
+           ctx->rom[0x209] == 0x1c && ctx->rom[0x20a] == 0x21 && ctx->rom[0x20b] == 0x67 &&
+           ctx->rom[0x20c] == 0x45;
 }
 inline bool field_loading(const GBContext *ctx) {
     // SpecialEnterMap yields at DelayFrames in bank 1, after changing wCurMap

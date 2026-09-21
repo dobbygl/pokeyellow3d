@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: A1, A2 y B1 validadas; B2 y C1 pendientes.
+Fecha: 2026-09-21. Estado: A1, A2, B1 y B2 validadas; C1 pendiente.
 
 ## Análisis del estado actual
 
@@ -183,9 +183,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Ninguna escena de juego dibuja texto con la fuente ImGui por defecto; solo el menú Esc la conserva.
-- [ ] Un contacto revisado con las cuatro escenas en ambas cámaras muestra un único conjunto de colores, radios y tamaños de glifo.
-- [ ] Las baterías de combate, PC, Pokédex y título pasan sin cambios en el estado del motor.
+- [x] Ninguna escena de juego dibuja texto con la fuente ImGui por defecto; solo el menú Esc la conserva.
+- [x] Un contacto revisado con las cuatro escenas en ambas cámaras muestra un único conjunto de colores, radios y tamaños de glifo.
+- [x] Las baterías de combate, PC, Pokédex y título pasan sin cambios en el estado del motor.
 
 ## Bloque C: transiciones de menú
 
@@ -687,10 +687,89 @@ haber jugado 47 encuentros distintos. El código anterior falla con salida
 62 por la R final de BUG CATCHER; la corrección pasa ambas cámaras, conserva
 los símbolos de género y rechaza un glifo extra-fuente en el duodécimo lugar.
 Contacto y comandos en `build/qa/logs/menu-style-b2-trainer-label*` y
-`build/qa/menu-style-b2/trainer-labels/commands.json`.
+`build/qa/menu-style-b2/trainer-labels-final/commands.json`.
 
 La cohorte anterior se detuvo al descubrir el caso y quedó archivada bajo
 `build/qa/logs/menu-style-b2-before-trainer-label-fix/`. Se repiten las veinte
 baterías clásicas y los dieciocho recorridos integrados sobre el candidato
 corregido antes de acreditar B2. El README incorpora siete capturas del
 estilo integrado; cada PNG conserva los píxeles de su fuente a 800×720.
+
+
+Sobre el candidato corregido `9724968`, CTest pasa 37/37, el build
+independiente sin ROM 18/18 y clang-format 18.1.8. La CI `35653831016`
+aprueba Linux/GCC, Linux/Clang, Linux 2D y Windows/MSVC. Los 18 recorridos
+integrados de `build/qa/ui-style-iPghbQ` pasan con 25.613 frames,
+659.726 glifos y 42.222.464 bits comprobados; el cursor se verifica en
+7.648 frames. Su contacto de ocho vistas de combate está revisado en
+`menu-style-b2-battle-review.{png,json}`.
+
+La auditoría conjunta del HUD y los recorridos integrados reúne 265.619
+frames de juego sin glifos ImGui, 4.517.314 glifos del atlas y 48 frames
+con nombres de entrenador de más de diez caracteres. Incluye las pruebas
+previas de PC/Pokédex/título, cuyos componentes no cambiaron con la
+corrección de nombres. Los controles negativos de fuente ImGui y sufijo
+omitido fallan con código 62. Evidencia detallada:
+`build/qa/logs/menu-style-b2-font-evidence.json`,
+`menu-style-b2-integrated-evidence.json` y `menu-style-b2-trainer-labels.log`.
+La cadena adicional de combate pasa en `build/qa/battles-l2oCj8`.
+Las veinte baterías clásicas siguen en ejecución; los criterios B2 aún
+no se marcan ni la PR #20 se fusiona.
+
+
+Comandos de esta cohorte B2 (fixtures y registros privados):
+
+```sh
+bash build/qa/logs/run-menu-style-b2-regressions.sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
+  build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/battles-LojUdN/logs/route22-trainer.state \
+  build/qa/ui-crossfade-5bOG41/world.state \
+  build/qa/ui-crossfade-5bOG41/battle.state
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 \
+  QA_CAPTURE_STATES=1 tests/battles_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/logs/town-route1.state \
+  build/qa/firstperson-9cB3FJ/route.state
+python3 build/qa/logs/prepare-menu-style-b2-integrated-evidence.py
+python3 build/qa/logs/collect-menu-style-b2-font-evidence.py
+# Tras terminar las veinte baterías y revisar el contacto generado:
+python3 build/qa/logs/collect-menu-style-b2-evidence.py
+```
+
+Los comandos de las 47 etiquetas, con su directorio de ejecución aislado,
+están en `build/qa/menu-style-b2/trainer-labels-final/commands.json`.
+El colector final verifica el commit, los SHA-256 de código y binarios,
+la copia del helper de cada batería, las veinte salidas satisfactorias y
+los hashes de las imágenes revisadas antes de emitir el informe de cierre.
+
+
+### Cierre de B2
+
+El candidato `9724968` completa las veinte baterías clásicas con **2.159
+capturas y 1.831 estados idénticos a v0.2.0**; las 38 capturas exteriores
+archivadas coinciden también byte a byte. Las diez vistas de ajustes Esc
+se registran aparte y sus estados del motor siguen comparándose. No hay
+pruebas omitidas: CTest 37/37, sin ROM 18/18 y formato 18.1.8 aprobados.
+La CI del código `35653831016` está en verde en las cinco comprobaciones
+obligatorias; macOS sigue deshabilitado como en las fases anteriores.
+
+Los 18 recorridos integrados y la cadena adicional de combate pasan sobre
+el candidato corregido. La auditoría del HUD registra cero frames con
+fuente ImGui durante el juego. Las 47 etiquetas originales de entrenador
+se comprueban en ambas cámaras, incluidos nombres de doce glifos y respaldo
+LCD ante un símbolo fuera de la fuente. Los dos controles negativos
+reproducen el fallo esperado y los contactos están revisados.
+
+El informe de cierre es `build/qa/logs/menu-style-b2-evidence.json`, con
+commit, comandos, resultados, contactos, hashes de código y binarios.
+Los contactos `menu-style-b2-{eight-scenes,area-data-title,hall,battle,
+trainer-label}-review.{png,json}` y la revisión del README permanecen en
+`build/qa/logs/`. Siete PNG del README conservan exactamente los píxeles
+de sus capturas a 800×720. El runtime permanece limpio en `00cc26d`.
+
+Los tres criterios de B2 quedan acreditados: **16 de 19**. El commit de
+cierre incorpora solo documentación e imágenes; no cambia el código ni
+los binarios validados. C1 y la release v0.3.0 siguen pendientes. La fase
+C1 comenzará después de fusionar la PR #20 con su CI final aprobada.

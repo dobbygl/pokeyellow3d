@@ -30,13 +30,14 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
 - **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
+- **An integrated HUD with the ROM font.** Recognized menus, battle controls and compatible labels share dark panels and original glyphs. The game still supplies all menu text and selections. Integrated is the default in source builds; Esc can persistently restore the classic presentation. Special graphics and unsupported regions retain their original LCD pixels.
 - **Original interfaces over a 3D world.** Dialogues and recognized windows retain the scene behind them; full-screen menus frame the original LCD over a dimmed, blurred background. `F2` crossfades into original 2D presentation. Fly, Teleport and Dig follow the engine's white fade and relocate the camera at the destination; bike and surf remain continuous.
 - **Pokédex and storage.** Browse the original list and data on a 3D device, see encounter areas over Kanto, use Bill’s twelve boxes, and visit the item PC, Oak’s evaluation and Hall of Fame gallery with original portraits and menus.
 - **Bounded rendering work.** Exploration meshes are cached for the current map and its immediate neighbors, with at most five resident maps.
 
 ## Screenshots
 
-Real captures from the renderer and its QA runs, stored at their original 800 × 720 resolution. Click any image to inspect it. Celadon City and Viridian Forest use the map-catalog preview camera.
+Real captures from the renderer and its QA runs, stored at their original 800 × 720 resolution. Click any image to inspect it. Pallet Town, first person, battle and the interface captures below show the integrated style. The other landmark views retain their classic-style captures; Celadon City and Viridian Forest use the map-catalog preview camera.
 
 | First-person exploration | Viridian City |
 | --- | --- |
@@ -44,7 +45,13 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 | **Celadon City** | **Viridian Forest** |
 | [![Catalog overview of Celadon City's buildings, streets, and department store](docs/screenshots/celadon-city.png)](docs/screenshots/celadon-city.png) | [![Catalog overview of Viridian Forest's paths and dense rows of trees](docs/screenshots/viridian-forest.png)](docs/screenshots/viridian-forest.png) |
 | **Professor Oak's laboratory** | **Battle presentation** |
-| [![Professor Oak's laboratory with its desks, equipment, and original characters](docs/screenshots/oaks-lab.png)](docs/screenshots/oaks-lab.png) | [![Pikachu facing a wild Rattata in the 3D arena above the original battle menu](docs/screenshots/battle.png)](docs/screenshots/battle.png) |
+| [![Professor Oak's laboratory with its desks, equipment, and original characters](docs/screenshots/oaks-lab.png)](docs/screenshots/oaks-lab.png) | [![Pikachu facing a wild Pidgey with ROM-font status panels and integrated battle controls](docs/screenshots/battle.png)](docs/screenshots/battle.png) |
+
+| Integrated Start menu | PC storage |
+| --- | --- |
+| [![Original Start selections drawn with ROM glyphs on a dark panel over Kanto](docs/screenshots/integrated-start.png)](docs/screenshots/integrated-start.png) | [![PC storage with themed ROM-font shelf labels and the original full-screen menu](docs/screenshots/integrated-pc.png)](docs/screenshots/integrated-pc.png) |
+| **Pokédex** | **Hall of Fame** |
+| [![Pokédex with shared-font counters and options, retaining the original list and portrait](docs/screenshots/integrated-pokedex.png)](docs/screenshots/integrated-pokedex.png) | [![Saved champion team on the Hall of Fame pedestals, with original labels and native information windows](docs/screenshots/integrated-hall.png)](docs/screenshots/integrated-hall.png) |
 
 ## Get started
 
@@ -55,12 +62,14 @@ Download [v0.2.0 for Linux or Windows x86_64](https://github.com/dobbygl/pokeyel
 - **Linux:** built on Ubuntu 24.04; uses system SDL2, libcurl and OpenGL/GLES libraries listed in `DEPENDENCIES.txt`. Open a terminal in the package directory and run `./pokeyellow3d`.
 - **Windows 10/11 x64:** includes SDL2, CURL, ANGLE and MSVC runtime DLLs. Double-click `Start.cmd`, which selects the package directory before launching. Keep the DLLs beside the executable; no compiler or vcpkg installation is required.
 
+The integrated style shown above is currently available in source builds; the v0.2.0 packages retain the classic interface.
+
 Each ZIP has a companion `.sha256` checksum. The launcher is included in `pokeyellow3d`; it starts the game once the matching user-supplied ROM is available.
 
 ### Requirements
 
 ROM-backed journeys and capture comparisons run on Linux with Mesa. Native
-Windows/MSVC builds and all thirteen ROM-independent tests, including the
+Windows/MSVC builds and all eighteen ROM-independent tests, including the
 Windows/ANGLE renderer, pass in CI. macOS has not been validated.
 
 - Git and CMake **3.18 or newer**.
@@ -163,6 +172,8 @@ First person follows the original movement grid; it does not provide free moveme
 
 In `Esc` settings, **Hora del mundo** selects disabled lighting, your local clock, or a fixed time. Daylight changes the sun direction, sky, fog and window light in both cameras. It starts disabled and stores its preference separately from cartridge saves; encounters and game time remain under the original engine's control. The title keeps its fixed sunset.
 
+In `Esc`, **Estilo de menus** selects **Integrado** or **Clasico**. The choice is saved with the lighting preferences, separately from cartridge saves. Integrated retains the ROM typeface; Esc settings use the application font.
+
 ## Development status
 
 | Area | Current scope |
@@ -173,6 +184,7 @@ In `Esc` settings, **Hora del mundo** selects disabled lighting, your local cloc
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
 | Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
 | Menus and transitions | A1/A2/A3, B1/B2 and C1/C2/C3 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle/save-state transitions, original boot into the 3D title, and Fly/Teleport/Dig travel. |
+| Integrated menus and HUD | Original ROM glyphs for recognized world and battle windows, names and compatible labels; shared theme and persistent classic fallback. See `PLAN_ESTILO_MENUS.md` for phase acceptance evidence. |
 | Pokédex and PC | 3D list/data device, ROM-verified portraits, AREA overview and Bill’s twelve-box storage are implemented. The item PC and Oak show live counters; the Hall of Fame reads saved teams from cartridge RAM into a pedestal gallery. |
 
 The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, and neighboring-map NPCs are not simulated. The engine may freeze an offscreen NPC; the renderer preserves that live state instead of inventing movement. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
@@ -196,7 +208,7 @@ The 3D layer reads the game state to draw the scene; it does not run a second ga
 
 ### Tests
 
-CMake registers thirteen ROM-independent checks, including title lifetimes, first-person controls, menus, presentation blending, tile animation, daylight/settings and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, seventeen additional tests cover game data and presentation, for 30 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
+CMake registers eighteen ROM-independent checks, including original-font decoding, HUD encoding, menu layouts, title lifetimes, first-person controls, presentation blending, tile animation, daylight/settings and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, nineteen additional tests cover game data and presentation, for 37 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON
@@ -276,7 +288,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all thirteen ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all eighteen ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel

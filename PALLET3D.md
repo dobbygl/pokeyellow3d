@@ -922,7 +922,9 @@ revisados en `build/qa/logs/menu-style-b1-*`.
 
 B2 extiende la fuente original al HUD del mundo y a nombres, niveles, HP y
 estado del combate. Los nombres conservan directamente los índices del
-juego, incluidos acentos y símbolos. Los paneles comparten tinta
+juego, incluidos acentos y símbolos. El rótulo del entrenador admite los
+12 glifos originales de su campo; los nombres de Pokémon conservan su
+límite de 10. Los paneles comparten tinta
 RGB 248/244/219, fondo 17/29/33, relleno 14 y radio 6. A 800x720, el título
 del mapa usa glifos de 24 píxeles, los nombres de combate 16 y los detalles
 8; los controles ajustan sus líneas al ancho disponible. Las etiquetas
@@ -941,3 +943,13 @@ la ventana original AREA UNKNOWN puede cubrir etiquetas: esa parte se
 compara con el último LCD completo observado; el resto de cada glifo sigue
 comprobándose. La validación completa de B2 se registra en
 `PLAN_ESTILO_MENUS.md` antes de acreditar sus tres criterios.
+
+
+B2 está validada: CTest 37/37, sin ROM 18/18, veinte baterías clásicas con
+2.159 capturas y 1.831 estados idénticos a v0.2.0 y las 38 vistas exteriores
+sin diferencias. Los 18 recorridos integrados comprueban 659.726 glifos en
+25.613 frames. La auditoría del HUD no detecta fuente ImGui durante el
+juego; los 47 nombres de clase de entrenador pasan en ambas cámaras.
+Los cinco contactos revisados y el informe completo se conservan en
+`build/qa/logs/menu-style-b2-*`. Las animaciones de apertura y cierre de
+paneles de C1 aún están pendientes.

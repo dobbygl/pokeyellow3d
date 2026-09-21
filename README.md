@@ -134,7 +134,7 @@ First person follows the original movement grid; it does not provide free moveme
 | First person | Movement, turning, transitions, dialogue overlays, and camera parity have dedicated checks. |
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
 | Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
-| Menus and transitions | A1/A2/A3 and C1/C2 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle transitions, and save-state transitions. Title-screen and special travel transitions remain pending. |
+| Menus and transitions | A1/A2/A3, B1/B2 and C1/C2/C3 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle/save-state transitions, original boot into the 3D title, and Fly/Teleport/Dig travel. |
 | Pokédex and PC | 3D list/data device, ROM-verified portraits, AREA overview and Bill’s twelve-box storage are implemented. The item PC and Oak show live counters; the Hall of Fame reads saved teams from cartridge RAM into a pedestal gallery. |
 
 The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, grass wind and particles remain pending, and neighboring-map NPCs are not simulated. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
@@ -210,14 +210,15 @@ Link `pokeyellow_cart` into your launcher and register `pokeyellow_main(argc, ar
 | ROM is missing or the launcher stays open | Start from `build/` and check `roms/pokeyellow.gbc`. |
 | ROM hash mismatch | Verify the revision against the SHA-1 above; renaming a different ROM does not make it compatible. |
 | CMake cannot find SDL2, CURL, or GLES | Install the corresponding development packages, then reconfigure. |
-| `Pallet 3D: runtime integration point changed` | Use the pinned `GBRT_REF` below; a cached override may select an incompatible runtime. |
+| Runtime presentation API mismatch | Restore the runtime defaults below; a cached override may select an incompatible runtime. |
 | A menu or scene appears in 2D | Original interfaces and unsupported states intentionally use the 2D framebuffer. Press `F2` to check your presentation preference. |
 | CTest omits the cartridge-backed tests | Add the matching ROM to `build/roms/`, then rerun CMake configuration. |
 
-The current runtime pin is `6581880fce60e6f139901a5942fc984e9c1db8ab`. Restore it with:
+The immutable runtime revision is declared in `CMakeLists.txt`. Clear cached
+runtime overrides to restore that revision and its repository:
 
 ```sh
-cmake -S . -B build -DGBRT_REF=6581880fce60e6f139901a5942fc984e9c1db8ab
+cmake -S . -B build -G Ninja -U GBRT_REF -U GBRT_URL -U FETCHCONTENT_SOURCE_DIR_GB_RECOMPILED
 ```
 
 ## Documentation

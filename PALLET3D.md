@@ -39,8 +39,8 @@ Safari y estados no reconocidos siguen en
 2D. Los cuadros de diálogo inferiores reconocidos se superponen al mundo
 3D en ambas cámaras, con el HUD oculto mientras se lee. Los warps reconocidos
 conservan la escena saliente y siguen el fundido BGP del motor; la carga de un
-savestate en otro mapa hace un fundido breve a negro. El resto de la
-ampliación de menús, título y transiciones está en curso en
+savestate en otro mapa hace un fundido breve a negro. El título 3D, los menús
+y las transiciones especiales están verificados y registrados en
 `PLAN_MENUS_TITULO_TRANSICIONES.md`.
 
 | Tecla | Acción |
@@ -63,13 +63,15 @@ ampliación de menús, título y transiciones está en curso en
 ## Compilar y probar
 
 ```sh
-cmake -S . -B build -G Ninja -DPOKEYELLOW_3D=ON \
-  -DGBRT_REF=6581880fce60e6f139901a5942fc984e9c1db8ab
+cmake -S . -B build -G Ninja -DPOKEYELLOW_3D=ON
 cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure
 ```
 
 Se necesitan las dependencias habituales del proyecto, SDL2 y OpenGL ES 2.
+La revisión inmutable del runtime se declara en `CMakeLists.txt`. Si una
+compilación anterior fijó otro runtime, elimina las opciones de caché con
+`-U GBRT_REF -U GBRT_URL -U FETCHCONTENT_SOURCE_DIR_GB_RECOMPILED` al configurar.
 `POKEYELLOW_3D=OFF` produce el ejecutable original `pokeyellow`.
 CTest registra pruebas de controles, menús, fundidos y escenarios sintéticos.
 Al configurar con la ROM local en `build/roms/pokeyellow.gbc` añade las

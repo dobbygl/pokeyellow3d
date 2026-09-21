@@ -74,7 +74,7 @@ inline View view(const GBContext *ctx) {
     // before its font flag is set, without treating temporary sprite-update FF
     // (normal during every walking step) as a map transition.
     for (int i = 0; i < 20 * 18; i++)
-        if (read(ctx, 0xc3a0 + i) >= 0x60)
+        if (read(ctx, uint16_t(0xc3a0 + i)) >= 0x60)
             return View::Dialogue;
     if (!valid_live_map(ctx, *s))
         return View::Transition;
@@ -117,18 +117,18 @@ inline std::array<float, 2> player(const GBContext *ctx) {
 }
 
 inline bool actor(const GBContext *ctx, int slot, Actor &out) {
-    uint16_t a = Sprite1 + slot * 16, b = Sprite2 + slot * 16;
+    uint16_t a = uint16_t(Sprite1 + slot * 16), b = uint16_t(Sprite2 + slot * 16);
     if (!read(ctx, a))
         return false;
     // An image index of FF means either offscreen OR hidden by a story event.
     // Respect the same object flags as IsObjectHidden before expanding visibility.
     if (slot > 0 && slot < 15) {
         for (int i = 0; i < 17; i++) {
-            int id = read(ctx, HiddenList + i * 2);
+            int id = read(ctx, uint16_t(HiddenList + i * 2));
             if (id == 255)
                 break;
-            int flag = read(ctx, HiddenList + i * 2 + 1);
-            if (id == slot && (read(ctx, HiddenFlags + flag / 8) & (1 << (flag % 8))))
+            int flag = read(ctx, uint16_t(HiddenList + i * 2 + 1));
+            if (id == slot && (read(ctx, uint16_t(HiddenFlags + flag / 8)) & (1 << (flag % 8))))
                 return false;
         }
     }

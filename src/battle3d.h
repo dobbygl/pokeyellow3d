@@ -36,7 +36,8 @@ void remember_terrain(const GBContext *ctx) {
     if (!pallet::read(ctx, pallet::Battle) && pallet::valid_live_map(ctx, *s)) {
         const auto &ts = pallet::tileset(*s);
         int gx = x * 2, gz = z * 2 + 1;
-        int block = pallet::read(ctx, 0xc6e8 + (gz / 4 + 3) * (s->width / 2 + 6) + gx / 4 + 3);
+        int block =
+            pallet::read(ctx, uint16_t(0xc6e8 + (gz / 4 + 3) * (s->width / 2 + 6) + gx / 4 + 3));
         tile = ctx->rom[ts.blocks + block * 16 + (gz % 4) * 4 + gx % 4];
     }
     terrain = interior::cave(*s)                               ? 3
@@ -81,7 +82,8 @@ bool initialize_texture() {
     return texture != 0;
 }
 firstperson::Matrix camera(float aspect, double time) {
-    float ex = .10f * std::sin(time * .25), ey = 5.4f + .06f * std::sin(time * .7), ez = 10;
+    float ex = float(.10f * std::sin(time * .25)), ey = float(5.4f + .06f * std::sin(time * .7)),
+          ez = 10;
     float s = .40f, c = std::sqrt(1 - s * s), f = 1 / std::tan(48.f * firstperson::Pi / 360);
     constexpr float near = .1f, far = 80;
     float a = (far + near) / (near - far), b = 2 * near * far / (near - far);
@@ -169,10 +171,10 @@ void effects(std::vector<Vertex> &v, const GBContext *ctx) {
     auto move = battle::move(ctx, effect_id);
     Color color = move_color(move.type);
     int target = effect_kind == battle::Effect::Self ? effect_actor : 1 - effect_actor;
-    float tx = target ? 2 : -2, tz = target ? -3 : 2;
+    float tx = target ? 2.f : -2.f, tz = target ? -3.f : 2.f;
     float t = std::fmod(effect_time * 1.6f, 1.f);
     if (effect_kind == battle::Effect::Projectile) {
-        float sx = effect_actor ? 2 : -2, sz = effect_actor ? -3 : 2;
+        float sx = effect_actor ? 2.f : -2.f, sz = effect_actor ? -3.f : 2.f;
         for (int i = 6; i >= 0; i--) {
             float p = std::clamp(t - i * .035f, 0.f, 1.f);
             orb(v,
@@ -225,9 +227,9 @@ void panel(const GBContext *ctx, bool enemy, float w, float h) {
     if (battle::read(ctx, battle::IsInBattle) == 2) {
         int count = battle::read(ctx, enemy ? 0xd89b : 0xd162);
         for (int i = 0; i < std::min(count, 6); i++) {
-            int hp = battle::word(ctx, (enemy ? 0xd8a4 : 0xd16b) + 44 * i);
+            int party_hp = battle::word(ctx, (enemy ? 0xd8a4 : 0xd16b) + 44 * i);
             dl->AddCircleFilled({x + 12 * scale + i * 13 * scale, y + ph + 12 * scale}, 4 * scale,
-                                hp ? IM_COL32(222, 109, 84, 255) : IM_COL32(73, 87, 85, 255));
+                                party_hp ? IM_COL32(222, 109, 84, 255) : IM_COL32(73, 87, 85, 255));
         }
     }
 }
@@ -336,7 +338,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
                 p.fingerprint = battle::fingerprint(p.image);
             }
         }
-        float target = (present || effect) && m.hp > 0 ? 1 : 0;
+        float target = (present || effect) && m.hp > 0 ? 1.f : 0.f;
         p.alpha += std::clamp(target - p.alpha, -dt * 7, dt * 7);
     }
     glViewport(0, h / 3, w, h - h / 3);
@@ -365,9 +367,9 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
                              {.23f, .43f, .49f},
                              {.27f, .31f, .32f},
                              {.43f, .42f, .49f}};
-    Color ground = grounds[terrain];
+    Color arena_color = grounds[terrain];
     std::vector<Vertex> v;
-    quad(v, {-35, -.02f, -40}, {35, -.02f, -40}, {35, -.02f, 30}, {-35, -.02f, 30}, ground);
+    quad(v, {-35, -.02f, -40}, {35, -.02f, -40}, {35, -.02f, 30}, {-35, -.02f, 30}, arena_color);
     // A restrained grid gives the original flat terrain depth without replacing
     // any collision, movement or battle logic.
     for (int z = -15; z < 12; z++)
@@ -375,15 +377,15 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
             if ((x + z) & 1)
                 quad(v, {float(x), 0, float(z)}, {float(x + 1), 0, float(z)},
                      {float(x + 1), 0, float(z + 1)}, {float(x), 0, float(z + 1)},
-                     shade(ground, .97f));
+                     shade(arena_color, .97f));
     if (intro)
-        platform(v, 0, -2, shade(ground, 1.4f));
+        platform(v, 0, -2, shade(arena_color, 1.4f));
     else {
-        platform(v, 2, -3, shade(ground, 1.4f));
-        platform(v, -2, 2, shade(ground, 1.4f));
+        platform(v, 2, -3, shade(arena_color, 1.4f));
+        platform(v, -2, 2, shade(arena_color, 1.4f));
     }
     for (int i = 0; i < 2; i++) {
-        float x = i ? 2 : -2, z = i ? -3 : 2, size = i ? 2.8f : 3.1f, base = .14f;
+        float x = i ? 2.f : -2.f, z = i ? -3.f : 2.f, size = i ? 2.8f : 3.1f, base = .14f;
         if (intro) {
             if (!i)
                 continue;

@@ -25,7 +25,7 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 ## Highlights
 
 - **A connected Kanto.** Explore 36 connected outdoor maps, plus Viridian Forest and Vermilion Dock, with terrain, buildings, and textures derived from the ROM.
-- **Animated water and flowers.** Original ROM frames follow the live Game Boy animation phase, including pauses and save-state loads.
+- **An animated world.** Water and flowers follow the live Game Boy animation phase. Distant NPCs use their original ROM walking frames; grass sways and movement leaves small grass or surf trails. Effects pause with the game and reset on loads and map changes.
 - **Pallet Town at the title screen.** The original copyright, Game Freak logo and Pikachu intro lead through a fade into an actor-free sunset scene, with the original logo and a VRAM-decoded Pikachu billboard. Continue, New Game and naming retain the original menus over the dimmed scene.
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
@@ -55,7 +55,7 @@ Download [v0.1.0 for Linux x86_64](https://github.com/dobbygl/pokeyellow3d/relea
 ### Requirements
 
 ROM-backed journeys and capture comparisons run on Linux with Mesa. Native
-Windows/MSVC builds and all eleven ROM-independent tests, including the
+Windows/MSVC builds and all twelve ROM-independent tests, including the
 Windows/ANGLE renderer, pass in CI. macOS has not been validated.
 
 - Git and CMake **3.18 or newer**.
@@ -167,7 +167,7 @@ First person follows the original movement grid; it does not provide free moveme
 | Menus and transitions | A1/A2/A3, B1/B2 and C1/C2/C3 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle/save-state transitions, original boot into the 3D title, and Fly/Teleport/Dig travel. |
 | Pokédex and PC | 3D list/data device, ROM-verified portraits, AREA overview and Bill’s twelve-box storage are implemented. The item PC and Oak show live counters; the Hall of Fame reads saved teams from cartridge RAM into a pedestal gallery. |
 
-The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, grass wind and particles remain pending, and neighboring-map NPCs are not simulated. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
+The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, and neighboring-map NPCs are not simulated. The engine may freeze an offscreen NPC; the renderer preserves that live state instead of inventing movement. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.
 
 ## Development and validation
 
@@ -188,7 +188,7 @@ The 3D layer reads the game state to draw the scene; it does not run a second ga
 
 ### Tests
 
-CMake registers eleven ROM-independent checks, including title lifetimes, first-person controls, menus, presentation blending, tile animation and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, seventeen additional tests cover game data and presentation, for 28 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
+CMake registers twelve ROM-independent checks, including title lifetimes, first-person controls, menus, presentation blending, tile animation and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, seventeen additional tests cover game data and presentation, for 29 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON
@@ -268,7 +268,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all eleven ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all twelve ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel

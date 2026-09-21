@@ -1,6 +1,7 @@
 #include "pallet3d.h"
 #include "pallet_state.h"
 #include "tile_animation.h"
+#include "world_effects.h"
 #include "title_state.h"
 #include "title_picture.h"
 #include "firstperson.h"
@@ -37,6 +38,7 @@ struct Vertex {
     Vec p;
     float u, v;
     Color c;
+    float wind = 0;
 };
 struct UV {
     float x, y, w, h;
@@ -46,6 +48,9 @@ constexpr Color White{1, 1, 1, 1};
 GLuint program = 0, buffer = 0, atlas = 0;
 GLint fade_loc = -1, matrix_loc = -1, eye_loc = -1, fog_loc = -1, sky_loc = -1, xray_loc = -1;
 GLint dusk_loc = -1;
+GLint wind_loc = -1;
+world_effects::State effects;
+bool effects_enabled = true;
 bool first_person = false;
 firstperson::Camera eye;
 firstperson::Controls controls;
@@ -90,6 +95,7 @@ struct WorldFrame {
     bool fp = false;
     Vec hero{};
     float dusk = 0;
+    float wind = 0;
 } world_frame;
 bool world_frame_current = false;
 uint64_t world_frame_cycles = 0;
@@ -507,6 +513,7 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                     box(scenery, x, z + .70f, 1, .24f, .27f, .32f, {.56f, .65f, .39f});
                 }
             } else if (type == pallet::Terrain::Grass) {
+                size_t first = scenery.size();
                 for (int i = 0; i < 4; i++) {
                     float px = x + .18f + (i % 2) * .48f, pz = z + .22f + (i / 2) * .46f;
                     quad(scenery, {px - .08f, .02f, pz}, {px, .26f, pz}, {px + .09f, .02f, pz},
@@ -514,6 +521,8 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                     quad(scenery, {px, .02f, pz - .08f}, {px, .21f, pz}, {px, .02f, pz + .09f},
                          {px, .02f, pz + .09f}, {.42f, .60f, .30f});
                 }
+                for (size_t i = first; i < scenery.size(); ++i)
+                    scenery[i].wind = scenery[i].p.y > .03f ? 1.f : 0.f;
             } else if (type == pallet::Terrain::Fence) {
                 for (float off : {.16f, .66f})
                     box(scenery, x + off, z + .55f, .12f, .14f, 0, .65f, {.90f, .87f, .70f});
@@ -636,12 +645,19 @@ void original_frame(GBContext *ctx, int w, int h) {
 
 bool initialize(const GBContext *ctx) {
     const char *vs = R"(
-        attribute vec3 position; attribute vec2 texcoord; attribute vec4 color;
+        attribute vec3 position; attribute vec2 texcoord; attribute vec4 color; attribute float wind;
+        uniform float wind_time;
         uniform mat4 view_projection; uniform vec3 eye;
         uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
         void main() {
-            gl_Position=sky>0.5?vec4(position.xy,0.999,1.0):view_projection*vec4(position,1.0);
+            vec3 moved=position;
+            if(wind_time>0.0 && wind>0.0) {
+                float phase=position.x*0.7+position.z*0.4;
+                moved.x+=(sin(phase+wind_time)-sin(phase))*0.065*wind;
+                moved.z+=(cos(phase+wind_time)-cos(phase))*0.035*wind;
+            }
+            gl_Position=sky>0.5?vec4(position.xy,0.999,1.0):view_projection*vec4(moved,1.0);
             distance_to_eye=fog_enabled>0.5?length(position-eye):0.0;
             uv=texcoord; tint=color;
             // Resolve flat materials once per vertex for the orthographic view.
@@ -699,6 +715,7 @@ bool initialize(const GBContext *ctx) {
     glBindAttribLocation(program, 0, "position");
     glBindAttribLocation(program, 1, "texcoord");
     glBindAttribLocation(program, 2, "color");
+    glBindAttribLocation(program, 3, "wind");
     glLinkProgram(program);
     glDeleteShader(a);
     glDeleteShader(b);
@@ -717,6 +734,7 @@ bool initialize(const GBContext *ctx) {
     xray_loc = glGetUniformLocation(program, "xray");
     fade_loc = glGetUniformLocation(program, "fade_tone");
     dusk_loc = glGetUniformLocation(program, "dusk");
+    wind_loc = glGetUniformLocation(program, "wind_time");
     glGenBuffers(1, &buffer);
     glGenTextures(1, &atlas);
     glBindTexture(GL_TEXTURE_2D, atlas);
@@ -757,6 +775,19 @@ void sprite_image(const GBContext *ctx, const pallet::Actor &actor) {
         colors[2] = {.77f, .47f, .15f};
     } else if (actor.slot != 0)
         colors[2] = {.31f, .51f, .57f};
+    if (actor.slot > 0 && actor.slot < 15) {
+        const auto *live = ctx->wram + 0x100 + actor.slot * 16;
+        bool outside = live[2] == 255 || live[6] >= 160 || live[4] >= 144;
+        npc_animation::Image decoded;
+        int npc_frame =
+            live[2] == 255 ? npc_animation::sample(ctx, actor.slot).frame : (live[2] & 15);
+        if (outside && npc_animation::decode(ctx, actor.slot, npc_frame, decoded)) {
+            for (int y = 0; y < 32; ++y)
+                for (int x = 0; x < 32; ++x)
+                    pixel(ox + x, oy + y, colors[decoded[size_t(y) * 32 + x]]);
+            return;
+        }
+    }
     for (int i = 0; i < count; i++, at += 4) {
         int dy = int8_t(ctx->rom[at]), dx = int8_t(ctx->rom[at + 1]);
         int tile = (base + ctx->rom[at + 2]) & 255, flags = ctx->rom[at + 3];
@@ -847,6 +878,21 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
         if (slot == 0)
             hero_end = int(vertices.size());
     }
+    if (effects_enabled && preview_map < 0 && !current.interior && effects.map == current.id)
+        for (const auto &p : effects.particles) {
+            if (p.age >= p.life)
+                continue;
+            float age = p.age / p.life;
+            float x = p.x + p.vx * p.age, z = p.z + p.vz * p.age;
+            float y = .035f + std::sin(age * firstperson::Pi) * .65f;
+            float size = (p.surface == world_effects::Surface::Surf ? .055f : .04f) * (1 - age);
+            Color color = p.surface == world_effects::Surface::Surf ? Color{.72f, .94f, .94f}
+                                                                    : Color{.44f, .65f, .28f};
+            quad(vertices, {x - size, y, z}, {x, y + size * 2, z}, {x + size, y, z},
+                 {x, y - size, z}, color);
+            quad(vertices, {x, y, z - size}, {x, y + size * 2, z}, {x, y, z + size},
+                 {x, y - size, z}, color);
+        }
     if (fp && current.interior) {
         // Close the room for the eye-level view; the orthographic camera keeps
         // its open-top cutaway. The shell is outside all playable map cells.
@@ -910,6 +956,7 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
                    float(fp ? (current.interior && interior::cave(current) ? 2 : 1) : 0),
                    fp,
                    {player_position[0], .6f, player_position[1]}};
+    world_frame.wind = effects_enabled && preview_map < 0 && !current.interior ? effects.wind() : 0;
     world_frame_current = true;
     world_frame_cycles = ctx->cycles;
     draw_world_frame(w, h, tone);
@@ -960,10 +1007,11 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glUniform3f(eye_loc, frame.eye.x, frame.eye.y, frame.eye.z);
     glUniform1f(fog_loc, frame.fog);
     glUniform1f(dusk_loc, frame.dusk);
+    glUniform1f(wind_loc, frame.wind);
     glUniform1f(sky_loc, 0);
     glUniform1i(glGetUniformLocation(program, "image"), 0);
     glUniform1f(xray_loc, 0);
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
         glEnableVertexAttribArray(i);
     auto bind_vertices = [](GLuint id) {
         glBindBuffer(GL_ARRAY_BUFFER, id);
@@ -973,6 +1021,8 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
                               (void *)offsetof(Vertex, u));
         glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                               (void *)offsetof(Vertex, c));
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void *)offsetof(Vertex, wind));
     };
     if (frame.fp) {
         std::vector<Vertex> sky;
@@ -1008,11 +1058,12 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
         glDepthMask(GL_TRUE);
         glUniform1f(xray_loc, 0);
     }
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
         glDisableVertexAttribArray(i);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glUniform1f(dusk_loc, 0);
+    glUniform1f(wind_loc, 0);
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);
 }
@@ -1429,6 +1480,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
 }
 
 void pallet3d_shutdown() {
+    effects.reset();
     title3d::shutdown();
     presentation::shutdown();
     presented_lcd = nullptr;
@@ -1508,6 +1560,33 @@ bool pallet3d_active() {
 
 void pallet3d_begin_frame(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
     presented_lcd = framebuffer;
+    if (effects_enabled && enabled && preview_map < 0 && ctx &&
+        pallet::view(ctx) == pallet::View::Overworld) {
+        const auto *s = pallet::scene(pallet::read(ctx, pallet::Map));
+        auto p = pallet::world_player(ctx);
+        auto surface = world_effects::Surface::None;
+        if (s && !s->interior) {
+            auto mesh = meshes.find(s->id);
+            auto local = pallet::player(ctx);
+            if (mesh != meshes.end() && local[0] >= 0 && local[1] >= 0 && local[0] < s->width &&
+                local[1] < s->height) {
+                auto terrain = pallet::terrain(ctx->rom, *s, int(local[0]), int(local[1]),
+                                               &mesh->second.blocks);
+                if (terrain == pallet::Terrain::Grass)
+                    surface = world_effects::Surface::Grass;
+                else if (terrain == pallet::Terrain::Water && pallet::read(ctx, 0xd6ff) == 2)
+                    surface = world_effects::Surface::Surf;
+            }
+        }
+        effects.update(s->id, ctx->cycles, menu_open || !window_focused, p[0], p[1], surface);
+    } else if (ctx) {
+        // Do not accumulate hidden battle/menu time or invent a trail on return.
+        effects.last_cycles = ctx->cycles;
+        effects.distance = 0;
+        effects.surface = world_effects::Surface::None;
+        if (effects.map != pallet::read(ctx, pallet::Map))
+            effects.reset();
+    }
     // While F2 is off the engine can move, change maps and start an encounter.
     // Keep the cached pixels for crossfading, but never use that old world as
     // the entry scene of a new battle. A verified arena can still resume 3D.
@@ -1575,6 +1654,7 @@ uint8_t pallet3d_input_mask() {
 }
 
 void pallet3d_state_loaded(GBContext *ctx) {
+    effects.reset();
     title3d::reset();
     world_frame_current = false;
     dex_area3d::reset();
@@ -1740,4 +1820,13 @@ PalletAreaInfo pallet3d_area() {
 
 PalletTileAnimationInfo pallet3d_tile_animation() {
     return tile_animation_info;
+}
+PalletWorldAnimationInfo pallet3d_world_animation() {
+    return {effects_enabled, world_frame.wind, effects.count(), effects.emitted};
+}
+void pallet3d_world_effects(bool value) {
+    if (effects_enabled != value) {
+        effects_enabled = value;
+        effects.reset();
+    }
 }

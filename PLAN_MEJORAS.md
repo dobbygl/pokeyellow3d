@@ -268,6 +268,40 @@ Acceptance criteria:
 - [ ] Identical input yields identical engine state with effects enabled or disabled, including RNG and cartridge RAM.
 - [ ] Full CTest, ROM-free CTest and every QA suite pass. All 38 exterior reference captures remain byte-identical at their fixed reference animation phase; separate frame sequences prove the animation, without relaxing the reference gate.
 
+### 5B execution record — in progress, 2026-09-21
+
+Branch `world-animations-5b`, based on API/Windows PR #11 merged as
+`f1ab11a08f9e1d0768ac0f6653820f134624cd61`. The upstream CI requirement is
+still externally blocked as recorded in `PLAN_API_CI.md`; the integrated
+objective explicitly authorizes continuing with the next point in this case.
+
+The implementation reads NPC movement counters and the matching ROM's 82
+sprite-sheet entries (05:42a9 through 05:43f0). It reconstructs off-LCD
+frames, including flips, and derives partial steps from the remaining walk
+counter. The original engine freezes ordinary offscreen NPCs: no synthetic
+movement is added to them. The private test additionally requests an original
+scripted walk, which can continue outside the LCD, and validates actual GPU
+pixels there. The matching recompiled routine's `LD DE,$cc5b` at 01:4ea2
+verifies the script buffer alias; generated code remains unchanged.
+
+Wind changes only grass-tip vertices. Grass and surf trails use a fixed
+96-particle pool, observed movement and guest cycles; a private integer mixer
+varies particles without accessing game RNG. Pause freezes effects, while
+loads and map changes reset them. Catalog rendering selects phase zero.
+
+Initial local evidence (not the complete acceptance gate): 29/29 CTest,
+38 exterior reference images byte-identical, all four original walking
+frames verified against resident VRAM, and an engine-driven off-LCD NPC
+walk covering four phases and 31 positions. Grass and surf replays each
+matched all 300 complete serialized engine states with effects on/off.
+The six-scenario battery in `tests/world_animation_qa.sh` exercises both
+cameras. Full regression, independent ROM-free build, final visual review
+and PR CI are still required; acceptance checkboxes remain open.
+
+Reproducible focused commands and private fixture paths are in the 5B
+section of `PALLET3D.md`. Initial reports and captures are under
+`build/qa/world-animation-preflight/` and `build/qa/logs/5b-*.log`.
+
 ### Execution and validation order for points 5 and 4
 
 The user explicitly advanced phase 5A on 2026-09-21 while the integrated

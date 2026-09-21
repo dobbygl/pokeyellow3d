@@ -704,6 +704,40 @@ cada frame contra VRAM, lee los texels reales de la GPU y revisa pausa,
 recarga y entrada/salida de la casa. Las secuencias quedan en
 `build/qa/tile-animation-*/`, fuera de Git.
 
+### NPC lejanos, viento y partículas (5B)
+
+`src/npc_animation.h` lee dirección, estado y contadores del actor vivo. Los
+NPC fuera del LCD usan la hoja de sprites de la ROM, incluida su mitad de
+andar y los reflejos de la tabla de orientación. La posición interpola el
+paso restante respecto a la casilla de destino. Un NPC que el motor detiene
+fuera de pantalla permanece detenido; los objetos de cuatro tiles no andan.
+La ROM compatible conserva 82 entradas en `05:42a9`; no se usan los IDs
+renumerados de versiones posteriores del desensamblado.
+
+`src/world_effects.h` observa posiciones y ciclos del motor. Deforma solo
+las puntas de hierba y mantiene un máximo de 96 partículas; caminar sobre
+hierba y surfear las emite, quedarse quieto no. Su variación es determinista
+y no llama al RNG del juego. Las cargas y cambios de mapa reinician los
+efectos; la pausa congela su reloj. El catálogo conserva la fase cero para
+las 38 comparaciones exactas. `pallet3d_world_effects(bool)` permite comparar
+recorridos con viento y partículas activados o desactivados.
+
+```sh
+ctest --test-dir build -R world_animation_test --output-on-failure
+tests/world_animation_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/kanto-Eqy7Ry/surf-active.state
+```
+
+La batería necesita Paleta (9,7), Ruta 1 (10,28) y una partida con surf
+activo en Paleta (6,14), preparada por `tests/world_qa.sh`. Usa copias
+privadas. Comprueba ROM contra VRAM y la textura de GPU, un recorrido de
+NPC que el motor ejecuta fuera del LCD y 300 snapshots completos por
+recorrido y cámara con efectos activados/desactivados. No se publican las
+partidas ni las capturas. El cierre y la regresión de 5B se registran en
+`PLAN_MEJORAS.md`.
+
 ### Título y menú principal
 
 El título muestra Paleta del catálogo sin actores, con un travelling lento

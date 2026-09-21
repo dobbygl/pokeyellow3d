@@ -857,6 +857,8 @@ visuales se encuentran en `src/ui_theme.h`.
 | Guardado | Tarjeta (4, 0, 16, 10); confirmación (0, 7, 6, 5) |
 | Centro | Heal/Cancel (11, 6, 9, 6), con cuadro inferior |
 | Tienda | Buy (0, 0, 11, 7), dinero (11, 0, 9, 3), stock (4, 2, 16, 11), cantidad (7, 9, 13, 3) |
+| Combate: mensajes y FIGHT | Inferior (0, 12, 20, 6), con controles (8, 12, 12, 6) superpuestos |
+| Combate: movimientos | Inferior, lista (4, 12, 16, 6) y PP/tipo (0, 8, 11, 5), en ese orden |
 | Equipo, mochila y pantalla desconocida | LCD completo enmarcado |
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
@@ -902,5 +904,18 @@ cursor activo en 5.400 ocasiones. Los contactos revisados y la evidencia
 se guardan en `build/qa/logs/menu-style-a2-*`. La tarjeta de guardado
 conserva su región LCD por el colon adicional de la fuente; una carga fría
 sin escena residente conserva el LCD completo hasta poder presentar la
-escena con seguridad. Los menús de combate aún usan su composición previa,
-a la espera de B1.
+escena con seguridad.
+
+En B1, los mensajes y controles de combate usan la misma fuente y paneles,
+alineados abajo a escala 4 a 800x720. Un cuadro sin tinta no dibuja panel;
+el texto aparece cuando el motor escribe cada glifo. PP/tipo conserva su
+solapamiento original y el retrato del jugador previamente decodificado,
+si corresponde al luchador actual. Una carga fría sin retratos completos,
+equipo y mochila conservan el LCD enmarcado. El respaldo de animaciones
+permanece intacto; no se dibuja simultáneamente el menú integrado.
+B1 está validada: CTest 36/36, sin ROM 17/17, veinte baterías clásicas
+con 2.159 capturas y 1.831 estados idénticos a v0.2.0. Los 18 recorridos
+integrados comprueban 659.726 glifos en 25.613 frames, y la cadena adicional
+de combate verifica captura, cambios, rival y efectos. Evidencia y contactos
+revisados en `build/qa/logs/menu-style-b1-*`. El HUD conserva su tipografía
+previa hasta B2; los menús de esta fase ya usan la fuente original.

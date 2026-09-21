@@ -19,6 +19,9 @@ int effect_id = 0, effect_actor = 0;
 battle::Effect effect_kind = battle::Effect::Original;
 bool capture_effect = false;
 bool framed_overlay = false;
+bool integrated_menu = false;
+battle_menu::Kind menu_kind = battle_menu::Kind::Unknown;
+int menu_panels = 0;
 int trainer_class = 0;
 int terrain = 0; // dirt, grass, water, cave, gym
 bool terrain_known = false;
@@ -49,6 +52,9 @@ void remember_terrain(const GBContext *ctx) {
 }
 void reset() {
     portraits = {};
+    integrated_menu = false;
+    menu_kind = battle_menu::Kind::Unknown;
+    menu_panels = 0;
     last_cycles = 0;
     shown = false;
     full_overlay = framed_overlay = false;
@@ -236,6 +242,11 @@ void panel(const GBContext *ctx, bool enemy, float w, float h) {
     }
 }
 void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
+    integrated_menu = false;
+    menu_kind = battle_menu::Kind::Unknown;
+    menu_panels = 0;
+    bool styled = menu_style == ui_preferences::Style::Integrated;
+    auto menu = styled ? battle_menu::classify(ctx->wram + 0x3a0) : battle_menu::Layout{};
     if (!terrain_known || terrain_map != pallet::read(ctx, pallet::Map) ||
         terrain_x != pallet::read(ctx, pallet::X) || terrain_z != pallet::read(ctx, pallet::Y) ||
         (last_cycles && ctx->cycles < last_cycles))
@@ -263,6 +274,11 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     bool cached = portraits[0].fingerprint && portraits[1].fingerprint &&
                   portraits[0].species == battle::read(ctx, 0xd013) &&
                   portraits[1].species == battle::read(ctx, 0xcfe4);
+    // The PP/type window covers part of the original back sprite. Keep the
+    // already decoded portraits while selecting moves; a cold load without
+    // those complete images retains the original framed LCD.
+    bool moves = styled && !animation && cached && menu.kind == battle_menu::Kind::Moves &&
+                 battle::ready(ctx) && battle::rectangle(ctx, battle::Enemy, true);
     int actor = ctx->hram[0x73] ? 1 : 0;
     // Some boosts (Agility) only switch palettes for two engine frames. Give
     // their confirmed event a bounded cosmetic tail while its result text is
@@ -284,7 +300,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
                       ? battle::move(ctx, id).presentation
                       : battle::Effect::Original;
     bool effect = capture_effect || effect_kind != battle::Effect::Original;
-    full_overlay = !opening && !intro && !effect &&
+    full_overlay = !opening && !intro && !effect && !moves &&
                    (animation || !battle::rectangle(ctx, battle::Enemy, true) ||
                     !battle::rectangle(ctx, battle::Player, true));
     overlay_alpha += std::clamp((full_overlay ? 1.f : 0.f) - overlay_alpha, -dt * 12, dt * 12);
@@ -340,7 +356,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
                 p.fingerprint = battle::fingerprint(p.image);
             }
         }
-        float target = (present || effect) && m.hp > 0 ? 1.f : 0.f;
+        float target = (present || effect || moves) && m.hp > 0 ? 1.f : 0.f;
         p.alpha += std::clamp(target - p.alpha, -dt * 7, dt * 7);
     }
     glViewport(0, h / 3, w, h - h / 3);
@@ -443,6 +459,15 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
         scene_filter::capture(w, h);
         scene_filter::draw(w, h);
         lcd_overlay::framed(gb_get_framebuffer(ctx), float(w), float(h), overlay_alpha);
+        return;
+    }
+    if (styled && !animation && overlay_alpha == 0 && menu.kind != battle_menu::Kind::Unknown) {
+        auto drawn = menu_text::regions(ctx->wram + 0x3a0, ctx->vram, ctx->rom, ctx->rom_size,
+                                        gb_get_framebuffer(ctx), menu.regions, float(w), float(h),
+                                        menu_text::Placement::Battle);
+        integrated_menu = true;
+        menu_kind = menu.kind;
+        menu_panels = drawn.panels;
         return;
     }
     lcd_overlay::draw(gb_get_framebuffer(ctx),

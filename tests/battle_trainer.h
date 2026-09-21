@@ -99,7 +99,10 @@ inline int battle_trainer(GBContext *ctx) {
     run.move(33, 29, 5, "L");
     run.input(nullptr);
     int frames = 0, previous_enemy = 0, replacements = 0;
+    uint64_t last_player_image = 0;
+    int last_player_species = 0;
     bool begun = false, intro = false, forced = false, saw_faint = false, saw_loss = false;
+    bool toured_menus = false;
     for (int i = 0; i < 15000; i++) {
         if (i % 20 == 0)
             run.input(battle_has_word(ctx, "YES") && battle_has_word(ctx, "NO") ? "B" : "A");
@@ -143,15 +146,77 @@ inline int battle_trainer(GBContext *ctx) {
             run.require(info.enemy_image == battle::fingerprint(battle::portrait(
                                                 ctx, battle::Enemy, info.enemy_species)),
                         "enemy portrait tracks trainer replacement");
-            run.require(info.player_image == battle::fingerprint(battle::portrait(
-                                                 ctx, battle::Player, info.player_species)),
-                        "player portrait tracks current fighter");
+            if (battle::rectangle(ctx, battle::Player, true)) {
+                run.require(info.player_image == battle::fingerprint(battle::portrait(
+                                                     ctx, battle::Player, info.player_species)),
+                            "player portrait tracks current fighter");
+                last_player_image = info.player_image;
+                last_player_species = info.player_species;
+            } else {
+                run.require(info.integrated_menu &&
+                                info.menu_kind == int(battle_menu::Kind::Moves) &&
+                                last_player_image && info.player_image == last_player_image &&
+                                info.player_species == last_player_species,
+                            "PP/type overlay retains the verified current player portrait");
+            }
             if (previous_enemy != info.enemy_species && info.enemy_alpha > .8f) {
                 if (previous_enemy)
                     ++replacements;
                 previous_enemy = info.enemy_species;
                 capture(replacements ? "trainer-second-mon" : "trainer-first-mon");
             }
+        }
+        if (!toured_menus && pallet3d_menu_style() == ui_preferences::Style::Integrated &&
+            battle_menu_visible(ctx) && info.integrated_menu && info.player_alpha > .8f) {
+            run.input(nullptr);
+            run.wait(12);
+            capture("trainer-fight");
+            run.press("A");
+            run.wait(35);
+            run.require(pallet3d_battle().integrated_menu &&
+                            pallet3d_battle().menu_kind == int(battle_menu::Kind::Moves),
+                        "trainer move list and PP/type integrated");
+            capture("trainer-moves");
+            run.press("B");
+            run.wait(20);
+            run.press("D");
+            run.press("A");
+            run.wait(35);
+            run.require(!battle_menu_visible(ctx) && pallet3d_battle().full_overlay,
+                        "trainer bag retains full LCD");
+            capture("trainer-bag");
+            run.press("B");
+            run.wait(35);
+            run.require(battle_menu_visible(ctx), "trainer bag returns to FIGHT");
+            run.press("U");
+            run.press("R");
+            run.press("A");
+            run.wait(35);
+            run.require(!battle_menu_visible(ctx) && pallet3d_battle().full_overlay,
+                        "trainer party retains full LCD");
+            capture("trainer-party");
+            run.press("B");
+            run.wait(35);
+            run.require(battle_menu_visible(ctx), "trainer party returns to FIGHT");
+            run.press("D");
+            run.press("A");
+            run.wait(35);
+            run.require(run.read(pallet::Battle) == 2 && !battle_menu_visible(ctx),
+                        "original engine rejects fleeing a trainer");
+            capture("trainer-cannot-run");
+            for (int f = 0; f < 1200 && !battle_menu_visible(ctx); ++f) {
+                if (f % 30 == 0)
+                    run.input("A");
+                if (f % 30 == 6)
+                    run.input(nullptr);
+                run.tick();
+            }
+            run.input(nullptr);
+            run.require(battle_menu_visible(ctx) && run.read(pallet::Battle) == 2,
+                        "trainer continues after rejected escape");
+            run.press("L");
+            run.press("U");
+            toured_menus = true;
         }
         if (begun && !run.read(pallet::Battle) && pallet::view(ctx) == pallet::View::Overworld &&
             i > 1000)
@@ -183,6 +248,8 @@ inline int battle_trainer(GBContext *ctx) {
                 "trainer battle finishes with 3D scene");
     run.require(replacements >= 1, "trainer sends a second Pokemon");
     run.require(intro, "trainer portrait shown before first enemy Pokemon");
+    if (pallet3d_menu_style() == ui_preferences::Style::Integrated)
+        run.require(toured_menus, "trainer fight/moves/bag/party/run inputs exercised");
     run.require(stable_world == 90 && pallet3d_active(),
                 "trainer closing dialogue returns to a stable 3D world");
     if (saw_loss)

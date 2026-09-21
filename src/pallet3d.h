@@ -129,6 +129,8 @@ struct PalletBattleInfo {
     float overlay_alpha;
     int trainer_class;
     float player_hp, enemy_hp, player_damage, enemy_damage;
+    bool integrated_menu;
+    int menu_kind, menu_panels;
 };
 PalletBattleInfo pallet3d_battle();
 

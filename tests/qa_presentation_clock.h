@@ -28,7 +28,8 @@ inline void before_swap(int width, int height, bool menu_open) {
     original_before_swap(width, height, menu_open);
     bool visible = SDL_ShowCursor(SDL_QUERY) == SDL_ENABLE;
     bool focused = pallet3d_window_focused();
-    if (visible != (menu_open || !focused)) {
+    bool backend_may_change = !(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange);
+    if (visible != (menu_open || !focused) || backend_may_change != visible) {
         std::fprintf(stderr, "[QA-CURSOR] FAIL menu=%d focus=%d visible=%d\n", menu_open, focused,
                      visible);
         std::exit(63);

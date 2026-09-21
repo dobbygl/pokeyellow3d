@@ -62,6 +62,19 @@ firstperson::Camera eye;
 firstperson::Controls controls;
 GBContext *input_context = nullptr;
 bool relative_allowed = false, window_focused = true;
+void update_cursor(bool menu_open) {
+    bool visible = menu_open || !window_focused;
+    // The SDL ImGui backend otherwise enables the system cursor at NewFrame,
+    // briefly undoing SDL_ShowCursor(false) before our scene gets drawn.
+    if (ImGui::GetCurrentContext()) {
+        auto &flags = ImGui::GetIO().ConfigFlags;
+        if (visible)
+            flags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+        else
+            flags |= ImGuiConfigFlags_NoMouseCursorChange;
+    }
+    SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE);
+}
 uint8_t input_mask = 0xff;
 bool dialogue_overlay = false;
 int actors_drawn = 0;
@@ -1445,7 +1458,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
                           event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED))
             load_started = SDL_GetTicks();
     }
-    SDL_ShowCursor(menu_open || !window_focused ? SDL_ENABLE : SDL_DISABLE);
+    update_cursor(menu_open);
     pallet3d_poll_controls(input_context, menu_open);
     if (menu_open)
         return false;
@@ -1536,7 +1549,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
 }
 
 void pallet3d_shutdown() {
-    SDL_ShowCursor(SDL_ENABLE);
+    update_cursor(true);
     effects.reset();
     title3d::shutdown();
     presentation::shutdown();
@@ -1616,6 +1629,7 @@ bool pallet3d_active() {
 }
 
 void pallet3d_begin_frame(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
+    update_cursor(menu_open);
     presented_lcd = framebuffer;
     if (effects_enabled && enabled && preview_map < 0 && ctx &&
         pallet::view(ctx) == pallet::View::Overworld) {
@@ -1914,7 +1928,7 @@ daynight::Light pallet3d_daylight_frame() {
     return world_frame.light;
 }
 void pallet3d_settings_ui(bool menu_open) {
-    SDL_ShowCursor(menu_open || !window_focused ? SDL_ENABLE : SDL_DISABLE);
+    update_cursor(menu_open);
     if (!menu_open)
         return;
     // ImGui supports appending to the same window with multiple Begin/End

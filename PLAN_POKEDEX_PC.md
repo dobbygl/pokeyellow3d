@@ -1,6 +1,6 @@
 # Plan: Pokédex and PC in 3D
 
-Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 completed and verified; B3 completed and verified. Goal active after resuming the integrated objective.
+Date: 2026-09-20. Status: A1, A2, B1 and B2 completed and verified; A3 completed and verified; B3 completed and verified. Included in v0.2.0; the integrated objective still awaits the original runtime CI gate recorded in `PLAN_API_CI.md`.
 
 ## Goal and scope
 

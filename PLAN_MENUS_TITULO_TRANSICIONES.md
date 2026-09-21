@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. Plan de menús cerrado: A1, A2, A3, B1, B2, C1, C2 y C3 completadas y verificadas. El goal integrado continúa con la fase 5 de API/CI.
+Fecha: 2026-09-20. Actualizado 2026-09-21: plan de menús cerrado, 26/26 criterios; A1, A2, A3, B1, B2, C1, C2 y C3 verificadas e incluidas en v0.2.0. El objetivo integrado mantiene pendiente la CI del runtime original, registrada en `PLAN_API_CI.md`.
 
 ## Análisis del estado actual
 

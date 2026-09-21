@@ -38,16 +38,22 @@ int main(int argc, char **argv) {
     ctx.rom = rom.data();
     ctx.rom_size = rom.size();
     ctx.wram = ram.data();
+    std::array<uint8_t, 128> hram{};
+    ctx.hram = hram.data();
     ctx.sp = 0xdfea;
     check(!fade::warp(&ctx), "stale warp variables are insufficient");
-    for (auto pair : std::array<std::array<int, 3>, 7>{{{0x576, 0x1eb6, 0xcd},
-                                                        {0x581, 0x6ef, 0xcd},
-                                                        {0x5a7, 0x6ef, 0xcd},
-                                                        {0x5c9, 0x6ef, 0xcd},
-                                                        {0x5d5, 0xfc3, 0xcd},
-                                                        {0x1dc, 0xecb, 0xcd},
-                                                        {0x1fd, 0x750, 0xc4}}}) {
+    for (auto pair : std::array<std::array<int, 3>, 10>{{{0x576, 0x1eb6, 0xcd},
+                                                         {0x581, 0x6ef, 0xcd},
+                                                         {0x5a7, 0x6ef, 0xcd},
+                                                         {0x5c9, 0x6ef, 0xcd},
+                                                         {0x5d5, 0xfc3, 0xcd},
+                                                         {0x1dc, 0xecb, 0xcd},
+                                                         {0x1fd, 0x750, 0xc4},
+                                                         {0x7ab, 0x7bc, 0xcd},
+                                                         {0x7ae, 0x7c4, 0xcd},
+                                                         {0x20d, 0x3e84, 0xcd}}}) {
         int call = pair[0], target = pair[1], ret = call + 3;
+        ram[0x1731] = call == 0x20d ? 8 : 0;
         check(rom[call] == pair[2] && (rom[call + 1] | rom[call + 2] << 8) == target,
               "canonical CALL target");
         ram[0x1fea] = ret & 255;
@@ -61,6 +67,31 @@ int main(int argc, char **argv) {
         ctx.sp = 0xdfea;
         ram[0x1fea] = ram[0x1feb] = 0;
     }
+    ram[0x1fea] = 0x10;
+    ram[0x1feb] = 2;
+    ram[0x1731] = 1;
+    check(!fade::field_arrival(&ctx) && !fade::warp(&ctx),
+          "Venusaur DATA register pair 0210 is not a field arrival");
+    ram[0x1fea] = ram[0x1feb] = 0;
+    ram[0x1731] = 9;
+    hram[0x38] = 1;
+    check(!fade::field_loading(&ctx), "field warp flags alone cannot select loading");
+    ram[0x1fea] = 0xfb;
+    ram[0x1feb] = 0x5c;
+    check(fade::field_loading(&ctx) && fade::warp(&ctx), "verified SpecialEnterMap delay");
+    hram[0x38] = 2;
+    check(!fade::field_loading(&ctx), "same return in a different bank is insufficient");
+    hram[0x38] = 1;
+    ram[0x1731] = 1;
+    check(!fade::field_loading(&ctx), "new game SpecialEnterMap is not a field move");
+    ram[0x1731] = 9;
+    rom[0x5cf9] ^= 1;
+    check(!fade::field_loading(&ctx), "loading target verified against original ROM");
+    rom[0x5cf9] ^= 1;
+    ctx.sp = 0xdff0;
+    check(!fade::field_loading(&ctx), "popped field-load return ignored");
+    ctx.sp = 0xdfea;
+    ram[0x1fea] = ram[0x1feb] = ram[0x1731] = 0;
     check(!menu_state::running(nullptr), "null menu context");
     for (int call : {0x2de, 0x3f47}) {
         check(rom[call] == 0xcd && (rom[call + 1] | rom[call + 2] << 8) == 0x2817,

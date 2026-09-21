@@ -87,6 +87,8 @@ struct WorldFrame {
     bool fp = false;
     Vec hero{};
 } world_frame;
+bool world_frame_current = false;
+uint64_t world_frame_cycles = 0;
 pc_state::Motion pc_motion;
 pc_state::Sample pc_sample;
 pc_state::Terminal pc_terminal;
@@ -106,7 +108,9 @@ bool can_compose_battle(const GBContext *ctx) {
         return false;
     if (pallet::view(ctx) == pallet::View::Battle)
         return true;
-    if (world_frame.map < 0 && !battle_sequence)
+    if ((!world_frame_current || world_frame.map < 0 ||
+         world_frame.map != pallet::read(ctx, pallet::Map)) &&
+        !battle_sequence)
         return false;
     if (battle_transition::entry(ctx) || battle::normal(ctx))
         return true;
@@ -128,9 +132,9 @@ bool can_compose_menu(const GBContext *ctx) {
            state == pallet::View::Computer || state == pallet::View::PokedexArea ||
            menu_state::running(ctx) || (menu_overlay && state == pallet::View::Transition);
 }
-bool warp_overlay = false;
+bool warp_overlay = false, field_arrival_ready = false;
 int warp_destination = -1;
-bool load_fade = false, load_incoming = false;
+bool load_fade = false, load_incoming = false, load_paused = false;
 uint32_t load_started = 0;
 float load_elapsed = 0;
 bool can_compose_warp(const GBContext *ctx) {
@@ -893,6 +897,8 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
                    float(fp ? (current.interior && interior::cave(current) ? 2 : 1) : 0),
                    fp,
                    {player_position[0], .6f, player_position[1]}};
+    world_frame_current = true;
+    world_frame_cycles = ctx->cycles;
     draw_world_frame(w, h, tone);
 }
 
@@ -1085,6 +1091,8 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
     menu_full = menu_overlay && menu_regions.kind == menu_layout::Kind::Full;
     dialogue_overlay = menu_overlay && pallet::bottom_dialogue(ctx);
     warp_overlay = !battle_composed && can_compose_warp(ctx);
+    if (!fade::field_arrival(ctx))
+        field_arrival_ready = false;
     if (warp_overlay)
         warp_destination = pallet::read(ctx, pallet::Map);
     active = enabled &&
@@ -1117,8 +1125,10 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         // A GPU upload/driver stall cannot skip the whole cosmetic reveal.
         // Guest-driven BGP fades above remain entirely frame-exact; this clock
         // is used only for a savestate, which has no guest fade of its own.
-        if (!menu_open && window_focused)
+        bool paused = menu_open || !window_focused;
+        if (!paused && !load_paused)
             load_elapsed += std::min(25.f, float(uint32_t(now - load_started)));
+        load_paused = paused;
         load_started = now;
         float elapsed = load_elapsed;
         bool entering = false;
@@ -1179,6 +1189,16 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         auto tone = fade::tone(ctx->io[0x47]);
         if (!(ctx->io[0x40] & 0x80))
             tone = {0, ctx->io[0x47] == 0 ? 1.f : 0.f};
+        // Fly/Teleport/Dig reveal the destination inside EnterMapAnim, before
+        // returning to the normal overworld loop. Build it at the white
+        // midpoint and snap both cameras, never easing across the journey.
+        if (fade::field_arrival(ctx) && !field_arrival_ready &&
+            pallet::valid_live_map(ctx, *pallet::scene(pallet::read(ctx, pallet::Map)))) {
+            camera_ready = false;
+            eye.reset();
+            world(ctx, width, height, tone);
+            field_arrival_ready = true;
+        }
         bool hidden =
             !pallet::read(ctx, pallet::Sprite1) || pallet::read(ctx, pallet::Sprite1 + 2) == 255;
         draw_world_frame(width, height, tone, hidden, false);
@@ -1395,9 +1415,12 @@ void pallet3d_shutdown() {
     atlas_tileset = -2;
     tile_animation_info = {};
     world_frame = {};
+    world_frame_current = false;
+    world_frame_cycles = 0;
     warp_overlay = false;
+    field_arrival_ready = false;
     warp_destination = -1;
-    load_fade = load_incoming = false;
+    load_fade = load_incoming = load_paused = false;
     scenery.clear();
     vertices.clear();
     camera_ready = false;
@@ -1438,6 +1461,13 @@ bool pallet3d_active() {
 
 void pallet3d_begin_frame(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
     presented_lcd = framebuffer;
+    // While F2 is off the engine can move, change maps and start an encounter.
+    // Keep the cached pixels for crossfading, but never use that old world as
+    // the entry scene of a new battle. A verified arena can still resume 3D.
+    if (!enabled && ctx && ctx->cycles != world_frame_cycles) {
+        world_frame_current = false;
+        battle_sequence = false;
+    }
     presentation::begin(wants_scene(ctx), menu_open || !window_focused, SDL_GetTicks());
     pallet3d_poll_controls(ctx, menu_open);
 }
@@ -1497,11 +1527,13 @@ uint8_t pallet3d_input_mask() {
 }
 
 void pallet3d_state_loaded(GBContext *ctx) {
+    world_frame_current = false;
     dex_area3d::reset();
     pc3d::reset();
     battle_sequence = battle_arena = battle_fighters = battle_dark = battle_composed = false;
     battle3d::reset();
     warp_overlay = false;
+    field_arrival_ready = false;
     warp_destination = -1;
     menu_overlay = false;
     scene_filter::invalidate();
@@ -1510,6 +1542,7 @@ void pallet3d_state_loaded(GBContext *ctx) {
                 world_frame.map != pallet::read(ctx, pallet::Map) &&
                 pallet::view(ctx) == pallet::View::Overworld;
     load_incoming = false;
+    load_paused = false;
     load_started = SDL_GetTicks();
     load_elapsed = 0;
     if (!load_fade) {

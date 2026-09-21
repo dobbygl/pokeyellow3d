@@ -167,6 +167,14 @@ inline int portraits(GBContext *ctx, bool device = false) {
         run.require(picture.valid && !differences,
                     "ROM decompression equals original vFrontPic byte for byte");
         if (device) {
+            if (!pallet3d_dex().active) {
+                std::fprintf(stderr,
+                             "[DEX-DATA] unpresented number=%d departure=%d arrival=%d loading=%d "
+                             "flags=%02x sp=%04x\n",
+                             n, fade::field_departure(ctx), fade::field_arrival(ctx),
+                             fade::field_loading(ctx), ctx->wram[0x1731], ctx->sp);
+                gb_context_save_state_file(ctx, "logs/dex-data-failure.state");
+            }
             run.require(pallet::view(ctx) == pallet::View::Pokedex && pallet3d_dex().active,
                         "verified original data screen presents the device");
             run.require(pallet3d_covers_frame(ctx) && pallet3d_input_mask() == 255,

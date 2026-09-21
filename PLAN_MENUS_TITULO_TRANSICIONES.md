@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, C1 y C2 completadas y verificadas; C3 parcialmente implementada; B1 y B2 pendientes.
+Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, C1, C2 y C3 completadas y verificadas; B1 y B2 pendientes.
 
 ## Análisis del estado actual
 
@@ -253,9 +253,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] F2 en cualquier estado produce un fundido cruzado y no un corte.
-- [ ] Volar de Ciudad Verde a Paleta encadena fundido, carga y aparición sin frame 2D.
-- [ ] Ninguna transición deja la máscara de controles relativos activa.
+- [x] F2 en cualquier estado produce un fundido cruzado y no un corte.
+- [x] Volar de Ciudad Verde a Paleta encadena fundido, carga y aparición sin frame 2D.
+- [x] Ninguna transición deja la máscara de controles relativos activa.
 
 ## Limitaciones asumidas
 
@@ -646,3 +646,116 @@ Criterios de aceptación:
   desplazarse con F2 desactivado. Después quedan B1/B2 y la validación final.
 - Las regresiones completas anotadas en el cierre de C2 preceden a estos
   cambios de C3; no se presentan como validación de la implementación parcial.
+
+### C3: viajes y casos especiales — 2026-09-21, verificación en curso
+
+- Revisión visual del compositor existente en
+  `build/qa/logs/ui-c3-crossfade-review.png`: mundo, Start, equipo, combate y
+  puerta; salida, punto intermedio, 2D y retorno, en ambas cámaras. Las imágenes
+  proceden de `build/qa/ui-crossfade-nWGjbc/`. No hay cortes ni pérdida de la
+  interfaz original; la superposición intermedia es el fundido entre frames.
+- La prueba real de Vuelo detectó huecos en el reconocimiento: `LeaveMapAnim`,
+  el `DelayFrames` de `SpecialEnterMap` y `EnterMapAnim` no seguían la ruta de
+  las puertas. Se reconocen sus retornos vivos y se verifican las instrucciones
+  de la ROM; el intervalo de carga exige además banco 1 y los flags activos.
+  El destino se prepara en blanco y ambas cámaras se recolocan inmediatamente.
+- Reproducido y corregido el salto al cerrar Esc durante la carga de un estado:
+  el primer frame de vuelta ya no suma el intervalo pausado. Se prueban Esc y
+  pérdida de foco durante las dos mitades, con igualdad exacta de imagen al
+  reanudar y sin avanzar el motor.
+- Reproducida y corregida la reutilización de una escena antigua al reactivar
+  F2 durante una entrada en combate después de caminar en 2D. Si el motor ha
+  avanzado sin actualizar el mundo, se conserva la entrada original hasta
+  tener arena válida. Se prueba tanto un mapa distinto como otra posición en
+  el mismo mapa, en ambas cámaras.
+- Batería específica `build/qa/ui-special-transitions-b9qm0U/`: **16/16
+  escenarios aprobados**. Vuelo Verde→Paleta registra 317 frames compuestos;
+  Teletransporte y Excavar, 346 cada uno. Bicicleta, 1.081 frames; surf, 656,
+  sin transiciones añadidas. Cuatro pausas por cámara y cuatro encuentros con
+  escena invalidada. Las pruebas de primera persona parten de W pulsada y
+  verifican que las transiciones neutralizan la máscara de controles.
+- La preparación privada concede movimientos, medalla, destinos y bicicleta;
+  fija Paleta como último punto de recuperación y carga la cueva mediante un
+  warp del motor. Los menús, viajes, monturas y encuentros observados los
+  ejecuta después el juego original. No se presenta como una partida que haya
+  obtenido esos requisitos. WRAM, VRAM, RAM de cartucho y framebuffer se
+  comparan antes y después de cada presentación; C generado y runtime intactos.
+- Revisadas las fases de los seis viajes en
+  `build/qa/logs/ui-c3-field-travel-review.png`: salida, blanco completo,
+  aparición y destino. Evidencia detallada en los CSV y PPM privados de la
+  batería. Los 26 CTest y los 10 tests del directorio sin ROM han pasado.
+  La regresión completa está en curso; las casillas C3 permanecen abiertas
+  hasta cerrar todas las baterías y la comparación de referencias.
+
+Reproducción de las comprobaciones específicas:
+
+```sh
+tests/ui_crossfade_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-crossfade-5bOG41/world.state \
+  build/qa/ui-crossfade-5bOG41/battle.state
+tests/ui_special_transitions_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/interiors-fJDbZk/city.state \
+  build/qa/firstperson-9cB3FJ/route.state
+bash build/qa/logs/run-ui-c3-regressions.sh
+```
+
+#### C3: regresión de DATA encontrada y corregida durante el cierre
+
+La primera ejecución completa se detuvo en la tercera ficha de Pokédex:
+`build/qa/dex-portraits-JDjShl/logs/run.log`. Venusaur guarda `0x0210` como
+registro en la pila, coincidiendo con el retorno de `EnterMapAnim`, mientras
+`wStatusFlags6` vale `01`. La detección exige ahora además el bit 3 que el motor
+comprueba antes de llamar a la animación y limpia al volver. El retorno vivo
+verificado y ese flag son necesarios juntos; ninguno basta por sí solo.
+
+Se añadió el caso negativo al test de fundidos y diagnóstico privado al test
+de las fichas. La repetición específica recorrió **151/151 retratos** con los
+bytes originales de VRAM idénticos y el dispositivo presentado, en
+`build/qa/dex-portraits-YCBoKU/`. CTest **26/26** aprobado; ficha de Venusaur
+revisada en `build/qa/logs/ui-c3-venusaur-regression-review.png`. Se repite la
+regresión completa sobre esta corrección con
+`bash build/qa/logs/run-ui-c3-final-regressions.sh`; la ejecución anterior se
+conserva con salida 40 como evidencia del fallo y no cuenta como aceptación.
+
+
+### C3 cerrada: regresión completa — 2026-09-21
+
+- PR [#8](https://github.com/dobbygl/pokeyellow3d/pull/8); implementación probada
+  `c49d90f`. CTest **26/26**, directorio independiente sin ROM **10/10**,
+  `clang-format` 18.1.8 y **las 16 baterías `tests/*_qa.sh` aprobadas**.
+  Ejecución reproducible: `bash build/qa/logs/run-ui-c3-final-regressions.sh`;
+  log y salida final en `build/qa/logs/ui-c3-final-regressions.{log,exit}`.
+- Las **38/38 referencias exteriores coinciden byte a byte**, sin excepciones.
+  Comparación en `build/qa/logs/ui-c3-final-exterior-comparison.txt` y resultados
+  estructurados en `build/qa/logs/ui-c3-final-acceptance.json`.
+- CI de la implementación aprobada: GCC, Clang, 2D y formato, ejecución
+  [35565819035](https://github.com/dobbygl/pokeyellow3d/actions/runs/35565819035).
+  Windows/macOS siguen con el estado previsto por el plan de API; no forman
+  parte de los jobs habilitados en este punto.
+- Revisión visual adicional de monturas, destinos de carga y arenas válidas en
+  `build/qa/logs/ui-c3-special-cases-review.png`. Las pruebas del motor original
+  y las comparaciones de imagen anteriores siguen vigentes. Los casos de link,
+  tutorial y Safari del compositor usan flags controlados y no se presentan
+  como recorridos reales de esos modos.
+- Se cierran las tres casillas C3. B1 y B2 siguen pendientes y se realizarán
+  después de fusionar este punto, según el orden del objetivo integrado.
+
+Directorios de evidencia de la regresión final:
+
+- `battles`: `build/qa/battles-10OS8j/`.
+- `dex_area`: `build/qa/dex-area-xVK452/`.
+- `dex_list`: `build/qa/dex-list-GmsrtM/`.
+- `dex_portraits`: `build/qa/dex-portraits-pnsWux/`.
+- `firstperson`: `build/qa/firstperson-Dd34nh/`.
+- `interiors`: `build/qa/interiors-sYI5Gh/`.
+- `pc_details`: `build/qa/pc-details-ggjyUv/`.
+- `pc_focus`: `build/qa/pc-focus-wTwS8Q/`.
+- `pc_storage`: `build/qa/pc-storage-zFhNw5/`.
+- `tile_animation`: `build/qa/tile-animation-PFEYsJ/`.
+- `ui_battles`: `build/qa/ui-battles-3Opx6i/`.
+- `ui_crossfade`: `build/qa/ui-crossfade-B7xqfb/`.
+- `ui_menus`: `build/qa/ui-menus-FzHv3Q/`.
+- `ui_special_transitions`: `build/qa/ui-special-transitions-Y8HxpK/`.
+- `ui_transitions`: `build/qa/ui-transitions-JULyLe/`.
+- `world`: `build/qa/kanto-jAHfVo/`.

@@ -1,6 +1,6 @@
 name: Release
 
-# Phase 4 of PLAN_API_CI.md. Publishes Linux binaries for every
+# Phase 4 of PLAN_API_CI.md. Publishes Linux and Windows binaries for every
 # `vX.Y.Z` tag. It never packages the ROM: the package only carries the
 # executable, the documentation, and a RUN.md explaining where to place the
 # user's own ROM.
@@ -9,9 +9,18 @@ on:
   push:
     tags:
       - "v*"
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - '.github/release/**'
+      - '.github/windows/vcpkg.json'
+
+# Pull requests exercise exactly the packaging jobs without publishing a release.
+env:
+  PACKAGE_VERSION: ${{ github.event_name == 'push' && github.ref_name || format('preview-{0}', github.sha) }}
 
 permissions:
-  contents: write
+  contents: read
 
 defaults:
   run:
@@ -76,71 +85,152 @@ jobs:
           assert "llvmpipe" in output or "softpipe" in output, "Renderer must run on software Mesa"
           PYCODE
 
-      - name: Package
+      - name: Package and verify the extracted launcher
         run: |
-          set -eu
-          pkg="pokeyellow3d-linux-x86_64-${{ github.ref_name }}"
+          set -euo pipefail
+          [[ "$PACKAGE_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+          pkg="pokeyellow3d-linux-x86_64-$PACKAGE_VERSION"
           mkdir -p "dist/$pkg"
           cp build/pokeyellow3d "dist/$pkg/"
           cp PALLET3D.md README.md "dist/$pkg/"
+          cp .github/release/RUN-linux.md "dist/$pkg/RUN.md"
           ldd build/pokeyellow3d > "dist/$pkg/DEPENDENCIES.txt"
           if grep -q 'not found' "dist/$pkg/DEPENDENCIES.txt"; then
             cat "dist/$pkg/DEPENDENCIES.txt"
             exit 1
           fi
-          cat > "dist/$pkg/RUN.md" <<'EOF'
-          # Running pokeyellow3d
-
-          This Linux x86_64 binary is built on Ubuntu 24.04. It requires
-          compatible system libraries: SDL2, libcurl, OpenGL/GLES2, and a
-          graphics driver. DEPENDENCIES.txt records the linked libraries.
-          This is a dynamic binary, not a self-contained AppImage.
-
-          This package does not include the Pokemon Yellow ROM. Supply your
-          own copy:
-
-          1. Create a `roms` folder next to the `pokeyellow3d` executable
-             in the extracted package.
-          2. Copy your ROM into it as `roms/pokeyellow.gbc`. The build
-             targets the 1 MiB English USA/Europe ROM, SHA-1
-             `cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1`.
-          3. Open a terminal in this folder and run `./pokeyellow3d`.
-
-          On first launch the game extracts its assets into an `assets/`
-          folder next to the executable; later launches reuse them. Saves
-          are written to `pokeyellow.sav` in the same folder. See
-          `PALLET3D.md` and `README.md` for controls and troubleshooting.
-          EOF
-          cd dist && zip -r "${pkg}.zip" "$pkg"
+          (cd dist && zip -r "$pkg.zip" "$pkg" && sha256sum "$pkg.zip" > "$pkg.zip.sha256")
+          mkdir -p build/qa/package-verification
+          unzip "dist/$pkg.zip" -d build/qa/package-verification
+          (cd "build/qa/package-verification/$pkg" && ./pokeyellow3d --list-games)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: pokeyellow3d-linux
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.sha256
           if-no-files-found: error
 
-  # ---------------------------------------------------------------------
-  # Windows (MSVC). Same steps as the `windows` job in ci.yml.
-  # ---------------------------------------------------------------------
-  # build-windows is intentionally absent: the pinned gb-recompiled runtime
-  # does not compile with MSVC yet (see the Windows job in ci.yml). Restore
-  # it once the runtime is portable.
+  build-windows:
+    name: Build Windows package
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/build/qa/vcpkg-cache,readwrite"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Checkout pinned dependency ports
+        uses: actions/checkout@v7
+        with:
+          repository: microsoft/vcpkg
+          ref: 5f96cd15fd745122cf27e0524606d6c1efc5fd07
+          path: build/qa/vcpkg
+      - name: Restore compiled dependencies
+        id: dependencies
+        uses: actions/cache/restore@v6
+        with:
+          path: build/qa/vcpkg-cache
+          key: windows-vcpkg-5f96cd15-x64-${{ hashFiles('.github/windows/vcpkg.json') }}
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: ./build/qa/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+      - name: Extract GBRT_REF
+        id: gbrt
+        run: |
+          ref=$(sed -n 's/.*set(GBRT_REF "\([^"]*\)".*/\1/p' CMakeLists.txt)
+          test -n "$ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Cache FetchContent runtime
+        uses: actions/cache@v6
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-msvc-deps-${{ steps.gbrt.outputs.ref }}
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Configure
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/build/qa/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_MANIFEST_DIR="${{ github.workspace }}/.github/windows"
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+          -DPOKEYELLOW_3D=ON
+          -DCMAKE_BUILD_TYPE=MinSizeRel
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+      - name: Build
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        # Report all independent MSVC diagnostics in one run; any failure still
+        # makes Ninja and this job fail.
+        run: cmake --build build --parallel 4 -- -k 0
+      - name: Test without ROM on native Windows and ANGLE
+        shell: pwsh
+        run: |
+          $env:PATH = "$pwd/build/vcpkg_installed/x64-windows/bin;$env:PATH"
+          ctest --test-dir build -LE rom --output-on-failure --output-junit "$pwd/build/ctest.xml"
+      - name: Require Windows rendering coverage
+        run: |
+          python - <<'PYCODE'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("build/ctest.xml").getroot()
+          preview = root.find(".//testcase[@name='render_preview_synthetic']")
+          assert preview is not None and preview.find("skipped") is None, "Renderer must run, not skip"
+          output = preview.findtext("system-out", "").lower()
+          assert "driver=windows" in output and "angle" in output, "Renderer must use Windows + ANGLE"
+          PYCODE
+      - name: Package and verify the extracted launcher and renderer
+        shell: pwsh
+        run: ./.github/release/package-windows.ps1 -Version $env:PACKAGE_VERSION
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pokeyellow3d-windows
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+      - name: Preserve diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-diagnostics
+          path: |
+            build/Testing/Temporary/LastTest.log
+            build/ctest.xml
+            build/qa/vcpkg/buildtrees/*/*.log
+      - name: Retain compiled dependencies
+        if: always() && steps.dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/qa/vcpkg-cache
+          key: windows-vcpkg-5f96cd15-x64-${{ hashFiles('.github/windows/vcpkg.json') }}
 
   publish:
     name: Publish release
-    needs: [build-linux]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-windows]
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@v8
         with:
+          pattern: pokeyellow3d-*
           path: dist
           merge-multiple: true
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/*.sha256
           fail_on_unmatched_files: true
           generate_release_notes: true

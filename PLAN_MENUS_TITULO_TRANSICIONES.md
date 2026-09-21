@@ -871,8 +871,9 @@ Rama `boot-sequence-b2`, después de fusionar B1. El arranque conserva el
 copyright, Game Freak y la animación de Pikachu originales: son objetos
 propios de la intro, sin una escena de mapa que reconstruir. El fundido de
 200 ms ya existente toma el último frame completo antes del título como
-origen y mezcla la escena 3D cuando B1 la reconoce. No hace falta modificar
-el runtime, el render jugable ni el C generado para conservar esta ruta.
+origen y mezcla la escena 3D cuando B1 la reconoce. La detección de Continuar
+se amplía al bucle de confirmación y a su salida a blanco; el runtime y el C
+generado no cambian.
 
 `pallet_render_smoke ROM boot` arranca una máquina nueva sin savestate,
 deja terminar toda la intro, pulsa Start desde el título y termina tras 90
@@ -898,6 +899,21 @@ del motor. Oak y los nombres siguen sobre el fondo atenuado; el paso al
 mundo conserva el blanco original de carga y la entrada gradual de C1/A3.
 Los blancos y los cambios entre viñetas de la intro pertenecen al juego
 original, comprobado por el oráculo de píxeles previo al título.
+
+La revisión ampliada de `boot-b2-focused-continue-world-fade.png` encontró
+un defecto entre el resumen de Continuar y la carga: al volver de
+`DisplayContinueGameInfo`, el bucle A/B ya no tenía el retorno reconocido
+por B1. El compositor mezclaba durante unos frames el panel pequeño con
+el LCD ampliado. La primera regresión completa se interrumpió con salida
+143 para corregirlo; no sirve como aceptación.
+
+La corrección reconoce las llamadas verificadas de ese bucle, el fundido a
+blanco, el borrado y su espera, además de sus PC de instrucciones con pila
+vacía y banco 1, cotejando los bytes de ROM. No basta un PC dentro de un
+intervalo ni un retorno antiguo. Las pruebas sintéticas y con ROM rechazan
+otro banco, bytes alterados y PC de operandos. El modo `boot` exige que el
+LCD original ya sea blanco cuando se abandona Continuar/Nueva partida:
+una futura regresión del menú duplicado falla automáticamente.
 
 Comandos reproducibles:
 

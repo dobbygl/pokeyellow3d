@@ -57,7 +57,8 @@ inline int run(GBContext *ctx, const char *mode, int limit) {
         require(title_qa::battery_loaded, "Continue requires a valid private battery input");
     FILE *trace = std::fopen("logs/boot.csv", "w");
     require(trace, "private logs directory exists");
-    std::fputs("frame,cycles,phase,active,blend,target,progress,bgp,lcdc,map,input,native_errors\n",
+    std::fputs("frame,cycles,phase,active,blend,target,progress,bgp,lcdc,map,input,native_errors,"
+               "pc,sp,bank,root\n",
                trace);
     const bool video = std::getenv("BOOT_VIDEO") != nullptr;
     Movie composed, original;
@@ -107,6 +108,15 @@ inline int run(GBContext *ctx, const char *mode, int limit) {
         auto phase = title_state::sample(ctx);
         auto blend = pallet3d_blend();
         const auto *lcd = gb_get_framebuffer(ctx);
+        if (phase == title_state::Phase::None && first_world < 0 &&
+            (last_phase == title_state::Phase::Continue ||
+             last_phase == title_state::Phase::NewGame)) {
+            // A native fallback while the summary is still visible would
+            // crossfade its framed panel into a second, enlarged copy.
+            require(std::all_of(lcd, lcd + 160 * 144,
+                                [](uint32_t pixel) { return (pixel & 0xffffff) == 0xffffff; }),
+                    "title menu exits only after the original LCD has faded to white");
+        }
         int native_errors = 0;
         if (first_title < 0 && phase == title_state::Phase::None) {
             require(!pallet3d_active() && !blend.active && !input,
@@ -172,10 +182,11 @@ inline int run(GBContext *ctx, const char *mode, int limit) {
             }
             original.write(raw);
         }
-        std::fprintf(trace, "%d,%llu,%d,%d,%d,%d,%.6f,%u,%u,%u,%s,%d\n", frame,
+        std::fprintf(trace, "%d,%llu,%d,%d,%d,%d,%.6f,%u,%u,%u,%s,%d,%04x,%04x,%02x,%04x\n", frame,
                      (unsigned long long)ctx->cycles, int(phase), pallet3d_active(), blend.active,
                      blend.target_3d, blend.progress, ctx->io[0x47], ctx->io[0x40],
-                     pallet::read(ctx, pallet::Map), input ? input : "", native_errors);
+                     pallet::read(ctx, pallet::Map), input ? input : "", native_errors, ctx->pc,
+                     ctx->sp, ctx->hram[0x38], ctx->wram[0x1ffd] | (ctx->wram[0x1ffe] << 8));
         if (frame % 120 == 0 || phase != last_phase ||
             (first_title >= 0 && frame <= first_title + 30) || frame == first_world) {
             char path[96];

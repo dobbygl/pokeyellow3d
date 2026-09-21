@@ -55,8 +55,30 @@ inline Phase sample(const GBContext *ctx) {
         return Phase::None;
     if (root_call(ctx, {0x5cd7, 0x5e85}) || root_call(ctx, {0x5ce1, 0x372f}))
         return Phase::NewGame;
-    if (save == 2 && root_call(ctx, {0x5c64, 0x5d1f}))
-        return Phase::Continue;
+    if (save == 2) {
+        constexpr Call continue_calls[]{{0x5c64, 0x5d1f},
+                                        {0x5c73, 0x01b9},
+                                        {0x5c83, 0x3dd8},
+                                        {0x5c86, 0x16dd},
+                                        {0x5c90, 0x372f}};
+        for (auto call : continue_calls)
+            if (root_call(ctx, call))
+                return Phase::Continue;
+        // DisplayContinueGameInfo returns before the A/B confirmation loop.
+        // That loop can yield with no CALL on the stack, just like the title
+        // audio loop. Keep the original menu framed until its white-out;
+        // falling back here would crossfade it into a second, enlarged menu.
+        constexpr uint8_t confirm_loop[]{0x21, 0x25, 0xd1, 0xcb, 0xee, 0xaf, 0xe0, 0xb3, 0xe0, 0xb2,
+                                         0xe0, 0xb4, 0xcd, 0xb9, 0x01, 0xf0, 0xb4, 0xcb, 0x47, 0x20,
+                                         0x07, 0xcb, 0x4f, 0xc2, 0xbb, 0x5b, 0x18, 0xe9};
+        constexpr uint16_t confirm_pc[]{0x5c67, 0x5c6a, 0x5c6c, 0x5c6d, 0x5c6f, 0x5c71, 0x5c73,
+                                        0x5c76, 0x5c78, 0x5c7a, 0x5c7c, 0x5c7e, 0x5c81};
+        if (ctx->sp == 0xdfff && ctx->hram[0x38] == 1 && ctx->rom_size >= 0x5c83 &&
+            !std::memcmp(ctx->rom + 0x5c67, confirm_loop, sizeof(confirm_loop)))
+            for (auto pc : confirm_pc)
+                if (ctx->pc == pc)
+                    return Phase::Continue;
+    }
     constexpr Call menu_calls[]{
         {0x5bb1, 0x5dfb}, {0x5bb8, 0x3eb4}, {0x5bbd, 0x372f}, {0x5bd3, 0x16dd}, {0x5bd6, 0x3e03},
         {0x5bd9, 0x36a3}, {0x5bdc, 0x3683}, {0x5bf1, 0x16f0}, {0x5bfa, 0x1723}, {0x5c05, 0x16f0},

@@ -56,10 +56,14 @@ static void capture_surface(const char *path) {
 #include "pc_hall_integration.h"
 #include "tile_animation_integration.h"
 #include "title_integration.h"
+#include "boot_integration.h"
 
 int main(int argc, char **argv) {
     if (argc < 3) {
         std::fprintf(stderr, "Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");
+        std::fprintf(
+            stderr,
+            "       pallet_render_smoke ROM boot [menu|new|continue] [MAX_FRAMES] [BATTERY]\n");
         return 1;
     }
     FILE *f = std::fopen(argv[1], "rb");
@@ -83,11 +87,17 @@ int main(int argc, char **argv) {
         return 4;
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
-    if (argc > 5 && !std::strcmp(argv[2], "--title-audit")) {
+    if (argc > 5 && (!std::strcmp(argv[2], "--title-audit") || !std::strcmp(argv[2], "boot"))) {
         title_qa::battery_path = argv[5];
         ctx->callbacks.load_battery_ram = title_qa::load_battery;
     }
     pokeyellow_init(ctx);
+    if (!std::strcmp(argv[2], "boot")) {
+        int result =
+            boot_qa::run(ctx, argc > 3 ? argv[3] : "menu", argc > 4 ? std::atoi(argv[4]) : 12000);
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 4 && !std::strcmp(argv[2], "--title-audit")) {
         int result = title_qa::audit(ctx, argv[3], std::atoi(argv[4]));
         gb_platform_shutdown();

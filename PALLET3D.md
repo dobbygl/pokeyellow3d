@@ -705,6 +705,10 @@ y las paletas vivas. Continuar, Nueva partida y los nombres se componen sobre
 la misma escena atenuada y desenfocada. El motor mantiene toda la entrada,
 la escritura de nombres y el temporizador que devuelve el título a la intro.
 El copyright inicial, Game Freak y la intro de Pikachu conservan su LCD.
+Esta animación usa objetos propios y no describe un mapa que convertir a
+3D. Se deja al motor reproducirla completa y el compositor aplica su
+fundido de 200 ms al entrar en el título, conservando el último frame
+completo de la intro como origen.
 
 La prueba local arranca una máquina nueva con ROM, tanto sin partida como con
 una copia de batería. No escribe la partida proporcionada:
@@ -717,3 +721,33 @@ Las capturas, trazas y copias quedan en `build/qa/title-*/`. Se comparan los
 píxeles del retrato contra el LCD original y se vigilan por frame la memoria
 emulada, el framebuffer y los controles relativos. El estado de aceptación
 y los recorridos observados se registran en `PLAN_MENUS_TITULO_TRANSICIONES.md`.
+
+Para verificar el arranque completo, sin saltar la intro ni cargar un
+savestate, el helper ofrece el modo público `boot`. Por defecto llega al
+menú principal y termina después de 90 frames de menú:
+
+```sh
+cmake --build build --target pallet_render_smoke --parallel 4
+mkdir -p build/qa/boot-manual/logs
+(cd build/qa/boot-manual && \
+  SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
+  ../../pallet_render_smoke ../../roms/pokeyellow.gbc boot)
+
+# Arranque completo, nueva partida y Continuar, con vídeos privados.
+tests/boot_qa.sh build/roms/pokeyellow.gbc /ruta/a/partida.sav
+```
+
+La sintaxis ampliada es `ROM boot [menu|new|continue] [MAX_FRAMES] [BATTERY]`.
+`new` parte sin batería y escribe los nombres mediante botones originales;
+`continue` exige una copia de batería válida. `BOOT_VIDEO=1` graba todos los
+frames a 60 fps en `logs/boot-composed.mp4` y `logs/boot-original.mp4`, sin
+audio. El helper limita el avance a 60 fps; el fundido conserva su reloj
+real, por lo que su número de frames depende del tiempo de renderizado.
+No cambia el reloj ni el ejecutable jugable.
+
+La batería deja vídeos, capturas, traza CSV y estado final en
+`build/qa/boot-*/`. Cada frame anterior al título se compara con los píxeles
+del LCD original, sin pulsaciones; la primera imagen del fundido coincide
+con el último frame de la intro. También se comprueban la finalización del
+fundido, la llegada al menú y al mundo, la cantidad de frames de los vídeos,
+los hashes de entrada y los guardas de memoria y controles por frame.

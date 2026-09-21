@@ -864,3 +864,50 @@ Directorios privados de evidencia:
 
 Se cierran las cuatro casillas B1. B2 sigue pendiente y empieza después de
 fusionar esta PR; no se declara todavía cerrado el plan de menús.
+
+### B2 en curso: arranque completo y grabación — 2026-09-21
+
+Rama `boot-sequence-b2`, después de fusionar B1. El arranque conserva el
+copyright, Game Freak y la animación de Pikachu originales: son objetos
+propios de la intro, sin una escena de mapa que reconstruir. El fundido de
+200 ms ya existente toma el último frame completo antes del título como
+origen y mezcla la escena 3D cuando B1 la reconoce. No hace falta modificar
+el runtime, el render jugable ni el C generado para conservar esta ruta.
+
+`pallet_render_smoke ROM boot` arranca una máquina nueva sin savestate,
+deja terminar toda la intro, pulsa Start desde el título y termina tras 90
+frames de menú. Sus variantes `new` y `continue` llegan al mundo mediante
+botones del motor; solo Continuar carga una copia de batería. La prueba
+verifica los píxeles nativos anteriores al título, el origen y progreso del
+fundido, la llegada al mundo, los controles relativos neutrales y la memoria
+WRAM/VRAM/RAM de cartucho/framebuffer intacta en cada presentación.
+
+Primera batería `build/qa/boot-EQzrWN/`: menú en 2.234 frames, nueva partida
+en 6.544 y Continuar en 2.463. Los tres conservan los 1.846 frames originales
+anteriores al título, con cero diferencias de píxeles. Nueva partida llega
+al dormitorio y Continuar a Paleta. Los vídeos completos conservan cada
+frame a 60 fps, tanto en la imagen compuesta como en el LCD original; son
+grabaciones sin audio. Los hashes de ROM y batería quedan intactos.
+
+Revisión visual privada: `build/qa/logs/boot-b2-focused-review-new-00.png`
+hasta `-06.png`, y `boot-b2-focused-review-continue-00.png` hasta `-03.png`.
+Cubren cada segundo de ambas secuencias y los frames de los fundidos. La
+entrada al título mezcla gradualmente el blanco final de la intro con
+Paleta; la aparición del retrato y la caída del logo conservan la secuencia
+del motor. Oak y los nombres siguen sobre el fondo atenuado; el paso al
+mundo conserva el blanco original de carga y la entrada gradual de C1/A3.
+Los blancos y los cambios entre viñetas de la intro pertenecen al juego
+original, comprobado por el oráculo de píxeles previo al título.
+
+Comandos reproducibles:
+
+```sh
+tests/boot_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-FzHv3Q/menus/logs/menu-battery.sav
+bash build/qa/logs/run-boot-b2-acceptance-regressions.sh
+```
+
+El segundo comando ejecuta CTest completo, el directorio independiente sin
+ROM, clang-format 18.1.8, las 18 baterías `tests/*_qa.sh` y la comparación
+exacta de las 38 referencias exteriores. Las dos casillas B2 permanecen
+pendientes hasta completar esta regresión y CI sobre la PR.

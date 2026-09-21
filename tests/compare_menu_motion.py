@@ -22,7 +22,7 @@ def verify_closing(logs):
             key = tuple(int(row[k]) for k in ('domain', 'x', 'y', 'w', 'h'))
             panels.setdefault(int(row['frame']), {})[key] = row
     previous = None
-    checked = 0
+    checked = visible = 0
     with (logs / 'motion-frames.csv').open() as stream:
         for frame in csv.DictReader(stream):
             current = panels.get(int(frame['frame']), {})
@@ -32,15 +32,16 @@ def verify_closing(logs):
                 step = elapsed / 629146
                 if elapsed < 629146 and frame['paused'] == old_frame['paused'] == '0':
                     for key, panel in old_panels.items():
-                        if panel['visible'] == '1' and float(panel['amount']) > step + 0.00001:
+                        if float(panel['amount']) > step + 0.00001:
                             assert key in current, (logs, frame['frame'], key, 'panel vanished before completing its fade')
                             if panel['target'] == '0':
                                 expected = max(0, float(panel['amount']) - step)
                                 assert abs(float(current[key]['amount']) - expected) < 0.00001, (logs, frame['frame'], 'closing phase jumped')
                                 checked += 1
+                                visible += panel['visible'] == current[key]['visible'] == '1'
             previous = frame, current
     assert checked > 0, (logs, 'no closing phase observed')
-    return checked
+    return dict(logical_steps=checked, visible_steps=visible)
 
 
 def compare(directory):

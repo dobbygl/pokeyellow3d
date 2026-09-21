@@ -1,7 +1,6 @@
 # Plan: ten improvements after completing the 3D design
 
-Date: 2026-09-20. Status: points 5 then 4 authorized after the pending menu, Pokédex/PC and API/CI phases. Ordered by priority; each point is
-independent except where a dependency is noted.
+Date: 2026-09-20. Updated 2026-09-21: points 5 and 4 are completed, verified and released in v0.2.0, after the prerequisite work recorded in the other plans. The integrated objective still awaits the original runtime CI gate in `PLAN_API_CI.md`. Other improvements retain their individual status below.
 
 ## Starting point
 

@@ -1,6 +1,6 @@
 # Plan: runtime extension API and CI on GitHub Actions
 
-Date: 2026-09-20. Status: phases 1–4 verified; phase 5 fork/Windows validation complete, original CI externally blocked; goal active. Develops points 1 and 2
+Date: 2026-09-20. Status: phases 1–4 verified, including Linux/Windows release v0.2.0; phase 5 fork/Windows validation complete, original CI externally blocked; integrated goal remains active. Develops points 1 and 2
 of `PLAN_MEJORAS.md`.
 
 ## Goal and scope
@@ -750,3 +750,72 @@ explicitly says to record a blocked point and continue with the next one: after
 merging this tested consumer PR, proceed to improvements 5B while retaining this
 external CI requirement. The overall goal cannot be marked complete until the
 original CI passes as well as all subsequent requirements.
+
+
+### v0.2.0 delivery and remaining external gate — 2026-09-21
+
+The ordered integrated work is on `main`: documentation PR #7, C3 #8,
+title B1 #9, boot B2 #10, runtime/Windows #11, world animation 5B #12 and
+local lighting 4A/4B #13. PR #13 merged as
+`b07162105a66531de7c6c59e6e9e30c67ff981da` after both implementation and
+closure-documentation CI passed. The menu plan has 26/26 criteria, Pokédex/PC
+20/20, improvements point 4 has 9/9 and point 5 has 10/10.
+
+[Packaging PR #14](https://github.com/dobbygl/pokeyellow3d/pull/14) restores the
+Windows artifact promised once the runtime became portable. It merged as
+`2544f9fe6895213965439162511f4a87b9a87526`, the exact target of **v0.2.0**.
+Both [preview package jobs](https://github.com/dobbygl/pokeyellow3d/actions/runs/35599222530)
+and the five enabled [PR CI jobs](https://github.com/dobbygl/pokeyellow3d/actions/runs/35599222508)
+passed before merge. [Main CI](https://github.com/dobbygl/pokeyellow3d/actions/runs/35604245921)
+also passed. The [tag workflow](https://github.com/dobbygl/pokeyellow3d/actions/runs/35604328912)
+built, verified and published both packages successfully.
+
+[Release v0.2.0](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.2.0)
+contains Linux x86_64 and Windows x64 ZIPs, each with a SHA-256 sidecar.
+Linux uses system libraries compatible with Ubuntu 24.04. Windows bundles
+15 release DLLs, including SDL2, CURL, ANGLE and the app-local MSVC runtime,
+dependency copyright notices and `Start.cmd`. Each executable includes the
+single-game launcher. Both packages include updated `README.md`, `PALLET3D.md`
+and platform-specific `RUN.md`, with no ROM, extracted assets, save or private
+capture. Public ZIPs were downloaded and verified after publication:
+
+- `linux`: 470,083 bytes; ZIP SHA-256
+  `45f6307be4d6c86812a19b3fbcc123fb0ad0a5708e23c5473565ae69576b6c0d`.
+- `windows`: 4,639,781 bytes; ZIP SHA-256
+  `d52de05424f1f6b704e1c13ed05a119bff7d55679e06a4354d2e798960dc42be`.
+
+Both package jobs passed all 13 ROM-free tests. The Windows job additionally
+ran the extracted launcher and synthetic renderer on native Windows/ANGLE
+with developer/vcpkg paths removed. The downloaded Linux launcher also ran
+locally. The artifact audit checks ZIP contents, x86_64 executable headers,
+all bundled Windows binary hashes, checksums and documentation against the
+version tag. Private results: `release-v0.2-artifacts.json`,
+`release-v0.2-metadata.json`, `release-v0.2-ci.json` and `release-main-ci.json`
+under `build/qa/logs/`.
+
+Game and runtime sources are unchanged from the accepted 4A/4B regression:
+30/30 CTest, 13/13 independent ROM-free tests, all 20 QA suites, all 38 exact
+exterior references, 24 reviewed lighting views and 31,464 identical complete
+engine-frame pairs. Packaging only changes workflows, distribution scripts
+and documentation. The local `build/pokeyellow3d` has been rebuilt from main;
+its SHA-256 remains
+`a6ea449e3e167176889391c86b4155cb8ab1e15b350ceaf670ce2eaeb6fa78cf`.
+
+Reproduction with the existing private evidence:
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 4
+gh run view 35604328912 -R dobbygl/pokeyellow3d
+# Download to a fresh private directory to avoid overwriting existing evidence.
+gh release download v0.2.0 -R dobbygl/pokeyellow3d \
+  --pattern '*.zip' --pattern '*.sha256' --dir build/qa/release-v0.2.0
+python3 build/qa/logs/verify-release-artifacts.py
+```
+
+**Still open:** upstream PR #2 at `00cc26d` has an empty check list and the
+original repository reports zero Actions runs. This account has read-only
+access there (`pull`, without `push`, `maintain` or `admin`). The fork,
+consumer CI and published packages are verified, but none proves the original
+project's CI. A maintainer must make that CI run available; the underlying
+workflow/approval policy is not visible. The phase 5 checkbox remains open
+and the integrated objective cannot be declared complete.

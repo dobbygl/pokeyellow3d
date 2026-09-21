@@ -80,6 +80,12 @@ generar primero la evidencia privada con `tests/dex_portraits_qa.sh`.
 `ctest --test-dir build -LE rom --output-on-failure` ejecuta el grupo sin ROM;
 no se distribuye esa ROM.
 
+Windows/MSVC también compila y pasa los once tests sin ROM, incluido el renderer
+sintético con el controlador Windows de SDL2 y ANGLE. Los comandos de compilación
+con las dependencias fijadas están en [README.md](README.md#building-on-windows).
+Los recorridos con ROM y las comparaciones de capturas se validan en Linux/Mesa;
+la CI no equivale a una partida completa en Windows.
+
 Para repetir la integración completa con las fixtures locales verificadas:
 
 ```sh

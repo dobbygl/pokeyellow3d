@@ -1,6 +1,6 @@
 # Plan: runtime extension API and CI on GitHub Actions
 
-Date: 2026-09-20. Status: phases 1–4 verified; phase 5 in progress; goal active. Develops points 1 and 2
+Date: 2026-09-20. Status: phases 1–4 verified; phase 5 fork/Windows validation complete, original CI externally blocked; goal active. Develops points 1 and 2
 of `PLAN_MEJORAS.md`.
 
 ## Goal and scope
@@ -632,3 +632,121 @@ the complete 18-suite ROM-backed regression is running through
 `bash build/qa/logs/run-api-phase5-final-regressions.sh`. The game's first native
 Windows consumer CI is still building its dependencies in
 https://github.com/dobbygl/pokeyellow3d/actions/runs/35582586562 .
+
+The first Windows consumer build completed its dependencies and then rejected
+implicit narrowing and shadowed local names under `/W4 /WX`. Commit `6520b1c`
+makes the existing byte/address/float conversions explicit and names the local
+render buffers distinctly; warning severity remains unchanged. Its local
+28/28 CTest passes. GCC, Clang, Linux 2D and format pass in
+https://github.com/dobbygl/pokeyellow3d/actions/runs/35584341509 ; the native
+Windows build is still running at this checkpoint. The earlier full regression
+was stopped with exit 143 to apply these diagnostics; its `api-phase5-pre-msvc-*`
+logs are retained but are not final acceptance. The full 18-suite driver will
+run again only after this CI succeeds.
+
+
+### Phase 5: Windows consumer CI passes, 2026-09-21
+
+Game commit `0162956b1443206788d079adf6b7aa21e3425b5d` passes all enabled
+jobs at https://github.com/dobbygl/pokeyellow3d/actions/runs/35585877841 :
+GCC, Clang, Linux 2D, format and native Windows/MSVC. Windows builds the complete
+application and runs **11/11** tests without a ROM and without skipped tests.
+The downloaded JUnit artifact verifies SDL `driver=windows` with ANGLE using
+Direct3D11's Microsoft Basic Render Driver. The renderer exercises 30 frames
+across three synthetic maps plus a live overworld, reports no GL error, and
+checks unchanged guest memory and a non-empty surface. Private evidence is in
+`build/qa/logs/api-phase5-code-ci.json` and `api-phase5-windows-diagnostics/`.
+
+The two rounds of strict MSVC diagnostics were fixed in the fixtures with
+explicit byte/address conversions and non-shadowing local names; no assertion
+or warning level was removed. The independent local build without a ROM also
+passes 11/11; full local CTest passes 28/28. The earlier `api-phase5-pre-msvc-*`
+and `api-phase5-pre-tests-*` partial runs are not accepted as the full regression.
+The 18-suite driver now runs after successful native CI on this exact code;
+`api-phase5-source-snapshot.json` records hashes of the 113 game source/test/build
+files and 91 runtime files checked again by `check-api-phase5-regressions.py`.
+
+The upstream CI gate is externally pending. The original repository reports
+zero pull-request workflow runs and an empty check list on the ready PR; this
+account has `pull` permission but no `push`, `maintain` or `admin` permission.
+The PR body asks a maintainer to inspect whether its workflow needs enabling
+or approval. The exact policy is not visible, so no specific approval cause is
+assumed. `api-phase5-upstream-ci-status.json` records the API evidence. Its
+checkbox stays unchecked until the original repository produces a passing run;
+the green fork and consumer runs do not substitute for that requirement.
+
+
+### Phase 5: full regression and external CI blocker — 2026-09-21
+
+[Game PR #11](https://github.com/dobbygl/pokeyellow3d/pull/11) validates the
+portable fork at `00cc26d`. Tested game code: `0162956`; all five enabled
+CI jobs pass in [35585877841](https://github.com/dobbygl/pokeyellow3d/actions/runs/35585877841).
+The final documentation commit must also pass CI before this PR is merged.
+
+- **28/28** full CTest and **11/11** CTest in the independent directory without
+  a ROM, with no skips; clang-format **18.1.8** passes.
+- **All 18 `tests/*_qa.sh` suites pass**, exit 0. Every presentation frame retains
+  its guards against WRAM, VRAM, cartridge RAM and framebuffer changes.
+- **All 38 fixed exterior references are byte-identical**, with no exception.
+  The broader comparison covers **1,895** PPMs against the completed B2 run:
+  **1,863** are identical, including all 215 interiors, 192 tile-animation
+  captures, 456 battle-UI captures and all PC/Pokédex settled captures.
+- The other **32** captures were reviewed beside their references and amplified
+  pixel differences. Nineteen boot/title images, eleven crossfade middle/paused
+  images and the surf-entry image sample different opacities of the existing
+  SDL wall-clock blend. One F2-to-original image differs only in native water
+  and flower phase: its helper steps the guest while waiting for that blend.
+  The 28,441 recorded boot/title trace rows have no differences in their guest
+  fields. `qa_presentation_clock.h` still fixes ImGui DeltaTime, not SDL ticks;
+  neither that adapter nor the title/blend logic changed. No fixed-reference
+  comparison was relaxed and no new presentation difference was designed.
+- Windows builds the executable and runs all eleven ROM-independent tests
+  through native SDL/ANGLE. Cartridge-backed journeys above were run on Linux;
+  this is not a claim of a full Windows story playthrough.
+
+Reproduction from this checkout with the existing private fixtures:
+
+```sh
+bash build/qa/logs/run-api-phase5-final-regressions.sh
+python3 build/qa/logs/check-api-phase5-regressions.py
+```
+
+The driver records each command/output, verifies the complete suite inventory,
+rebuilds the main binary and independent no-ROM targets, checks formatting,
+runs full CTest before/after the journeys and enforces all 38 fixed references.
+`api-phase5-regression-evidence.json` records the exact source/runtime revisions,
+CI, directories, comparisons, reviewed images and executable SHA-256.
+`api-phase5-source-snapshot.json` proves that the 113 game and 91 runtime source
+files did not change during the run. All reports and images are private under
+`build/qa/logs/`; no ROM, state, save or new game capture is committed.
+
+Private evidence directories:
+
+- `battles`: `build/qa/battles-EPd3zb/`.
+- `boot`: `build/qa/boot-XFZbLF/`.
+- `dex_area`: `build/qa/dex-area-mY4F52/`.
+- `dex_list`: `build/qa/dex-list-qbqdC3/`.
+- `dex_portraits`: `build/qa/dex-portraits-vuqvzU/`.
+- `firstperson`: `build/qa/firstperson-LDZP0b/`.
+- `interiors`: `build/qa/interiors-CSJykj/`.
+- `pc_details`: `build/qa/pc-details-oFqQzQ/`.
+- `pc_focus`: `build/qa/pc-focus-msh4EE/`.
+- `pc_storage`: `build/qa/pc-storage-NhgMrS/`.
+- `tile_animation`: `build/qa/tile-animation-BOegiR/`.
+- `title`: `build/qa/title-313y9J/`.
+- `ui_battles`: `build/qa/ui-battles-5XYHR5/`.
+- `ui_crossfade`: `build/qa/ui-crossfade-MqT8B1/`.
+- `ui_menus`: `build/qa/ui-menus-VTCUDK/`.
+- `ui_special_transitions`: `build/qa/ui-special-transitions-6qaxmb/`.
+- `ui_transitions`: `build/qa/ui-transitions-blxH46/`.
+- `world`: `build/qa/kanto-Eqy7Ry/`.
+
+**External blocker:** the ready [upstream PR #2](https://github.com/GB-Recomp/gb-recompiled/pull/2)
+has no reported checks or PR workflow runs, and this account cannot manage
+Actions in the original repository. A maintainer has been asked in the PR body
+to inspect whether enabling/approval is needed; the exact policy is unknown.
+The acceptance checkbox therefore remains open. The user's integrated objective
+explicitly says to record a blocked point and continue with the next one: after
+merging this tested consumer PR, proceed to improvements 5B while retaining this
+external CI requirement. The overall goal cannot be marked complete until the
+original CI passes as well as all subsequent requirements.

@@ -54,7 +54,9 @@ Download [v0.1.0 for Linux x86_64](https://github.com/dobbygl/pokeyellow3d/relea
 
 ### Requirements
 
-The current build and graphics checks have been run on Linux with Mesa. Other platforms have not been validated for this fork.
+ROM-backed journeys and capture comparisons run on Linux with Mesa. Native
+Windows/MSVC builds and all eleven ROM-independent tests, including the
+Windows/ANGLE renderer, pass in CI. macOS has not been validated.
 
 - Git and CMake **3.18 or newer**.
 - A compiler with **C11 and C++17** support, plus Make or Ninja.
@@ -87,6 +89,34 @@ cd build
 On first launch, the runtime extracts the required assets into `assets/pokeyellow/` inside the build directory. Later launches reuse those assets. The launcher starts Pokémon Yellow automatically when its ROM or extracted assets are available.
 
 Run the executable from `build/` so its relative paths resolve correctly. Battery saves are written to `build/pokeyellow.sav`; `Esc` opens runtime settings, including save states and **Restart Game**. Close other instances before using the same save.
+
+### Building on Windows
+
+Use an x64 Developer PowerShell for Visual Studio 2022 with the C++ tools,
+Git, CMake and Ninja. The Windows CI configuration uses the pinned vcpkg
+manifest in `.github/windows` to build SDL2, CURL and ANGLE (GLES2/EGL).
+From the repository root:
+
+```powershell
+git clone https://github.com/microsoft/vcpkg build/qa/vcpkg
+git -C build/qa/vcpkg checkout 5f96cd15fd745122cf27e0524606d6c1efc5fd07
+./build/qa/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+cmake -S . -B build/windows -G Ninja `
+  "-DCMAKE_TOOLCHAIN_FILE=$PWD/build/qa/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+  "-DVCPKG_MANIFEST_DIR=$PWD/.github/windows" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel
+cmake --build build/windows --parallel 4
+$env:PATH = "$PWD/build/windows/vcpkg_installed/x64-windows/bin;$env:PATH"
+ctest --test-dir build/windows -LE rom --output-on-failure
+New-Item -ItemType Directory -Force build/windows/roms
+Copy-Item C:/path/to/pokeyellow.gb build/windows/roms/pokeyellow.gbc
+Set-Location build/windows
+./pokeyellow3d.exe
+```
+
+The first dependency build takes longer; subsequent builds reuse it. Saves,
+extracted assets and runtime settings live in the chosen build directory.
+No Windows binary package is included in the Linux `v0.1.0` release.
 
 <details>
 <summary><strong>Build the original 2D executable</strong></summary>
@@ -238,7 +268,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The Windows (MSVC) job is enabled on this branch with pinned SDL2/CURL/ANGLE dependencies and requires the synthetic renderer to run on a real Windows graphics context. Its portability validation is in progress; see `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all eleven ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel

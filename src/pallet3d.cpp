@@ -1068,8 +1068,15 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         eye.reset();
         // Catalog-only Pallet: no actor or live-map WRAM is interpreted here.
         preview_map = 0;
-        active = (program || initialize(ctx)) &&
-                 title3d::draw(ctx, width, height, title_phase, menu_open || !window_focused);
+        if (!program && !initialize(ctx)) {
+            // A failed link may still leave a nonzero program handle. Match
+            // the world path: never reuse that handle on the next frame.
+            failed = true;
+            std::fprintf(stderr,
+                         "[3D] Title initialization failed; keeping the original 2D view.\n");
+        }
+        active =
+            !failed && title3d::draw(ctx, width, height, title_phase, menu_open || !window_focused);
         preview_map = -1;
         if (active) {
             ++active_frames;

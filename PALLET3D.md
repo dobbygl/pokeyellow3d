@@ -959,7 +959,7 @@ sin diferencias. Los 18 recorridos integrados comprueban 659.726 glifos en
 juego; los 47 nombres de clase de entrenador pasan en ambas cámaras.
 Los cinco contactos revisados y el informe completo se conservan en
 `build/qa/logs/menu-style-b2-*`. C1 incorpora las animaciones de paneles;
-su validación completa sigue pendiente en `PLAN_ESTILO_MENUS.md`.
+sus tres criterios están acreditados en `PLAN_ESTILO_MENUS.md`.
 
 La prueba de C1 `menu-motion-styled` (y `menu-motion-fp-styled`) comprueba
 Esc, foco y cargas de estado con el motor real, y forma parte de
@@ -978,3 +978,14 @@ incluidas las pulsaciones durante la aparición, y las capturas al terminar
 el fundido. Los estados se comprimen durante la ejecución; las secuencias
 visuales y las fases se guardan aparte bajo `build/qa/menu-motion-pair-*`.
 Las opciones `QA_MENU_MOTION` y de auditoría solo pertenecen al helper.
+
+
+C1 está validada: CTest 38/38 y sin ROM 19/19; veinte baterías clásicas
+con 2.159 capturas y 1.831
+estados idénticos a v0.2.0, más las 38 vistas exteriores originales.
+Los dieciocho recorridos integrados mantienen la comprobación de glifos
+por frame. Ocho recorridos comparan 20.520 frames
+completos del motor con animaciones activadas y desactivadas; las
+62 capturas a fase fija coinciden con B2.
+Los contactos de apertura y cierre, la pausa/carga real en ambas cámaras
+y el informe final se conservan en `build/qa/logs/menu-style-c1-*`.

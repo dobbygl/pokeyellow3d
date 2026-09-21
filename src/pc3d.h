@@ -156,7 +156,11 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
                 continue;
             float x = left + i * glyph_size, y = pc.height + 1.055f, z = center.z + .001f;
             quad(v, {x, y, z}, {x + glyph_size, y, z}, {x + glyph_size, y - glyph_size, z},
-                 {x, y - glyph_size, z}, ui_theme::with_alpha(ui_theme::ShelfInk, t),
+                 {x, y - glyph_size, z},
+                 ui_theme::with_alpha(menu_style == ui_preferences::Style::Integrated
+                                          ? ui_theme::InkColor
+                                          : ui_theme::ShelfInk,
+                                      t),
                  {float(glyph % 16 * 8) - .25f, float(256 + glyph / 16 * 8) - .25f, 8.5f, 8.5f});
         }
     }

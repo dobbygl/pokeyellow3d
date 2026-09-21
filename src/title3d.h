@@ -44,7 +44,7 @@ inline firstperson::Matrix camera(float aspect, Vec &position) {
             -a * (s * ey + c * ez) + b,
             s * ey + c * ez};
 }
-inline void original_lettering(const uint32_t *lcd, int w, int h) {
+inline void original_lettering(const GBContext *ctx, const uint32_t *lcd, int w, int h) {
     if (!lettering) {
         glGenTextures(1, &lettering);
         glBindTexture(GL_TEXTURE_2D, lettering);
@@ -54,6 +54,10 @@ inline void original_lettering(const uint32_t *lcd, int w, int h) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
     std::array<uint8_t, 160 * 144 * 4> data{};
+    const auto &font = rom_font::get(ctx->rom, ctx->rom_size);
+    bool shared_caption =
+        menu_style == ui_preferences::Style::Integrated &&
+        rom_text_region::ready(ctx->wram + 0x3a0, ctx->vram, font, lcd, {0, 17, 20, 1});
     uint32_t background = lcd[0] & 0xffffff;
     for (int y = 0; y < 144; ++y)
         for (int x = 0; x < 160; ++x) {
@@ -63,6 +67,19 @@ inline void original_lettering(const uint32_t *lcd, int w, int h) {
             data[p * 4 + 1] = uint8_t(color >> 8);
             data[p * 4 + 2] = uint8_t(color);
             data[p * 4 + 3] = color != background && (y < 64 || y >= 136) ? 255 : 0;
+            if (shared_caption && y >= 136) {
+                uint8_t tile = ctx->wram[0x3a0 + 17 * 20 + x / 8];
+                int glyph = tile - 0x80;
+                // Reuse the shared atlas verbatim. Title logos and special
+                // copyright tiles outside that atlas keep their original art.
+                size_t at = (size_t(glyph >= 0 ? glyph / 16 * 8 + y % 8 : 0) * rom_font::Width +
+                             (glyph >= 0 ? glyph % 16 * 8 + x % 8 : 0)) *
+                            4;
+                data[p * 4] = uint8_t((ui_theme::Ink >> IM_COL32_R_SHIFT) & 0xff);
+                data[p * 4 + 1] = uint8_t((ui_theme::Ink >> IM_COL32_G_SHIFT) & 0xff);
+                data[p * 4 + 2] = uint8_t((ui_theme::Ink >> IM_COL32_B_SHIFT) & 0xff);
+                data[p * 4 + 3] = glyph >= 0 ? font.rgba[at + 3] : 0;
+            }
         }
     glBindTexture(GL_TEXTURE_2D, lettering);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 160, 144, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
@@ -73,7 +90,8 @@ inline void original_lettering(const uint32_t *lcd, int w, int h) {
     dl->AddImage((ImTextureID)(intptr_t)lettering, {left, 16},
                  {left + 160 * scale, 16 + 64 * scale}, {0, 0}, {1, 64.f / 144});
     dl->AddRectFilled({left - 4, h - 20 - 8 * scale}, {left + 160 * scale + 4, h - 12.f},
-                      ui_theme::TitleStrip);
+                      shared_caption ? ui_theme::Panel : ui_theme::TitleStrip,
+                      shared_caption ? ui_theme::Radius : 0);
     dl->AddImage((ImTextureID)(intptr_t)lettering, {left, h - 16 - 8 * scale},
                  {left + 160 * scale, h - 16.f}, {0, 136.f / 144}, {1, 1});
 }
@@ -113,7 +131,7 @@ inline bool draw(GBContext *ctx, int w, int h, title_state::Phase phase, bool pa
     }
     draw_world_frame(w, h, {}, true, false);
     if (phase == title_state::Phase::Title)
-        original_lettering(gb_get_framebuffer(ctx), w, h);
+        original_lettering(ctx, gb_get_framebuffer(ctx), w, h);
     else {
         if (scene_filter::capture(w, h))
             scene_filter::draw(w, h);

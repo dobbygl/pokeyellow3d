@@ -12,6 +12,7 @@ battle::Image image{};
 std::array<uint32_t, 160 * 144> lcd{};
 bool lcd_valid = false, presented = false;
 size_t uploads = 0;
+size_t font_generation = 0;
 void shutdown() {
     if (texture)
         glDeleteTextures(1, &texture);
@@ -21,6 +22,7 @@ void shutdown() {
     image = {};
     lcd_valid = presented = false;
     uploads = 0;
+    font_generation = 0;
     cache = {};
     selection = {};
     list_mode = false;
@@ -45,7 +47,26 @@ void panel(std::vector<Vertex> &v, float left, float top, float w, float h, Colo
     quad(v, {left, top, z}, {left + w, top, z}, {left + w, top - h, z}, {left, top - h, z}, color,
          uv);
 }
-void lcd_region(std::vector<Vertex> &v, lcd_overlay::Rect r, float left, float top, float scale) {
+void lcd_region(std::vector<Vertex> &v, const GBContext *ctx, lcd_overlay::Rect r, float left,
+                float top, float scale) {
+    const auto &font = rom_font::get(ctx->rom, ctx->rom_size);
+    if (menu_style == ui_preferences::Style::Integrated &&
+        rom_text_region::ready(ctx->wram + 0x3a0, ctx->vram, font, lcd.data(),
+                               {r.x, r.y, r.w, r.h})) {
+        panel(v, left, top, r.w * 8 * scale, r.h * 8 * scale, ui_theme::PanelColor);
+        for (int y = 0; y < r.h; ++y)
+            for (int x = 0; x < r.w; ++x) {
+                int glyph = ctx->wram[0x3a0 + (r.y + y) * 20 + r.x + x] - 0x80;
+                if (glyph < 0)
+                    continue;
+                panel(
+                    v, left + x * 8 * scale, top - y * 8 * scale, 8 * scale, 8 * scale,
+                    ui_theme::InkColor,
+                    {float(glyph % 16 * 8) - .25f, float(256 + glyph / 16 * 8) - .25f, 8.5f, 8.5f},
+                    .44f);
+            }
+        return;
+    }
     panel(v, left, top, r.w * 8 * scale, r.h * 8 * scale, White,
           {float(r.x * 8), float(64 + r.y * 8), float(r.w * 8), float(r.h * 8)});
 }
@@ -85,6 +106,14 @@ bool draw(GBContext *ctx, int w, int h, bool) {
     if (!initialize_texture())
         return false;
     glBindTexture(GL_TEXTURE_2D, texture);
+    if (menu_style == ui_preferences::Style::Integrated) {
+        const auto &font = rom_font::get(ctx->rom, ctx->rom_size);
+        if (font.valid && font_generation != rom_font::decodes) {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 256, rom_font::Width, rom_font::Height, GL_RGBA,
+                            GL_UNSIGNED_BYTE, font.rgba.data());
+            font_generation = rom_font::decodes;
+        }
+    }
     auto next = mon_pic::rgba(picture, battle::palette(ctx, current),
                               list_mode && selection.registration == dex_state::Registration::Seen);
     if (list_mode && selection.registration == dex_state::Registration::Absent)
@@ -126,17 +155,17 @@ bool draw(GBContext *ctx, int w, int h, bool) {
     // typeface or menu content is reconstructed; the source portrait is moved
     // to the other screen rather than duplicated with the text.
     if (list_mode) {
-        lcd_region(v, {0, 0, 14, 18}, -5.68f, 3.15f, .039f);
+        lcd_region(v, ctx, {0, 0, 14, 18}, -5.68f, 3.15f, .039f);
         panel(v, .82f, 2.02f, 3.62f, 3.62f, White, {192, 0, 56, 56});
-        lcd_region(v, {15, 8, 5, 9}, 4.48f, 1.68f, .039f);
+        lcd_region(v, ctx, {15, 8, 5, 9}, 4.48f, 1.68f, .039f);
         // The counters on the body are also the game's own glyphs, driven by
         // the same seen/owned bitmaps exposed in Selection, never re-typeset.
-        lcd_region(v, {16, 1, 4, 2}, 2.0f, 3.57f, .049f);
-        lcd_region(v, {16, 4, 4, 2}, 4.05f, 3.57f, .049f);
+        lcd_region(v, ctx, {16, 1, 4, 2}, 2.0f, 3.57f, .049f);
+        lcd_region(v, ctx, {16, 4, 4, 2}, 4.05f, 3.57f, .049f);
     } else {
-        lcd_region(v, {2, 8, 5, 1}, -5.85f, 3.1f, .041f);
-        lcd_region(v, {9, 2, 10, 7}, -5.5f, 2.55f, .052f);
-        lcd_region(v, {1, 10, 18, 7}, -6.1f, -.52f, .0365f);
+        lcd_region(v, ctx, {2, 8, 5, 1}, -5.85f, 3.1f, .041f);
+        lcd_region(v, ctx, {9, 2, 10, 7}, -5.5f, 2.55f, .052f);
+        lcd_region(v, ctx, {1, 10, 18, 7}, -6.1f, -.52f, .0365f);
         panel(v, .82f, 2.65f, 5.2f, 5.2f, White, {192, 0, 56, 56});
     }
     box(v, .7f, .35f, .55f, .18f, 3.18f, 3.73f, ui_theme::DexBlueLed);

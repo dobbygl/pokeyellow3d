@@ -208,8 +208,21 @@ void panel(const GBContext *ctx, bool enemy, float w, float h) {
     dl->AddRectFilled({x, y}, {x + pw, y + ph}, ui_theme::Panel, ui_theme::Radius * scale);
     char label[80];
     std::snprintf(label, sizeof label, "%s   Lv.%d", m.name.c_str(), m.level);
-    dl->AddText(nullptr, 18 * scale, {x + ui_theme::Padding * scale, y + 12 * scale}, ui_theme::Ink,
-                label);
+    bool styled = menu_style == ui_preferences::Style::Integrated;
+    if (styled) {
+        int detail = std::max(1, int(scale)),
+            name_scale = std::max(1, int(ui_theme::HudGlyphScale * scale));
+        hud_text::draw(ctx->rom, ctx->rom_size, ctx->wram + (enemy ? 0xfd9 : 0x1008), 10,
+                       {x + ui_theme::Padding * scale, y + ui_theme::Padding * scale}, name_scale,
+                       ui_theme::Ink);
+        std::snprintf(label, sizeof label, "Lv.%d", m.level);
+        hud_text::label(ctx->rom, ctx->rom_size, label,
+                        {x + pw - ui_theme::Padding * scale - std::strlen(label) * 8 * detail,
+                         y + ui_theme::Padding * scale + 4},
+                        detail, ui_theme::DimInk);
+    } else
+        dl->AddText(nullptr, 18 * scale, {x + ui_theme::Padding * scale, y + 12 * scale},
+                    ui_theme::Ink, label);
     int index = enemy ? 1 : 0;
     float hp = std::clamp(portraits[index].hp / std::max(1, m.max_hp), 0.f, 1.f);
     ImU32 color = m.hp_color == 2   ? ui_theme::HpRed
@@ -222,15 +235,21 @@ void panel(const GBContext *ctx, bool enemy, float w, float h) {
                       {x + ui_theme::Padding * scale + (pw - 28 * scale) * hp, y + 50 * scale},
                       color, ui_theme::BarRadius * scale);
     std::snprintf(label, sizeof label, "%d / %d   %s", m.hp, m.max_hp, battle::status(m.status));
-    dl->AddText(nullptr, 13 * scale, {x + ui_theme::Padding * scale, y + 58 * scale},
-                ui_theme::DimInk, label);
+    if (styled)
+        hud_text::label(ctx->rom, ctx->rom_size, label,
+                        {x + ui_theme::Padding * scale, y + 58 * scale}, std::max(1, int(scale)),
+                        ui_theme::DimInk);
+    else
+        dl->AddText(nullptr, 13 * scale, {x + ui_theme::Padding * scale, y + 58 * scale},
+                    ui_theme::DimInk, label);
     if (!enemy) {
         float xp = battle::experience(ctx);
         dl->AddRectFilled({x + ui_theme::Padding * scale, y + 83 * scale},
-                          {x + pw - ui_theme::Padding * scale, y + 87 * scale}, ui_theme::BarTrack);
+                          {x + pw - ui_theme::Padding * scale, y + 87 * scale}, ui_theme::BarTrack,
+                          styled ? ui_theme::BarRadius * scale : 0);
         dl->AddRectFilled({x + ui_theme::Padding * scale, y + 83 * scale},
                           {x + ui_theme::Padding * scale + (pw - 28 * scale) * xp, y + 87 * scale},
-                          ui_theme::Experience);
+                          ui_theme::Experience, styled ? ui_theme::BarRadius * scale : 0);
     }
     if (battle::read(ctx, battle::IsInBattle) == 2) {
         int count = battle::read(ctx, enemy ? 0xd89b : 0xd162);
@@ -303,6 +322,17 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     full_overlay = !opening && !intro && !effect && !moves &&
                    (animation || !battle::rectangle(ctx, battle::Enemy, true) ||
                     !battle::rectangle(ctx, battle::Player, true));
+    // D049..D055 holds twelve trainer glyphs plus a terminator. Pokemon
+    // nicknames have the shorter ten-glyph limit used by their status panels.
+    bool unsupported_name = styled && (intro ? !hud_text::supported(ctx->wram + 0x1049, 13)
+                                             : (battle::name_matches(ctx, 0xcfd9, 1, 0) &&
+                                                !hud_text::supported(ctx->wram + 0xfd9, 10)) ||
+                                                   (battle::name_matches(ctx, 0xd008, 10, 7) &&
+                                                    !hud_text::supported(ctx->wram + 0x1008, 10)));
+    if (unsupported_name) {
+        full_overlay = true;
+        overlay_alpha = 1;
+    }
     overlay_alpha += std::clamp((full_overlay ? 1.f : 0.f) - overlay_alpha, -dt * 12, dt * 12);
     if (full_overlay)
         framed_overlay = !animation;
@@ -450,10 +480,15 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
         if (!opening || battle::name_matches(ctx, 0xd008, 10, 7))
             panel(ctx, false, float(w), float(h));
     }
-    if (intro) {
-        auto name = battle::text(ctx, 0xd049);
-        ImGui::GetForegroundDrawList()->AddText(nullptr, 22, {24, 24}, ui_theme::BattleCaption,
-                                                name.c_str());
+    if (intro && !unsupported_name) {
+        if (styled)
+            hud_text::draw(ctx->rom, ctx->rom_size, ctx->wram + 0x1049, 13, {24, 24},
+                           ui_theme::HudGlyphScale, ui_theme::Ink);
+        else {
+            auto name = battle::text(ctx, 0xd049);
+            ImGui::GetForegroundDrawList()->AddText(nullptr, 22, {24, 24}, ui_theme::BattleCaption,
+                                                    name.c_str());
+        }
     }
     if (framed_overlay && overlay_alpha > 0) {
         scene_filter::capture(w, h);

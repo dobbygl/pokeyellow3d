@@ -47,7 +47,10 @@ inline bool frame(GBContext *ctx, int width, int height, bool menu_open) {
     context = ctx;
     if (fixed)
         ImGui::GetIO().DeltaTime = seconds;
-    return original_frame(ctx, width, height, menu_open);
+    bool active = original_frame(ctx, width, height, menu_open);
+    if (std::getenv("QA_FONT_NEGATIVE_CONTROL") && !menu_open)
+        ImGui::GetForegroundDrawList()->AddText({0, 0}, IM_COL32_WHITE, "FONT AUDIT CONTROL");
+    return active;
 }
 inline bool install() {
     const char *style = std::getenv("QA_MENU_STYLE");

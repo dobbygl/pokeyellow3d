@@ -59,6 +59,7 @@ static void capture_surface(const char *path) {
 #include "boot_integration.h"
 #include "world_animation_integration.h"
 #include "daylight_integration.h"
+#include "hud_text_integration.h"
 
 int main(int argc, char **argv) {
     SDL_SetMainReady();
@@ -99,6 +100,13 @@ int main(int argc, char **argv) {
         pallet3d_menu_style(ui_preferences::Style::Integrated);
         ui_style_qa::enabled = true;
     }
+    // Suites without a -styled suffix still honor the explicit QA style after
+    // platform initialization has loaded presentation preferences.
+    if (!styled)
+        if (const char *style = std::getenv("QA_MENU_STYLE"))
+            pallet3d_menu_style(!std::strcmp(style, "integrated")
+                                    ? ui_preferences::Style::Integrated
+                                    : ui_preferences::Style::Classic);
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
     if (argc > 5 && (!std::strcmp(argv[2], "--title-audit") || !std::strcmp(argv[2], "boot"))) {
@@ -377,6 +385,12 @@ int main(int argc, char **argv) {
     }
     if (argc > 3 && std::strcmp(argv[3], "battle-probe") == 0) {
         int result = battle_probe(ctx);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "trainer-labels") || !std::strcmp(argv[3], "trainer-labels-fp"))) {
+        int result = hud_text_qa::trainer_labels(ctx, rom.data(), std::strstr(argv[3], "-fp"));
         gb_platform_shutdown();
         return result;
     }

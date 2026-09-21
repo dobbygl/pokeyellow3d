@@ -10,6 +10,7 @@ bool presented = false, initialized = false;
 float camera_x = 0;
 uint32_t last_cycles = 0;
 size_t builds = 0, uploads = 0;
+ui_preferences::Style rendered_style = ui_preferences::Style::Classic;
 void reset() {
     team = {};
     geometry.clear();
@@ -51,11 +52,13 @@ void text(std::vector<Vertex> &v, const uint8_t *chars, int length, float mid, f
             continue;
         float x = mid + (i - count * .5f) * size;
         quad(v, {x, y, .72f}, {x + size, y, .72f}, {x + size, y - size, .72f}, {x, y - size, .72f},
-             {.94f, .93f, .81f},
+             menu_style == ui_preferences::Style::Integrated ? ui_theme::InkColor
+                                                             : Color{.94f, .93f, .81f},
              {float(glyph % 16 * 8) - .25f, float(256 + glyph / 16 * 8) - .25f, 8.5f, 8.5f});
     }
 }
 void build(const GBContext *ctx, const pc_details::HallTeam &next) {
+    rendered_style = menu_style;
     initialize(ctx);
     geometry.clear();
     ++builds;
@@ -95,7 +98,7 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
     for (int i = 0; i < next.count; ++i)
         if (!portraits.get(ctx->rom, ctx->rom_size, next.mons[i].species).valid)
             return false;
-    if (!team.valid || team.fingerprint != next.fingerprint)
+    if (!team.valid || team.fingerprint != next.fingerprint || rendered_style != menu_style)
         build(ctx, next);
     uint32_t now = uint32_t(ctx->cycles);
     float target = next.selected * 2.7f;

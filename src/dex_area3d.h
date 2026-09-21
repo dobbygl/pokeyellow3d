@@ -134,11 +134,7 @@ bool initialize(const GBContext *ctx) {
                                           : water)[c]);
                     }
         }
-        for (int g = 0; g < 128; g++)
-            for (int y = 0; y < 8; y++)
-                for (int x = 0; x < 8; x++)
-                    put((g % 16) * 8 + x, 384 + (g / 16) * 8 + y,
-                        {1, 1, 1, float((rom.byte(0x10600 + g * 8 + y) >> (7 - x)) & 1)});
+        rom_font::copy_to(ctx->rom, ctx->rom_size, rgba.data(), AW, AH, 0, 384);
         put(511, 511, White);
         const char *vs = R"(
             attribute vec3 position;attribute vec2 texcoord;attribute vec4 color;
@@ -294,6 +290,8 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
     glDisable(GL_DEPTH_TEST);
     if (!menu_open) {
         auto *dl = ImGui::GetForegroundDrawList();
+        bool styled = menu_style == ui_preferences::Style::Integrated;
+        float label_pad = styled ? ui_theme::CompactPadding : 3;
         std::vector<ImVec4> placed;
         for (const auto &label : labels) {
             float x = (label.x - cx) * scale + w * .5f, y = (label.z - cz) * scale + h * .5f - 40;
@@ -309,8 +307,15 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
                     break;
             }
             placed.push_back({left, top, left + width, top + 8});
-            dl->AddRectFilled({left - 3, top - 3}, {left + width + 3, top + 11},
-                              IM_COL32(12, 29, 31, 225));
+            dl->AddRectFilled({left - label_pad, top - label_pad},
+                              {left + width + label_pad, top + 8 + label_pad},
+                              styled ? ui_theme::Panel : IM_COL32(12, 29, 31, 225),
+                              styled ? ui_theme::CompactRadius : 0);
+            if (styled) {
+                hud_text::draw(ctx->rom, ctx->rom_size, label.name.data(), label.name.size(),
+                               {left, top}, ui_theme::HudDetailScale, ui_theme::Ink);
+                continue;
+            }
             for (size_t i = 0; i < label.name.size(); i++) {
                 int g = int(label.name[i]) - 0x80;
                 if (g < 0 || g >= 128)

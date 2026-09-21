@@ -399,8 +399,8 @@ El script copia las entradas a una carpeta nueva, graba vídeos con `ffmpeg`,
 compara el brillo de los píxeles y comprueba cámara, mallas, GL, cobertura y
 memoria por frame. `check_ui_traces.py` comprueba las duraciones medidas.
 Esto cubre fundidos de mapa y la vuelta desde blanco. La entrada en combate
-se describe en C2 más abajo. El fundido F2 está implementado en el avance de
-C3; los viajes de Vuelo siguen pendientes de validación.
+se describe en C2 más abajo; los viajes de Vuelo, Teletransporte y Excavar se
+comprueban en la batería específica de C3.
 
 ### Menús del mundo (A2/A3)
 
@@ -447,7 +447,7 @@ desarrollo de la validación final y sus regresiones.
 | Entrada en combate normal | Destellos BGP y acercamiento con desenfoque radial; arena desde el primer cuadro original |
 | Equipo y mochila durante el combate | LCD enmarcado sobre la arena atenuada y desenfocada |
 | Salida de combate normal | Fin de combate y fundido del mundo compuestos sin hueco 2D |
-| F2 manual | Fundido de 200 ms entre frames completos; C3 parcialmente implementada |
+| F2 manual | Fundido de 200 ms entre frames completos, reversible y congelado durante la pausa |
 
 ### Entrada y salida de combate (C2)
 
@@ -476,14 +476,39 @@ de cada carpeta de prueba. La batería específica pasa en
 `build/qa/ui-battles-0luMpy/`, junto a las regresiones generales y CTest 15/15
 registrados en el cierre de C2 de `PLAN_MENUS_TITULO_TRANSICIONES.md`.
 
-### Fundidos generales (C3, trabajo pausado)
+### Fundidos generales y viajes (C3)
 
 F2 mezcla el frame completo, incluidos los menús del juego. Invertir el cambio
 conserva la imagen intermedia; Esc y la pérdida de foco congelan su progreso.
-La batería `tests/ui_crossfade_qa.sh ROM PALLET_9_7 READY_BATTLE` pasa en
-`build/qa/ui-crossfade-5bOG41/`, con seis escenarios en ambas cámaras y CTest
-16/16. C3 sigue abierta: faltan viajes reales, revisión visual y regresión
-completa. El punto de reanudación está registrado en el plan.
+La batería `tests/ui_crossfade_qa.sh ROM PALLET_9_7 READY_BATTLE` comprueba
+continuidad de píxeles, inversión, pausa, menús, combate y puertas en ambas
+cámaras. Los modos no soportados conservan el framebuffer original.
+
+Vuelo, Teletransporte y Excavar se detectan mediante retornos vivos verificados
+contra las llamadas de la ROM. La salida conserva la escena; al llegar al
+punto blanco se carga el destino y se recoloca la cámara sin interpolar el
+viaje. El ritmo sigue BGP y el motor original. Bicicleta y surf no añaden
+transiciones. El fundido de carga de estado excluye todo el tiempo pasado con
+Esc abierto o sin foco, incluida la primera imagen al reanudar.
+
+Si el motor ha avanzado con F2 desactivado, la escena retenida ya no sirve de
+fondo de entrada a un combate. Se conserva la transición 2D original hasta
+disponer de una arena 3D válida. Esto también se comprueba al moverse dentro
+del mismo mapa. Los controles relativos se neutralizan durante cada transición,
+incluido cuando se mantenía W pulsada antes de iniciarla.
+
+```sh
+tests/ui_special_transitions_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/interiors-fJDbZk/city.state \
+  build/qa/firstperson-9cB3FJ/route.state
+```
+
+Sus 16 escenarios usan copias privadas. La preparación concede los movimientos,
+la medalla, los destinos y los objetos necesarios; el recorrido observado usa
+menús e inputs del motor original. No equivale a obtener esos requisitos en una
+partida completa. Cada frame comprueba WRAM, VRAM, RAM de cartucho, framebuffer
+y GL. Evidencias y cierre de regresión en `PLAN_MENUS_TITULO_TRANSICIONES.md`.
 
 ### Pokédex y PC: plan en ejecución
 

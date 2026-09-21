@@ -29,7 +29,7 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
 - **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
-- **Original interfaces over a 3D world.** Dialogues and recognized windows retain the scene behind them; full-screen menus frame the original LCD over a dimmed, blurred background. Press `F2` for original 2D presentation.
+- **Original interfaces over a 3D world.** Dialogues and recognized windows retain the scene behind them; full-screen menus frame the original LCD over a dimmed, blurred background. `F2` crossfades into original 2D presentation. Fly, Teleport and Dig follow the engine's white fade and relocate the camera at the destination; bike and surf remain continuous.
 - **Pokédex and storage.** Browse the original list and data on a 3D device, see encounter areas over Kanto, use Bill’s twelve boxes, and visit the item PC, Oak’s evaluation and Hall of Fame gallery with original portraits and menus.
 - **Bounded rendering work.** Exploration meshes are cached for the current map and its immediate neighbors, with at most five resident maps.
 

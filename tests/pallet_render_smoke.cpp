@@ -49,6 +49,7 @@ static void capture_surface(const char *path) {
 #include "ui_transitions.h"
 #include "battle_transition_trace.h"
 #include "presentation_integration.h"
+#include "special_transitions.h"
 #include "dex_integration.h"
 #include "pc_integration.h"
 #include "pc_details_integration.h"
@@ -102,6 +103,32 @@ int main(int argc, char **argv) {
     if (argc > 3 &&
         (!std::strcmp(argv[3], "tile-animation") || !std::strcmp(argv[3], "tile-animation-fp"))) {
         int result = tile_animation_qa::run(ctx, !std::strcmp(argv[3], "tile-animation-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 4 && (!std::strcmp(argv[3], "travel") || !std::strcmp(argv[3], "travel-fp"))) {
+        int result =
+            special_transition_qa::travel(ctx, argv[4], !std::strcmp(argv[3], "travel-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 4 &&
+        (!std::strcmp(argv[3], "load-pause") || !std::strcmp(argv[3], "load-pause-fp"))) {
+        int result =
+            special_transition_qa::load_pause(ctx, argv[4], !std::strcmp(argv[3], "load-pause-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "stale-battle") || !std::strcmp(argv[3], "stale-battle-fp"))) {
+        int result =
+            special_transition_qa::stale_battle(ctx, !std::strcmp(argv[3], "stale-battle-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 4 && (!std::strcmp(argv[3], "transport") || !std::strcmp(argv[3], "transport-fp"))) {
+        int result = special_transition_qa::transport(ctx, !std::strcmp(argv[4], "bike"),
+                                                      !std::strcmp(argv[3], "transport-fp"));
         gb_platform_shutdown();
         return result;
     }

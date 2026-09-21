@@ -646,3 +646,56 @@ Criterios de aceptación:
   desplazarse con F2 desactivado. Después quedan B1/B2 y la validación final.
 - Las regresiones completas anotadas en el cierre de C2 preceden a estos
   cambios de C3; no se presentan como validación de la implementación parcial.
+
+### C3: viajes y casos especiales — 2026-09-21, verificación en curso
+
+- Revisión visual del compositor existente en
+  `build/qa/logs/ui-c3-crossfade-review.png`: mundo, Start, equipo, combate y
+  puerta; salida, punto intermedio, 2D y retorno, en ambas cámaras. Las imágenes
+  proceden de `build/qa/ui-crossfade-nWGjbc/`. No hay cortes ni pérdida de la
+  interfaz original; la superposición intermedia es el fundido entre frames.
+- La prueba real de Vuelo detectó huecos en el reconocimiento: `LeaveMapAnim`,
+  el `DelayFrames` de `SpecialEnterMap` y `EnterMapAnim` no seguían la ruta de
+  las puertas. Se reconocen sus retornos vivos y se verifican las instrucciones
+  de la ROM; el intervalo de carga exige además banco 1 y los flags activos.
+  El destino se prepara en blanco y ambas cámaras se recolocan inmediatamente.
+- Reproducido y corregido el salto al cerrar Esc durante la carga de un estado:
+  el primer frame de vuelta ya no suma el intervalo pausado. Se prueban Esc y
+  pérdida de foco durante las dos mitades, con igualdad exacta de imagen al
+  reanudar y sin avanzar el motor.
+- Reproducida y corregida la reutilización de una escena antigua al reactivar
+  F2 durante una entrada en combate después de caminar en 2D. Si el motor ha
+  avanzado sin actualizar el mundo, se conserva la entrada original hasta
+  tener arena válida. Se prueba tanto un mapa distinto como otra posición en
+  el mismo mapa, en ambas cámaras.
+- Batería específica `build/qa/ui-special-transitions-b9qm0U/`: **16/16
+  escenarios aprobados**. Vuelo Verde→Paleta registra 317 frames compuestos;
+  Teletransporte y Excavar, 346 cada uno. Bicicleta, 1.081 frames; surf, 656,
+  sin transiciones añadidas. Cuatro pausas por cámara y cuatro encuentros con
+  escena invalidada. Las pruebas de primera persona parten de W pulsada y
+  verifican que las transiciones neutralizan la máscara de controles.
+- La preparación privada concede movimientos, medalla, destinos y bicicleta;
+  fija Paleta como último punto de recuperación y carga la cueva mediante un
+  warp del motor. Los menús, viajes, monturas y encuentros observados los
+  ejecuta después el juego original. No se presenta como una partida que haya
+  obtenido esos requisitos. WRAM, VRAM, RAM de cartucho y framebuffer se
+  comparan antes y después de cada presentación; C generado y runtime intactos.
+- Revisadas las fases de los seis viajes en
+  `build/qa/logs/ui-c3-field-travel-review.png`: salida, blanco completo,
+  aparición y destino. Evidencia detallada en los CSV y PPM privados de la
+  batería. Los 26 CTest y los 10 tests del directorio sin ROM han pasado.
+  La regresión completa está en curso; las casillas C3 permanecen abiertas
+  hasta cerrar todas las baterías y la comparación de referencias.
+
+Reproducción de las comprobaciones específicas:
+
+```sh
+tests/ui_crossfade_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-crossfade-5bOG41/world.state \
+  build/qa/ui-crossfade-5bOG41/battle.state
+tests/ui_special_transitions_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/interiors-fJDbZk/city.state \
+  build/qa/firstperson-9cB3FJ/route.state
+bash build/qa/logs/run-ui-c3-regressions.sh
+```

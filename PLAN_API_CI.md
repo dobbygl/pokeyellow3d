@@ -536,3 +536,47 @@ The isolated filesystem portability commit also passes the original runtime
 presentation contract and a freshly regenerated procedural game. Frames
 1/30/60 remain byte-identical (`gb-recompiled-windows/logs/windows-filesystem-*`).
 This does not change the runtime version used by the release.
+
+### Phase 5: upstream draft and Windows networking, 2026-09-21
+
+Upstream contribution: https://github.com/GB-Recomp/gb-recompiled/pull/2 .
+The draft contains the versioned presentation API, implementation, procedural
+example/contract test and documentation, plus the host portability changes.
+The added-line audit against upstream `6581880` contains no game-specific
+references. Existing upstream game mocks retain their original purpose; their
+filesystem calls use the same generic portability interface as other callers.
+
+The fork's `windows-portability` branch includes:
+
+- `9a1280c`: C++17 link/discovery workers and POSIX/Winsock sockets, preserving
+  the C APIs and BGB/LAN packet formats. Real loopback tests cover exact wire
+  bytes, master/slave transfers, fragmented reads, reconnects, rejected
+  versions, failed starts, bounded cancellation, peer updates/expiry and
+  persisted discovery identity. Native Linux and Windows/MSVC pass at
+  https://github.com/dobbygl/gb-recompiled/actions/runs/35579385732 .
+- `cb3fe7e`: Windows links matching ANGLE GLES2/EGL libraries and SDL uses the
+  corresponding context. A separate Windows CI job builds the entire SDL
+  runtime and runs the presentation contract with the Windows video driver.
+  This integration run is still pending:
+  https://github.com/dobbygl/gb-recompiled/actions/runs/35579683835 .
+
+Both local runtime revisions pass the presentation contract after rebuilding
+and regenerating the procedural cartridge; frames 1/30/60 remain byte-identical
+to the original baseline. The game's separate directory without a ROM also
+passes **11/11** tests against `cb3fe7e`, including the synthetic renderer and
+tile animations. This is preflight evidence, not phase 5's full acceptance.
+
+Reproduce with the private scripts/logs retained in their respective worktrees:
+
+```sh
+# In gb-recompiled-windows:
+bash logs/run-windows-network-sync.sh
+bash logs/run-windows-gles-sync.sh
+# In pokeyellow:
+bash build/qa/logs/run-api-phase5-preflight-no-rom.sh
+```
+
+The game's committed runtime pin remains `presentation-api-v1`. The Windows
+job will be reactivated against a tested immutable fork revision once the
+complete runtime compiles. The upstream CI criterion and phase 5 remain open;
+the draft's current empty check list is not a successful CI result.

@@ -15,7 +15,9 @@ pallet=$(realpath -- "$5")
 battle=$(realpath -- "$6")
 qa_dir=$(mktemp -d "$project/build/qa/ui-style-XXXXXX")
 mkdir -p "$qa_dir/logs"
-export QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 LIBGL_ALWAYS_SOFTWARE=1
+# Inherit the renderer used by the other journey suites. Call with
+# LIBGL_ALWAYS_SOFTWARE=1 when software rendering is explicitly wanted.
+export QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1
 echo "QA output: $qa_dir"
 "$project/tests/ui_menus_qa.sh" "$rom" "$world" > "$qa_dir/logs/menus.log" 2>&1
 "$project/tests/ui_battles_qa.sh" "$rom" "$wild" "$trainer" > "$qa_dir/logs/battles.log" 2>&1

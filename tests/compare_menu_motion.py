@@ -60,7 +60,8 @@ def compare(directory):
             frames += 1
             total += size
     assert frames > 0
-    names = lambda folder: {p.name for p in folder.glob('*.ppm') if not p.name.startswith('motion-')}
+    names = lambda folder: {p.name for p in folder.glob('*.ppm')
+                            if not (p.stem.startswith('motion-') and p.stem[7:].isdigit())}
     captures = names(left)
     assert captures and captures == names(right), 'fixed capture set differs'
     for name in sorted(captures):

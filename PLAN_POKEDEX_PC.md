@@ -670,3 +670,62 @@ bash build/qa/logs/run-pc-b3-regressions.sh
 # Recorded recovery of the interrupted invocation:
 bash build/qa/logs/resume-pc-b3-regressions.sh
 ```
+
+
+### A3 interior capture differences resolved — 2026-09-21
+
+The five differences recorded after A3 in
+`build/qa/logs/dex-a3-interior-comparison.txt` were caused by the smoke
+helper's presentation clock being tied to host elapsed time. They were
+`lab-return.ppm`, `mart-2f-camera.ppm`, `mother-dialogue-fp.ppm`,
+`pallet-return.ppm` and `town-route1.ppm`. Camera easing could therefore
+reach a different intermediate position or heading at the same guest frame;
+the first-person dialogue could retain that intermediate heading. This
+supersedes the earlier checkpoint's provisional camera-settling explanation.
+
+[Commit ba41775](https://github.com/dobbygl/pokeyellow3d/commit/ba41775b88769501389b8b337e44112a47f56683),
+already merged by [PR #6](https://github.com/dobbygl/pokeyellow3d/pull/6),
+fixes the smoke helper's presentation timestep at 1/60 second through a QA
+adapter around the production callback table. It does not change the
+playable frontend's camera clock, the original game clock, or game memory.
+`QA_FRAME_SECONDS=wall` remains available for clock probes;
+`QA_CAPTURE_STATES=1` records private full-machine snapshots beside captures.
+
+Controlled repetitions of historical B2 (`47e032e`), A3 (`dfb019c`) and
+the corrected pre-5A helper produced **215/215 byte-identical images and
+215/215 byte-identical full machine snapshots in each comparison**. The
+private evidence directories are `interiors-eFUhHA` (B2),
+`interiors-mN7WEl` (A3) and `interiors-3jiH2O` (corrected helper), all under
+`build/qa/`. The result is recorded in
+`build/qa/logs/interior-clock-comparison.json`; the current documentation
+work also rechecked the actual image and snapshot bytes. The original
+comparison's `mart-2f-camera.state` and `town-route1.state` were already
+identical before the clock fix.
+
+The equality above describes the controlled **pre-5A** comparison. Water
+and flowers added in 5A intentionally change five live exterior-return
+captures; these are different from the five A3 clock discrepancies. Their
+pixel differences were reviewed and documented in `PLAN_MEJORAS.md`, while
+all 38 exterior and 179 interior catalog references remain identical.
+
+The archived corrected pre-5A helper can reproduce the controlled image set
+without replacing the current executable:
+
+```sh
+QA_CAPTURE_STATES=1 \
+API_COMPARE_BINARY="$PWD/build/qa/interiors-3jiH2O/pallet_render_smoke" \
+  bash build/qa/logs/api-fixed-interiors-qa.sh \
+  build/roms/pokeyellow.gbc build/qa/interiors-fJDbZk/pallet.state \
+  build/qa/interiors-fJDbZk/house.state build/qa/interiors-fJDbZk/city.state
+```
+
+Use that archived helper for the historical comparison: current main
+intentionally animates the 5A tiles. This entry changes documentation only.
+
+The requested point-1 gate runs separately on current main code with the new
+animation: full CTest, an independent ROM-free CTest build, clang-format,
+all fifteen `tests/*_qa.sh` suites and the 38-image exterior comparison.
+Its reproducible local driver is
+`bash build/qa/logs/run-a3-clock-doc-regressions.sh`; its logs use the
+`a3-clock-doc-` prefix under `build/qa/logs/`. Gate completion and PR merge
+are recorded only after their actual results are available.

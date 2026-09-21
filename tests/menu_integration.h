@@ -36,6 +36,17 @@ inline void observe_menu_frame(GBContext *c, int frame) {
     }
 }
 
+// Extra integrated input coverage leaves the classic reference journey intact.
+inline void exercise_integrated_cursor(QaWalk &run) {
+    if (pallet3d_menu_style() != ui_preferences::Style::Integrated)
+        return;
+    int initial = run.read(0xcc26);
+    run.press("D");
+    run.require(run.read(0xcc26) != initial, "original cursor moves down");
+    run.press("U");
+    run.require(run.read(0xcc26) == initial, "original cursor returns to its entry");
+}
+
 inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -1) {
     auto *ctx = run.ctx;
     auto info = pallet3d_menu();
@@ -91,6 +102,13 @@ inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -
         run.require(storage.rebuilds == pallet3d_storage().rebuilds &&
                         storage.uploads == pallet3d_storage().uploads,
                     "unchanged box/party bytes reuse shelf geometry and portraits");
+    if (pallet3d_menu_style() == ui_preferences::Style::Integrated && !info.full && !pc.active) {
+        run.require(ui_style_qa::enabled, "integrated capture requires per-frame glyph oracle");
+        ui_style_qa::observe(ctx, w, h, false);
+        std::fprintf(stderr, "[MENU] %s integrated glyphs verified against ROM and wTileMap\n",
+                     label);
+        return;
+    }
     int scale = info.full ? std::max(1, int(std::min(w * .75f / 160, h * .75f / 144)))
                           : std::max(1, std::min(w / 160, h / 144));
     int left = (w - 160 * scale) / 2, top = info.full ? (h - 144 * scale) / 2 : h - 144 * scale;
@@ -228,6 +246,7 @@ inline int menus_journey(GBContext *ctx, bool fp) {
     choose(4);
     run.wait(180);
     capture("save-question", 1);
+    exercise_integrated_cursor(run);
     std::vector<uint8_t> old_save(ctx->eram, ctx->eram + ctx->eram_size);
     for (int i = 0; i < 4 && std::equal(old_save.begin(), old_save.end(), ctx->eram); i++) {
         run.press("A");
@@ -280,6 +299,7 @@ inline int menus_center(GBContext *ctx, bool fp) {
     }
     run.require(battle::tile(ctx, 11, 6) == 0x79, "original Heal/Cancel choice reached");
     verify_menu_overlay(run, "center-question", 1);
+    exercise_integrated_cursor(run);
     for (int i = 0; i < 45; i++) {
         run.press("A");
         run.wait(40);
@@ -378,9 +398,11 @@ inline int menus_shop(GBContext *ctx, bool fp) {
     run.press("A");
     run.wait(180);
     verify_menu_overlay(run, "shop-buy", 1);
+    exercise_integrated_cursor(run);
     run.press("A");
     run.wait(60);
     verify_menu_overlay(run, "shop-stock", 1);
+    exercise_integrated_cursor(run);
     run.press("A");
     run.wait(60);
     verify_menu_overlay(run, "shop-quantity", 1);
@@ -440,6 +462,7 @@ inline int menus_name(GBContext *ctx, bool fp) {
     };
     until([&]() { return battle::tile(ctx, 14, 7) == 0x79; }, "name rating Yes/No prompt");
     verify_menu_overlay(run, "name-question", 1);
+    exercise_integrated_cursor(run);
     run.press("A");
     until(
         [&]() {
@@ -510,6 +533,11 @@ inline void verify_bottom_overlay(QaWalk &run, const char *label) {
                     uploads.bytes == pallet3d_overlay_stats().bytes,
                 "unchanged LCD regions do not trigger texture uploads");
     run.require(before == after, "camera and HUD stay fixed during the dialogue");
+    if (pallet3d_menu_style() == ui_preferences::Style::Integrated) {
+        run.require(ui_style_qa::enabled, "integrated dialogue requires glyph oracle");
+        ui_style_qa::observe(ctx, w, h, false);
+        return;
+    }
     const auto *lcd = gb_get_framebuffer(ctx);
     int differences = 0, background_differences = 0;
     for (int y = 0; y < 144; y++)

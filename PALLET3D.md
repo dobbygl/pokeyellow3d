@@ -834,15 +834,16 @@ fundido, la llegada al menú y al mundo, la cantidad de frames de los vídeos,
 los hashes de entrada y los guardas de memoria y controles por frame.
 
 
-### Estilo de menús: base A1
+### Estilo de menús: clásico e integrado
 
 Esc incluye **Estilo de menus: Clasico / Integrado**. Integrado es el
 valor inicial; la elección se guarda junto a la iluminación en
 `lighting.cfg`, formato v2. Los archivos v1 siguen cargando su iluminación.
-A1 prepara el tema y la fuente común; ambos estilos conservan todavía las
-mismas disposiciones y píxeles. Las fases siguientes aplicarán el nuevo
-panel a las regiones reconocidas. El cursor del ratón se oculta al jugar
-con foco y vuelve en Esc o al perderlo.
+El estilo integrado presenta las regiones reconocidas del mundo con paneles
+oscuros y los glifos originales de la ROM. A 800x720, Start y los cuadros
+superiores usan escala 3; el diálogo inferior usa escala 4. El relleno es
+14 píxeles y el radio 6. Clásico conserva la composición de v0.2.0.
+El cursor del ratón se oculta al jugar con foco y vuelve en Esc o al perderlo.
 
 La fuente compartida es `FontGraphics` de la ROM, sin reemplazar sus 128
 glifos. Los atlas del PC conservan sus coordenadas y filtrado. Los tokens
@@ -857,6 +858,13 @@ visuales se encuentran en `src/ui_theme.h`.
 | Centro | Heal/Cancel (11, 6, 9, 6), con cuadro inferior |
 | Tienda | Buy (0, 0, 11, 7), dinero (11, 0, 9, 3), stock (4, 2, 16, 11), cantidad (7, 9, 13, 3) |
 | Equipo, mochila y pantalla desconocida | LCD completo enmarcado |
+
+Cada celda pertenece a la última ventana que la cubre en el mapa original;
+no se repite texto al separar el diálogo inferior de los cuadros superiores.
+Un tile ajeno a la fuente o reemplazado en VRAM conserva los píxeles LCD de
+su región, a escala entera. La tarjeta de guardado utiliza este respaldo por
+su colon pequeño; las pantallas completas mantienen su marco. Ningún texto
+ni selección se reconstruye desde nombres o estados del menú.
 
 El orden de las regiones conserva los solapamientos originales. Las nuevas
 pruebas se ejecutan con `tests/ui_style_qa.sh ROM WORLD ROUTE1 ROUTE22 PALLET
@@ -884,3 +892,15 @@ de iluminación conserva explícitamente el estilo seleccionado al crear y
 recargar sus preferencias. La evidencia y los comandos completos están en
 el registro de `PLAN_ESTILO_MENUS.md` y en
 `build/qa/logs/menu-style-a1-evidence.json`.
+
+
+La presentación A2 está validada: las veinte baterías clásicas conservan
+2.159 capturas y 1.831 estados idénticos a v0.2.0, incluidas las 38 vistas
+exteriores. CTest pasa 35/35 y el build independiente sin ROM 16/16. Los
+18 recorridos integrados comprobaron 514.558 glifos en 16.517 frames y el
+cursor activo en 5.400 ocasiones. Los contactos revisados y la evidencia
+se guardan en `build/qa/logs/menu-style-a2-*`. La tarjeta de guardado
+conserva su región LCD por el colon adicional de la fuente; una carga fría
+sin escena residente conserva el LCD completo hasta poder presentar la
+escena con seguridad. Los menús de combate aún usan su composición previa,
+a la espera de B1.

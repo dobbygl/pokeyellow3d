@@ -10,6 +10,7 @@
 #include "ui_theme.h"
 #include "rom_font.h"
 #include "lcd_overlay.h"
+#include "menu_text_gl.h"
 #include "fade_state.h"
 #include "menu_state.h"
 #include "battle_transition_state.h"
@@ -1423,9 +1424,15 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
                 draw_world_frame(width, height, {.42f, 0});
             if (!menu_open)
                 lcd_overlay::framed(gb_get_framebuffer(ctx), float(width), float(height));
-        } else if (!menu_open)
-            lcd_overlay::regions(gb_get_framebuffer(ctx), menu_regions, float(width),
-                                 float(height));
+        } else if (!menu_open) {
+            if (menu_style == ui_preferences::Style::Integrated)
+                menu_text::regions(ctx->wram + 0x3a0, ctx->vram, ctx->rom, ctx->rom_size,
+                                   gb_get_framebuffer(ctx), menu_regions, float(width),
+                                   float(height));
+            else
+                lcd_overlay::regions(gb_get_framebuffer(ctx), menu_regions, float(width),
+                                     float(height));
+        }
         ++active_frames;
         return;
     }
@@ -1559,6 +1566,7 @@ void pallet3d_shutdown() {
     dex3d::shutdown();
     dex_area3d::shutdown();
     pc3d::shutdown();
+    menu_text::shutdown();
     lcd_overlay::shutdown();
     scene_filter::shutdown();
     menu_overlay = menu_full = menu_blurred = false;

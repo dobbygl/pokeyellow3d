@@ -26,6 +26,7 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 
 - **A connected Kanto.** Explore 36 connected outdoor maps, plus Viridian Forest and Vermilion Dock, with terrain, buildings, and textures derived from the ROM.
 - **Animated water and flowers.** Original ROM frames follow the live Game Boy animation phase, including pauses and save-state loads.
+- **Pallet Town at the title screen.** An actor-free sunset scene keeps the original logo and a VRAM-decoded Pikachu billboard. Continue, New Game and naming retain the original menus over the dimmed scene.
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
 - **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
@@ -157,7 +158,7 @@ The 3D layer reads the game state to draw the scene; it does not run a second ga
 
 ### Tests
 
-CMake always registers eight ROM-independent checks: first-person controls, menu layouts, presentation blending, and five synthetic-ROM tests, including a headless rendering check and procedural portrait decompression. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, sixteen additional tests cover game data and presentation, for 24 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
+CMake registers eleven ROM-independent checks, including title lifetimes, first-person controls, menus, presentation blending, tile animation and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, seventeen additional tests cover game data and presentation, for 28 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON

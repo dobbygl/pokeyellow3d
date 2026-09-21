@@ -443,7 +443,9 @@ desarrollo de la validación final y sus regresiones.
 | Animación compleja de combate | Animación LCD original sobre la arena |
 | Puertas, escaleras y ascensor reconocidos | Fundido 3D derivado del BGP del motor |
 | Cargar un savestate de otro mapa | Fundido breve a negro de la presentación |
-| Intro, título, link, tutorial y Safari | LCD original; fases B y C pendientes |
+| Título | Paleta sin actores, cámara lenta al atardecer, logo original y Pikachu decodificado de VRAM |
+| Continuar, Nueva partida y nombres iniciales | LCD original sobre Paleta atenuada y desenfocada |
+| Copyright, Game Freak, intro de Pikachu, link, tutorial y Safari | LCD original |
 | Entrada en combate normal | Destellos BGP y acercamiento con desenfoque radial; arena desde el primer cuadro original |
 | Equipo y mochila durante el combate | LCD enmarcado sobre la arena atenuada y desenfocada |
 | Salida de combate normal | Fin de combate y fundido del mundo compuestos sin hueco 2D |
@@ -693,3 +695,25 @@ sin animación en ambas cámaras. Registra dos ciclos completos, verifica
 cada frame contra VRAM, lee los texels reales de la GPU y revisa pausa,
 recarga y entrada/salida de la casa. Las secuencias quedan en
 `build/qa/tile-animation-*/`, fuera de Git.
+
+### Título y menú principal
+
+El título muestra Paleta del catálogo sin actores, con un travelling lento
+al atardecer. El logo y el copyright conservan los píxeles originales a
+escala entera; Pikachu se decodifica de la VRAM, los atributos de tiles, OAM
+y las paletas vivas. Continuar, Nueva partida y los nombres se componen sobre
+la misma escena atenuada y desenfocada. El motor mantiene toda la entrada,
+la escritura de nombres y el temporizador que devuelve el título a la intro.
+El copyright inicial, Game Freak y la intro de Pikachu conservan su LCD.
+
+La prueba local arranca una máquina nueva con ROM, tanto sin partida como con
+una copia de batería. No escribe la partida proporcionada:
+
+```sh
+tests/title_qa.sh build/roms/pokeyellow.gbc /ruta/a/partida.sav
+```
+
+Las capturas, trazas y copias quedan en `build/qa/title-*/`. Se comparan los
+píxeles del retrato contra el LCD original y se vigilan por frame la memoria
+emulada, el framebuffer y los controles relativos. El estado de aceptación
+y los recorridos observados se registran en `PLAN_MENUS_TITULO_TRANSICIONES.md`.

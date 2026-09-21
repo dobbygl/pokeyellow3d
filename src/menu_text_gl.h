@@ -1,17 +1,62 @@
 #pragma once
 #include "lcd_overlay.h"
 #include "menu_text.h"
+#include "menu_motion.h"
 #include "ui_theme.h"
 #include <cstdio>
 
 namespace menu_text {
 inline GLuint texture = 0;
 inline size_t texture_generation = 0;
+inline bool motion_frame = false, motion_eligible = false, motion_suppressed = false;
+inline void begin_frame(uint32_t cycles, bool paused, bool integrated) {
+    motion_frame = integrated;
+    motion_eligible = false;
+    motion_suppressed = false;
+    if (integrated)
+        menu_motion::state.begin(cycles, paused, menu_motion::enabled);
+    else
+        menu_motion::state.reset();
+}
+inline void prime() {
+    motion_eligible = true;
+}
+inline void finish_frame(bool visible) {
+    if (!motion_frame)
+        return;
+    auto &motion = menu_motion::state;
+    motion.finish(motion_eligible);
+    if (!visible || motion_suppressed)
+        return;
+    // ImGui draws this list before every native LCD and glyph foreground quad.
+    // A closing panel retains decoration only, never the previous menu's text.
+    auto *dl = ImGui::GetBackgroundDrawList();
+    for (const auto &panel : motion.panels) {
+        float alpha = panel.opacity(), dy = std::round(panel.offset());
+        if (!panel.visible || alpha <= 0)
+            continue;
+        auto b = panel.bounds;
+        for (int pad = 3; pad >= 1; --pad)
+            dl->AddRectFilled({b.left - pad, b.top - pad + 2 + dy},
+                              {b.right + pad, b.bottom + pad + 2 + dy},
+                              ui_theme::opacity(ui_theme::Shadow, alpha), ui_theme::Radius);
+        dl->AddRectFilled({b.left, b.top + dy}, {b.right, b.bottom + dy},
+                          ui_theme::opacity(ui_theme::Panel, alpha), ui_theme::Radius);
+    }
+}
+struct FrameEnd {
+    const bool &scene_active, &scene_failed;
+    ~FrameEnd() {
+        finish_frame(scene_active && !scene_failed);
+    }
+};
 inline void shutdown() {
     if (texture)
         glDeleteTextures(1, &texture);
     texture = 0;
     texture_generation = 0;
+    menu_motion::state.reset();
+    motion_frame = motion_eligible = false;
 }
 inline bool upload(const rom_font::Atlas &font) {
     if (!font.valid)
@@ -44,13 +89,18 @@ inline Drawn regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *r
     auto plan = prepare(tiles, vram, font, layout, width, height, ui_theme::Padding,
                         ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale, placement);
     if (!plan.count || !upload(font)) {
+        menu_motion::state.panels.clear();
         lcd_overlay::regions(framebuffer, layout, width, height);
         return drawn;
     }
     auto *dl = ImGui::GetForegroundDrawList();
     static std::array<bool, 256> reported{};
+    prime();
     for (size_t i = 0; i < plan.count; ++i) {
         auto &p = plan.panels[i];
+        menu_motion::Key key{layout.regions[i], int(placement)};
+        if (p.fallback || !p.visible)
+            menu_motion::state.hide(key);
         if (p.fallback) {
             if (p.rejected_tile >= 0 && !reported[size_t(p.rejected_tile)]) {
                 std::fprintf(stderr, "[MENU-TEXT] classic region: tile=%02x region=%zu\n",
@@ -64,6 +114,10 @@ inline Drawn regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *r
         if (!p.visible)
             continue;
         ++drawn.panels;
+        if (motion_frame) {
+            menu_motion::state.submit(key, {p.left, p.top, p.right, p.bottom});
+            continue;
+        }
         for (int pad = 3; pad >= 1; --pad)
             dl->AddRectFilled({p.left - pad, p.top - pad + 2}, {p.right + pad, p.bottom + pad + 2},
                               ui_theme::Shadow, ui_theme::Radius);

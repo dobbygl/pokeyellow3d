@@ -1226,6 +1226,7 @@ void hud(GBContext *ctx) {
 } // namespace
 
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
+    menu_text::FrameEnd menu_frame_end{active, failed};
     battle3d::integrated_menu = false;
     battle3d::menu_panels = 0;
     dex3d::presented = false;
@@ -1235,6 +1236,7 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
     pc_boxes::presented = false;
     pc_hall3d::presented = false;
     if (frozen_blend(ctx)) {
+        menu_text::motion_suppressed = true;
         active = presentation::draw(presentation::history, width, height);
         return;
     }
@@ -1464,6 +1466,7 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         }
     }
     if (menu_overlay) {
+        menu_text::prime();
         // Only an initial recognized dialogue needs live preparation. Once a
         // scene is resident, party/PC buffers and menu VRAM are never consulted.
         bool prepare = world_frame.map < 0 || (dialogue_overlay && can_compose_dialogue(ctx));
@@ -1503,6 +1506,7 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         return;
     }
     world(ctx, width, height);
+    menu_text::prime();
     if (!menu_open && !dialogue_overlay)
         hud(ctx);
     if (dialogue_overlay && !menu_open) {
@@ -1701,6 +1705,8 @@ bool pallet3d_active() {
 
 void pallet3d_begin_frame(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
     update_cursor(menu_open);
+    menu_text::begin_frame(ctx ? ctx->cycles : 0, menu_open || !window_focused,
+                           ctx && enabled && menu_style == ui_preferences::Style::Integrated);
     presented_lcd = framebuffer;
     if (effects_enabled && enabled && preview_map < 0 && ctx &&
         pallet::view(ctx) == pallet::View::Overworld) {
@@ -1796,6 +1802,7 @@ uint8_t pallet3d_input_mask() {
 }
 
 void pallet3d_state_loaded(GBContext *ctx) {
+    menu_motion::state.reset();
     effects.reset();
     title3d::reset();
     world_frame_current = false;

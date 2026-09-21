@@ -49,6 +49,7 @@ static void capture_surface(const char *path) {
 #include "ui_transitions.h"
 #include "battle_transition_trace.h"
 #include "presentation_integration.h"
+#include "menu_motion_integration.h"
 #include "special_transitions.h"
 #include "dex_integration.h"
 #include "pc_integration.h"
@@ -234,6 +235,18 @@ int main(int argc, char **argv) {
     }
     if (argc > 3 && (!std::strcmp(argv[3], "crossfade") || !std::strcmp(argv[3], "crossfade-fp"))) {
         int result = presentation_qa::run(ctx, !std::strcmp(argv[3], "crossfade-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && (!std::strcmp(argv[3], "menu-motion-rapid") ||
+                     !std::strcmp(argv[3], "menu-motion-rapid-fp"))) {
+        int result = menu_motion_qa::rapid(ctx, !std::strcmp(argv[3], "menu-motion-rapid-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "menu-motion") || !std::strcmp(argv[3], "menu-motion-fp"))) {
+        int result = menu_motion_qa::run(ctx, !std::strcmp(argv[3], "menu-motion-fp"));
         gb_platform_shutdown();
         return result;
     }

@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: A1, A2, B1 y B2 validadas; C1 pendiente.
+Fecha: 2026-09-22. Estado: A1, A2, B1 y B2 validadas; C1 en validación.
 
 ## Análisis del estado actual
 
@@ -773,3 +773,44 @@ Los tres criterios de B2 quedan acreditados: **16 de 19**. El commit de
 cierre incorpora solo documentación e imágenes; no cambia el código ni
 los binarios validados. C1 y la release v0.3.0 siguen pendientes. La fase
 C1 comenzará después de fusionar la PR #20 con su CI final aprobada.
+
+
+### C1 — animación de paneles, 2026-09-22
+
+Parte del merge B2 `3ffc0b1` en `menu-style-c1`. Los tres criterios siguen
+abiertos hasta completar la cohorte final y la CI.
+
+El fondo de cada región reconocida usa 629.146 ciclos (unos 150 ms) y
+8 píxeles de desplazamiento. Los glifos originales mantienen posición y
+opacidad completas. La identidad es el rectángulo fuente y su contexto de
+mundo o combate; las regiones compartidas u ocultas conservan la fase.
+La decoración que se cierra no conserva texto. El contador de 32 bits
+admite su desbordamiento normal; cargar una partida reinicia explícitamente
+la presentación para mostrar completo cualquier menú ya abierto.
+
+El test puro cubre apertura, cierre sin nuevas regiones, solapamientos,
+pausa, carga, modo sin animación y desbordamiento. El build independiente
+sin ROM pasa 19/19. Las pruebas reales de foco, Esc y carga hacia delante
+y atrás pasan en ambas cámaras en `build/qa/menu-motion-pause-ohg2vs0c`.
+Las pulsaciones rápidas pasan una comparación completa con y sin animación:
+339 frames por cámara, 83.057.712 bytes del motor por recorrido, sin
+diferencias. Evidencia preliminar en `build/qa/menu-motion-pair-_jr497id`;
+la comparación de Start/guardado/centro/tienda sigue ejecutándose.
+
+Comandos reproducibles y pendientes:
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 2
+ctest --test-dir build --output-on-failure
+cmake --build build/qa/no-rom --parallel 2
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+env -u LIBGL_ALWAYS_SOFTWARE python3 tests/compare_menu_motion.py \
+  build/roms/pokeyellow.gbc build/qa/ui-menus-DPPi1E/pallet.state \
+  --center build/qa/ui-menus-DPPi1E/center.state \
+  --shop build/qa/ui-menus-DPPi1E/shop.state
+```
+
+Pendientes: contacto de secuencia revisado, comparación de capturas de fase
+fija contra B2, veinte baterías clásicas contra v0.2.0, dieciocho recorridos
+integrados y las nuevas pruebas de pausa/carga, CTest completo final, formato
+y CI. No hay fusión de C1 ni release v0.3.0 todavía.

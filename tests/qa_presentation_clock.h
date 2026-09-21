@@ -8,6 +8,8 @@
 #include <cstring>
 #include <string>
 #include "ui_style_oracle.h"
+#include "menu_motion.h"
+#include "ui_motion_oracle.h"
 
 #ifdef QA_DETERMINISTIC_SDL_CLOCK
 void qa_advance_sdl_clock(float seconds);
@@ -35,6 +37,7 @@ inline void before_swap(int width, int height, bool menu_open) {
         std::exit(63);
     }
     ui_style_qa::observe(context, width, height, menu_open);
+    ui_motion_qa::observe(context, width, height, menu_open);
 }
 inline bool begin(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
 #ifdef QA_DETERMINISTIC_SDL_CLOCK
@@ -53,6 +56,13 @@ inline bool frame(GBContext *ctx, int width, int height, bool menu_open) {
     return active;
 }
 inline bool install() {
+    const char *motion = std::getenv("QA_MENU_MOTION");
+    if (motion && std::strcmp(motion, "on") && std::strcmp(motion, "off")) {
+        std::fprintf(stderr, "QA_MENU_MOTION must be on or off\n");
+        return false;
+    }
+    menu_motion::enabled = !motion || std::strcmp(motion, "off");
+    ui_motion_qa::install();
     const char *style = std::getenv("QA_MENU_STYLE");
     if (style && std::strcmp(style, "classic") && std::strcmp(style, "integrated")) {
         std::fprintf(stderr, "QA_MENU_STYLE must be classic or integrated\n");

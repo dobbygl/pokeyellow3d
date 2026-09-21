@@ -580,3 +580,28 @@ The game's committed runtime pin remains `presentation-api-v1`. The Windows
 job will be reactivated against a tested immutable fork revision once the
 complete runtime compiles. The upstream CI criterion and phase 5 remain open;
 the draft's current empty check list is not a successful CI result.
+
+
+### Phase 5: Windows consumer integration in progress, 2026-09-21
+
+The first full Windows runtime run reached the executable link and identified
+two remaining POSIX string functions: `strcasecmp` and `strtok_r`. Fork commit
+`6f88e30` maps them to the Windows CRT through private C-compatible helpers;
+independent tokenizer streams and case comparisons are covered by the host
+suite. The local **4/4** host suite, presentation contract and regenerated
+procedural cartridge pass; frames 1/30/60 still match the original baseline.
+Evidence and reproduction: `gb-recompiled-windows/logs/windows-strings-*` and
+`bash logs/run-windows-strings-sync.sh`.
+
+This game branch now pins that immutable candidate revision and enables the
+Windows job with the same pinned vcpkg ports as the runtime. It requires a real
+Windows/ANGLE synthetic-renderer result instead of accepting an SDL dummy-driver
+skip. SDL main handling covers both launcher auto-start and test executables;
+MSVC receives its own optimization options without editing generated C. Owned
+sources retain `/W4 /WX`; upstream headers are classified as external, and
+standard C stdio calls retain their portable spellings.
+
+The complete Linux consumer build and its **11/11** ROM-free tests pass locally
+(`api-phase5-consumer-{build,build-refresh,tests}.log`). Windows CI and the full
+ROM-backed acceptance gate still need completion. The earlier runtime pin and
+pending-CI notes above describe the preceding checkpoints, not a final acceptance.

@@ -379,6 +379,11 @@ static int run_graphical_launcher(const GBLauncherGame** out_selected) {
 }
 
 int main(int argc, char* argv[]) {
+    // Auto-start bypasses the graphical launcher, but still owns SDL startup.
+    SDL_SetMainReady();
+#if defined(_WIN32)
+    SDL_SetHintWithPriority(SDL_HINT_OPENGL_ES_DRIVER, "1", SDL_HINT_OVERRIDE);
+#endif
     const GBLauncherGame* selected = NULL;
     char** forwarded_argv = (char**)calloc((size_t)argc + 1, sizeof(char*));
     int forwarded_argc = 1;

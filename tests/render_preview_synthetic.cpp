@@ -52,6 +52,7 @@ struct Snapshot {
 } // namespace
 
 int main() {
+    SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
         return skip("SDL video initialization failed");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);

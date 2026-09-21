@@ -141,7 +141,7 @@ The renderer interprets building heights and furniture visually. Unclassified in
 
 ## Development and validation
 
-The 3D layer reads the game state to draw the scene; it does not run a second gameplay simulation. The SDL integration registers the versioned runtime presentation API through [`src/pallet_presentation.cpp`](src/pallet_presentation.cpp). [`cmake/Pallet3D.cmake`](cmake/Pallet3D.cmake) checks API compatibility and adds the renderer without rewriting runtime sources or generated game C. The default runtime is the `presentation-api-v1` tag of `dobbygl/gb-recompiled`; `GBRT_URL` and `GBRT_REF` are configurable.
+The 3D layer reads the game state to draw the scene; it does not run a second gameplay simulation. The SDL integration registers the versioned runtime presentation API through [`src/pallet_presentation.cpp`](src/pallet_presentation.cpp). [`cmake/Pallet3D.cmake`](cmake/Pallet3D.cmake) checks API compatibility and adds the renderer without rewriting runtime sources or generated game C. The default runtime is an immutable revision of `dobbygl/gb-recompiled`, pinned in `CMakeLists.txt`; `GBRT_URL` and `GBRT_REF` are configurable. The upstream contribution is [GB-Recomp/gb-recompiled#2](https://github.com/GB-Recomp/gb-recompiled/pull/2).
 
 | Location | Purpose |
 | --- | --- |
@@ -237,7 +237,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The Windows (MSVC) and macOS jobs are defined but disabled for now: the pinned gb-recompiled runtime is not portable to MSVC yet, and macOS lacks the GLES2 headers. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The Windows (MSVC) job is enabled on this branch with pinned SDL2/CURL/ANGLE dependencies and requires the synthetic renderer to run on a real Windows graphics context. Its portability validation is in progress; see `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel

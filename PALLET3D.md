@@ -226,7 +226,7 @@ Esto no equivale a haber jugado 165 combates distintos.
 - `cmake/Pallet3D.cmake` comprueba la versión de `gb_presentation.h` y añade
   el renderer y su adaptador. El launcher registra los callbacks antes de
   arrancar SDL. No genera copias del frontend ni modifica fuentes descargadas.
-  El runtime se fija al tag `presentation-api-v1` de `dobbygl/gb-recompiled`.
+  El runtime se fija a una revisión inmutable de `dobbygl/gb-recompiled` en `CMakeLists.txt`. La contribución a upstream está en [GB-Recomp/gb-recompiled#2](https://github.com/GB-Recomp/gb-recompiled/pull/2).
 
 Las listas de colisión, hierba, cornisas y pares de tiles se leen de la ROM.
 La colisión del juego sigue siendo la única autoridad. Las cornisas originales

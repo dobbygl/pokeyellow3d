@@ -39,7 +39,7 @@ endif()
 # ---------------------------------------------------------------------------
 if(NOT TARGET gbrt)
     set(GBRT_URL "https://github.com/dobbygl/gb-recompiled.git" CACHE STRING "Runtime repository URL")
-    set(GBRT_REF "presentation-api-v1" CACHE STRING "Runtime git ref with presentation API v1")
+    set(GBRT_REF "6f88e30aa15ae657a8b2e19c58c96c64bdd1c979" CACHE STRING "Runtime git ref with presentation API v1")
     FetchContent_Declare(gb_recompiled
         GIT_REPOSITORY ${GBRT_URL}
         GIT_TAG ${GBRT_REF}
@@ -100,7 +100,18 @@ set(POKEYELLOW_SOURCES
 
 set(GBRECOMP_GENERATED_OPT_LEVEL "1" CACHE STRING "Optimization level for generated ROM source files")
 set_property(CACHE GBRECOMP_GENERATED_OPT_LEVEL PROPERTY STRINGS 0 1 2 3)
-set_source_files_properties(${POKEYELLOW_SOURCES} PROPERTIES COMPILE_OPTIONS "-O${GBRECOMP_GENERATED_OPT_LEVEL}")
+if(MSVC)
+    if(GBRECOMP_GENERATED_OPT_LEVEL STREQUAL "0")
+        set(generated_optimization /Od)
+    elseif(GBRECOMP_GENERATED_OPT_LEVEL STREQUAL "1")
+        set(generated_optimization /O1)
+    else()
+        set(generated_optimization /O2)
+    endif()
+else()
+    set(generated_optimization "-O${GBRECOMP_GENERATED_OPT_LEVEL}")
+endif()
+set_source_files_properties(${POKEYELLOW_SOURCES} PROPERTIES COMPILE_OPTIONS "${generated_optimization}")
 
 # ---------------------------------------------------------------------------
 # pokeyellow_cart: static library so umbrella compilations can link us in.
@@ -187,6 +198,7 @@ if(CMAKE_PROJECT_NAME STREQUAL "pokeyellow")
         add_executable(pallet_render_smoke EXCLUDE_FROM_ALL tests/pallet_render_smoke.cpp)
         target_include_directories(pallet_render_smoke PRIVATE src)
         target_link_libraries(pallet_render_smoke PRIVATE pokeyellow_cart gbrt)
+        target_compile_definitions(pallet_render_smoke PRIVATE SDL_MAIN_HANDLED)
         include(cmake/SyntheticTests.cmake)
     endif()
     add_executable(pokeyellow_launcher launcher_main.cpp)

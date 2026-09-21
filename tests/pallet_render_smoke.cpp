@@ -59,6 +59,7 @@ static void capture_surface(const char *path) {
 #include "boot_integration.h"
 
 int main(int argc, char **argv) {
+    SDL_SetMainReady();
     if (argc < 3) {
         std::fprintf(stderr, "Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");
         std::fprintf(

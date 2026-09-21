@@ -89,7 +89,8 @@ inline Drawn regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *r
     auto plan = prepare(tiles, vram, font, layout, width, height, ui_theme::Padding,
                         ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale, placement);
     if (!plan.count || !upload(font)) {
-        menu_motion::state.panels.clear();
+        // An empty/unrecognized frame still retires the previous decoration
+        // through finish_frame(). The native LCD remains on top of it.
         lcd_overlay::regions(framebuffer, layout, width, height);
         return drawn;
     }

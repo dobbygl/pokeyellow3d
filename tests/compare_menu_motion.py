@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Linux private-ROM audit: exact canonical engine frames with cosmetics on/off."""
 import argparse
+import csv
 import gzip
 import hashlib
 import json
@@ -11,6 +12,35 @@ import struct
 import subprocess
 import tempfile
 import threading
+
+
+def verify_closing(logs):
+    """These input journeys do not load states or disable the renderer."""
+    panels = {}
+    with (logs / 'motion-panels.csv').open() as stream:
+        for row in csv.DictReader(stream):
+            key = tuple(int(row[k]) for k in ('domain', 'x', 'y', 'w', 'h'))
+            panels.setdefault(int(row['frame']), {})[key] = row
+    previous = None
+    checked = 0
+    with (logs / 'motion-frames.csv').open() as stream:
+        for frame in csv.DictReader(stream):
+            current = panels.get(int(frame['frame']), {})
+            if previous:
+                old_frame, old_panels = previous
+                elapsed = (int(frame['cycles']) - int(old_frame['cycles'])) & 0xffffffff
+                step = elapsed / 629146
+                if elapsed < 629146 and frame['paused'] == old_frame['paused'] == '0':
+                    for key, panel in old_panels.items():
+                        if panel['visible'] == '1' and float(panel['amount']) > step + 0.00001:
+                            assert key in current, (logs, frame['frame'], key, 'panel vanished before completing its fade')
+                            if panel['target'] == '0':
+                                expected = max(0, float(panel['amount']) - step)
+                                assert abs(float(current[key]['amount']) - expected) < 0.00001, (logs, frame['frame'], 'closing phase jumped')
+                                checked += 1
+            previous = frame, current
+    assert checked > 0, (logs, 'no closing phase observed')
+    return checked
 
 
 def compare(directory):
@@ -36,7 +66,8 @@ def compare(directory):
     for name in sorted(captures):
         for suffix in ('', '.machine'):
             assert (left / (name + suffix)).read_bytes() == (right / (name + suffix)).read_bytes(), name + suffix
-    return dict(frames=frames, engine_bytes_compared=total, fixed_captures=sorted(captures))
+    return dict(frames=frames, engine_bytes_compared=total, fixed_captures=sorted(captures),
+                closing_steps_checked=verify_closing(left))
 
 
 def run(helper, rom, fixture, mode, directory, animated):

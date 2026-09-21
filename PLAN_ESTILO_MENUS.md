@@ -814,3 +814,13 @@ Pendientes: contacto de secuencia revisado, comparación de capturas de fase
 fija contra B2, veinte baterías clásicas contra v0.2.0, dieciocho recorridos
 integrados y las nuevas pruebas de pausa/carga, CTest completo final, formato
 y CI. No hay fusión de C1 ni release v0.3.0 todavía.
+
+
+La revisión temporal de la primera cohorte detectó un cierre truncado en
+Heal/Cancel: un plan sin regiones eliminaba inmediatamente la decoración
+pendiente. Se conserva ahora hasta terminar su fundido, bajo el respaldo
+LCD original. `compare_menu_motion.py` exige que cada fase de cierre
+persista durante sus ciclos restantes; el control negativo sobre la cohorte
+anterior detecta exactamente el frame 836 del centro. Esa cohorte valida
+las comparaciones de motor, pero no acredita el cierre de C1. Se repite la
+validación con la corrección antes de marcar criterios.

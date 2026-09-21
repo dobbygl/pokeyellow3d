@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: confirmado para ejecución; ninguna fase iniciada.
+Fecha: 2026-09-21. Estado: A1 implementada en rama; validación completa en curso.
 
 ## Análisis del estado actual
 
@@ -293,3 +293,61 @@ La fase A1 aún no está iniciada. Validación documental: 19 casillas abiertas,
 `git diff --check` y CI de esta PR antes de fusionar. Las veinte baterías
 clásicas y la nueva integrada se ejecutarán tras cada fase; este commit no
 modifica código ni cambia el binario de v0.2.0.
+
+### A1 — implementación y referencia, 2026-09-21
+
+Plan confirmado y fusionado en PR #16, merge `f2f6d75`, con CI
+`35612560495` verde. Rama de implementación: `menu-style-a1`. Las 19
+casillas siguen abiertas hasta terminar la evidencia de aceptación.
+
+- `ui_theme.h` conserva los valores previos y centraliza paneles, barras,
+  marcos y paletas. `rom_font.h` decodifica una vez los 128 glifos y copia
+  el atlas compartido en los rectángulos originales de PC, cajas y Hall.
+- `ui_preferences.h` lee v1 y v2. V2 conserva iluminación y estilo; el
+  valor inicial del estilo es integrado. Esc permite cambiarlo. El cursor
+  del sistema se oculta con foco durante el juego y se muestra en Esc o
+  al perder foco.
+- Referencia independiente: worktree privado `build/qa/menu-style-v020`,
+  tag `2544f9fe6895213965439162511f4a87b9a87526`, con **solo** el adaptador
+  de reloj de QA y su enlace. Ningún archivo de `src/` de v0.2.0 se modifica.
+  En Linux, el helper intercepta SDL_GetTicks/SDL_Delay y avanza un reloj
+  virtual por frame. El ejecutable jugable y el reloj del motor no cambian.
+  La batería de fundidos de esa referencia ya pasa, incluida inversión y
+  pausa de Esc/foco. Las veinte baterías completas están en ejecución.
+- Las capturas del juego se compararán sin tolerancia. Las dos vistas del
+  **panel de ajustes del runtime** (`settings.ppm` y `settings-paused.ppm`)
+  se registran aparte porque ahora incluyen el nuevo control autorizado;
+  esa separación no excluye ningún menú original del juego. Sus estados
+  del motor también se comparan.
+- `ui_style_qa.sh` reutiliza los recorridos de menús, combate y fundidos
+  en ambas cámaras. A1 aún conserva la composición clásica en ambos
+  estilos; su observador compara por frame los bits de los glifos y sus
+  píxeles LCD presentados. A2 añadirá la comparación de los glifos
+  reestilizados, y B1 la del menú de combate integrado.
+
+Primeras comprobaciones: compilación correcta; CTest inicial 32/32;
+128 glifos iguales a ambos planos de VRAM del estado privado
+`build/qa/ui-menus-YdVuWy/menus/logs/start.state`. La nueva configuración
+registra 34 pruebas con ROM y 15 sin ROM; su ejecución completa está
+pendiente junto con las baterías. No se da por cerrada A1.
+
+Comandos y evidencia reproducibles:
+
+```sh
+# La referencia usa los mismos tests/qa_sdl_clock.cpp y adaptador de reloj,
+# sin los observadores posteriores ni cambios de presentación de A1.
+bash build/qa/logs/run-menu-style-baseline.sh
+bash build/qa/logs/run-menu-style-a1-regressions.sh
+SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy build/pallet_render_smoke \
+  build/roms/pokeyellow.gbc build/qa/ui-menus-YdVuWy/menus/logs/start.state \
+  font-export build/qa/ui/font.vram
+build/rom_font_test build/roms/pokeyellow.gbc build/qa/ui/font.vram
+ctest --test-dir build --output-on-failure
+ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+```
+
+Los drivers, logs y datos de comparación se guardan bajo
+`build/qa/logs/menu-style-*`. Para conservar espacio se aplicó compresión
+Btrfs zstd transparente a 32.461 capturas existentes: SHA-256 idéntico antes
+y después de cada archivo, rutas conservadas. Registro en
+`private-captures-compression-summary.json` y su manifiesto JSONL privado.

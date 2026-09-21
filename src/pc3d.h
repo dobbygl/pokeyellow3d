@@ -31,15 +31,7 @@ void shutdown() {
 void upload(const GBContext *ctx, const uint32_t *original) {
     if (!texture) {
         std::vector<uint8_t> rgba(AW * AH * 4);
-        for (int glyph = 0; glyph < 128; glyph++)
-            for (int y = 0; y < 8; y++)
-                for (int x = 0; x < 8; x++) {
-                    size_t dest = ((256 + glyph / 16 * 8 + y) * AW + glyph % 16 * 8 + x) * 4;
-                    bool ink = ctx->rom[0x10600 + glyph * 8 + y] & (1 << (7 - x));
-                    for (int c = 0; c < 3; c++)
-                        rgba[dest + c] = 255;
-                    rgba[dest + 3] = ink ? 255 : 0;
-                }
+        rom_font::copy_to(ctx->rom, ctx->rom_size, rgba.data(), AW, AH, 0, 256);
         for (int i = 0; i < 4; i++)
             rgba[((AH - 1) * AW + AW - 1) * 4 + i] = 255;
         glGenTextures(1, &texture);
@@ -118,21 +110,21 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
     }
     std::vector<Vertex> v;
     box(v, pc.x - .02f, pc.z + .04f, 1.04f, .15f, pc.height, pc.height + .94f,
-        {.28f, .34f, .32f, t});
+        ui_theme::with_alpha(ui_theme::PcCase, t));
     box(v, pc.x + .34f, pc.z + .07f, .32f, .26f, pc.height - .03f, pc.height + .025f,
-        {.22f, .27f, .25f, t});
+        ui_theme::with_alpha(ui_theme::PcStand, t));
     Vec corners[] = {{center.x - .48f, center.y + .432f, center.z},
                      {center.x + .48f, center.y + .432f, center.z},
                      {center.x + .48f, center.y - .432f, center.z},
                      {center.x - .48f, center.y - .432f, center.z}};
     quad(v, corners[0], corners[1], corners[2], corners[3],
-         monitor_image ? Color{1, 1, 1, t} : Color{.17f, .32f, .26f, t},
+         monitor_image ? Color{1, 1, 1, t} : ui_theme::with_alpha(ui_theme::PcScreen, t),
          // Cancel the atlas helper's quarter-texel inset: every LCD pixel has
          // equal width here, including the first and last rows/columns.
          monitor_image ? UV{-.25f, -.25f, 160.5f, 144.5f} : Solid);
     if (counters) {
         box(v, pc.x - .02f, pc.z + .04f, 1.04f, .15f, pc.height + .94f, pc.height + 1.11f,
-            {.18f, .25f, .23f, t});
+            ui_theme::with_alpha(ui_theme::PcCounter, t));
         char text[32];
         if (stored_items.valid)
             std::snprintf(text, sizeof(text), "ITEMS %02d OF 50", stored_items.count);
@@ -164,7 +156,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
                 continue;
             float x = left + i * glyph_size, y = pc.height + 1.055f, z = center.z + .001f;
             quad(v, {x, y, z}, {x + glyph_size, y, z}, {x + glyph_size, y - glyph_size, z},
-                 {x, y - glyph_size, z}, {.94f, .93f, .81f, t},
+                 {x, y - glyph_size, z}, ui_theme::with_alpha(ui_theme::ShelfInk, t),
                  {float(glyph % 16 * 8) - .25f, float(256 + glyph / 16 * 8) - .25f, 8.5f, 8.5f});
         }
     }

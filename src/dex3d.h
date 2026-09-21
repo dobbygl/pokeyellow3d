@@ -115,12 +115,12 @@ bool draw(GBContext *ctx, int w, int h, bool) {
         ++uploads;
     }
     std::vector<Vertex> v;
-    box(v, -6.8f, -.35f, 6.65f, .7f, -3.5f, 4, {.66f, .065f, .09f});
-    box(v, .15f, -.35f, 6.65f, .7f, -3.5f, 4, {.76f, .085f, .11f});
-    box(v, -.15f, -.22f, .3f, .65f, -3.2f, 3.7f, {.28f, .055f, .065f});
-    panel(v, -6.32f, 3.48f, 5.7f, 6.45f, {.085f, .12f, .12f}, Solid, .38f);
-    panel(v, .63f, 2.8f, 5.6f, 5.65f,
-          list_mode ? Color{.50f, .61f, .53f} : Color{.095f, .17f, .15f}, Solid, .38f);
+    box(v, -6.8f, -.35f, 6.65f, .7f, -3.5f, 4, ui_theme::DexLeft);
+    box(v, .15f, -.35f, 6.65f, .7f, -3.5f, 4, ui_theme::DexRight);
+    box(v, -.15f, -.22f, .3f, .65f, -3.2f, 3.7f, ui_theme::DexHinge);
+    panel(v, -6.32f, 3.48f, 5.7f, 6.45f, ui_theme::DexBezel, Solid, .38f);
+    panel(v, .63f, 2.8f, 5.6f, 5.65f, list_mode ? ui_theme::DexList : ui_theme::DexScreen, Solid,
+          .38f);
     panel(v, -6.12f, 3.25f, 5.3f, 5.95f, White, Solid, .40f);
     // Original number/name/category/height/weight and description pixels. No
     // typeface or menu content is reconstructed; the source portrait is moved
@@ -139,12 +139,12 @@ bool draw(GBContext *ctx, int w, int h, bool) {
         lcd_region(v, {1, 10, 18, 7}, -6.1f, -.52f, .0365f);
         panel(v, .82f, 2.65f, 5.2f, 5.2f, White, {192, 0, 56, 56});
     }
-    box(v, .7f, .35f, .55f, .18f, 3.18f, 3.73f, {.15f, .69f, .9f});
+    box(v, .7f, .35f, .55f, .18f, 3.18f, 3.73f, ui_theme::DexBlueLed);
     if (!list_mode) {
-        box(v, 1.6f, .35f, .22f, .13f, 3.32f, 3.54f, {.5f, .83f, .24f});
-        box(v, 2.1f, .35f, .22f, .13f, 3.32f, 3.54f, {.98f, .77f, .2f});
+        box(v, 1.6f, .35f, .22f, .13f, 3.32f, 3.54f, ui_theme::DexGreenLed);
+        box(v, 2.1f, .35f, .22f, .13f, 3.32f, 3.54f, ui_theme::DexAmberLed);
         for (int i = 0; i < 4; i++)
-            panel(v, 4.15f + i * .32f, 3.53f, .14f, .48f, {.23f, .035f, .045f});
+            panel(v, 4.15f + i * .32f, 3.53f, .14f, .48f, ui_theme::DexGrille);
     }
     firstperson::Camera camera;
     float distance = std::max(6.7f, 11.2f / (float(w) / h));
@@ -156,7 +156,8 @@ bool draw(GBContext *ctx, int w, int h, bool) {
     glViewport(0, 0, w, h);
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_CULL_FACE);
-    glClearColor(.035f, .065f, .075f, 1);
+    glClearColor(ui_theme::DexBackground.r, ui_theme::DexBackground.g, ui_theme::DexBackground.b,
+                 1);
     glDepthMask(GL_TRUE);
     glClearDepthf(1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

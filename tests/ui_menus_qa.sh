@@ -32,6 +32,7 @@ for entry in 'pallet 37' 'center 41' 'shop 42' 'name 229'; do
 done
 run() {
     local name=$1 fixture=$2 mode=$3
+    if [[ ${QA_MENU_STYLE:-classic} == integrated ]]; then mode=$mode-styled; fi
     mkdir -p "$name/logs"
     echo "Checking $name"
     (cd "$name"; ../pallet_render_smoke ../roms/pokeyellow.gbc "../$fixture.state" "$mode" > logs/run.log 2>&1)

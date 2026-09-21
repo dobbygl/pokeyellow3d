@@ -28,6 +28,7 @@ for scenario in wild trainer; do
         mode=battle-timing
         if [[ $scenario == trainer ]]; then mode=trainer-timing; fi
         if [[ $camera == fp ]]; then mode=$mode-fp; fi
+        if [[ ${QA_MENU_STYLE:-classic} == integrated ]]; then mode=$mode-styled; fi
         mkdir -p "$name/logs"
         echo "Checking $name"
         (cd "$name"; ../pallet_render_smoke ../roms/pokeyellow.gbc "../$scenario.state" "$mode" > logs/run.log 2>&1)

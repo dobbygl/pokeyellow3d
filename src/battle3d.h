@@ -123,10 +123,9 @@ void orb(std::vector<Vertex> &v, Vec center, float radius, Color color, bool bal
                            center.y + radius * std::sin(a),
                            center.z + radius * std::cos(a) * std::sin(b)};
             };
-            Color shade_color =
-                ball ? (row < 4 ? Color{.94f, .94f, .89f} : Color{.86f, .19f, .13f}) : color;
+            Color shade_color = ball ? (row < 4 ? ui_theme::BallTop : ui_theme::BallBottom) : color;
             if (ball && (row == 3 || row == 4))
-                shade_color = {.13f, .17f, .19f};
+                shade_color = ui_theme::BallSeam;
             quad(v, point(row, col), point(row, col + 1), point(row + 1, col + 1),
                  point(row + 1, col), shade(shade_color, .7f + .3f * row / 7));
         }
@@ -134,19 +133,19 @@ void orb(std::vector<Vertex> &v, Vec center, float radius, Color color, bool bal
 Color move_color(int type) {
     switch (type) {
     case 20:
-        return {.99f, .35f, .12f};
+        return ui_theme::Fire;
     case 21:
-        return {.25f, .65f, 1};
+        return ui_theme::Water;
     case 22:
-        return {.42f, .86f, .3f};
+        return ui_theme::Grass;
     case 23:
-        return {1, .89f, .18f};
+        return ui_theme::Electric;
     case 24:
-        return {.95f, .4f, .86f};
+        return ui_theme::Psychic;
     case 25:
-        return {.57f, .94f, 1};
+        return ui_theme::Ice;
     default:
-        return {.81f, .72f, 1};
+        return ui_theme::MoveNeutral;
     }
 }
 void effects(std::vector<Vertex> &v, const GBContext *ctx) {
@@ -162,7 +161,8 @@ void effects(std::vector<Vertex> &v, const GBContext *ctx) {
         if (id == 0xc3)
             for (int i = 0; i < 12; i++) {
                 float a = 2 * firstperson::Pi * i / 12, r = .4f + .9f * std::fmod(effect_time, 1.f);
-                orb(v, {2 + std::cos(a) * r, 1.4f + std::sin(a) * r, -3}, .10f, {.96f, .93f, .72f});
+                orb(v, {2 + std::cos(a) * r, 1.4f + std::sin(a) * r, -3}, .10f,
+                    ui_theme::CaptureSpark);
             }
         return;
     }
@@ -199,37 +199,39 @@ void panel(const GBContext *ctx, bool enemy, float w, float h) {
     float scale = std::max(.8f, std::min(w / 800.f, h / 720.f));
     float pw = 250 * scale, ph = 100 * scale;
     float x = enemy ? 24 * scale : w - pw - 24 * scale, y = enemy ? 22 * scale : h * .43f;
-    dl->AddRectFilled({x, y}, {x + pw, y + ph}, IM_COL32(17, 29, 33, 238), 6 * scale);
+    dl->AddRectFilled({x, y}, {x + pw, y + ph}, ui_theme::Panel, ui_theme::Radius * scale);
     char label[80];
     std::snprintf(label, sizeof label, "%s   Lv.%d", m.name.c_str(), m.level);
-    dl->AddText(nullptr, 18 * scale, {x + 14 * scale, y + 12 * scale}, IM_COL32(248, 244, 219, 255),
+    dl->AddText(nullptr, 18 * scale, {x + ui_theme::Padding * scale, y + 12 * scale}, ui_theme::Ink,
                 label);
     int index = enemy ? 1 : 0;
     float hp = std::clamp(portraits[index].hp / std::max(1, m.max_hp), 0.f, 1.f);
-    ImU32 color = m.hp_color == 2   ? IM_COL32(231, 92, 70, 255)
-                  : m.hp_color == 1 ? IM_COL32(237, 192, 71, 255)
-                                    : IM_COL32(110, 194, 139, 255);
-    dl->AddRectFilled({x + 14 * scale, y + 42 * scale}, {x + pw - 14 * scale, y + 50 * scale},
-                      IM_COL32(44, 59, 58, 255), 3 * scale);
-    dl->AddRectFilled({x + 14 * scale, y + 42 * scale},
-                      {x + 14 * scale + (pw - 28 * scale) * hp, y + 50 * scale}, color, 3 * scale);
+    ImU32 color = m.hp_color == 2   ? ui_theme::HpRed
+                  : m.hp_color == 1 ? ui_theme::HpAmber
+                                    : ui_theme::HpGreen;
+    dl->AddRectFilled({x + ui_theme::Padding * scale, y + 42 * scale},
+                      {x + pw - ui_theme::Padding * scale, y + 50 * scale}, ui_theme::BarTrack,
+                      ui_theme::BarRadius * scale);
+    dl->AddRectFilled({x + ui_theme::Padding * scale, y + 42 * scale},
+                      {x + ui_theme::Padding * scale + (pw - 28 * scale) * hp, y + 50 * scale},
+                      color, ui_theme::BarRadius * scale);
     std::snprintf(label, sizeof label, "%d / %d   %s", m.hp, m.max_hp, battle::status(m.status));
-    dl->AddText(nullptr, 13 * scale, {x + 14 * scale, y + 58 * scale}, IM_COL32(182, 201, 190, 255),
-                label);
+    dl->AddText(nullptr, 13 * scale, {x + ui_theme::Padding * scale, y + 58 * scale},
+                ui_theme::DimInk, label);
     if (!enemy) {
         float xp = battle::experience(ctx);
-        dl->AddRectFilled({x + 14 * scale, y + 83 * scale}, {x + pw - 14 * scale, y + 87 * scale},
-                          IM_COL32(44, 59, 58, 255));
-        dl->AddRectFilled({x + 14 * scale, y + 83 * scale},
-                          {x + 14 * scale + (pw - 28 * scale) * xp, y + 87 * scale},
-                          IM_COL32(112, 172, 230, 255));
+        dl->AddRectFilled({x + ui_theme::Padding * scale, y + 83 * scale},
+                          {x + pw - ui_theme::Padding * scale, y + 87 * scale}, ui_theme::BarTrack);
+        dl->AddRectFilled({x + ui_theme::Padding * scale, y + 83 * scale},
+                          {x + ui_theme::Padding * scale + (pw - 28 * scale) * xp, y + 87 * scale},
+                          ui_theme::Experience);
     }
     if (battle::read(ctx, battle::IsInBattle) == 2) {
         int count = battle::read(ctx, enemy ? 0xd89b : 0xd162);
         for (int i = 0; i < std::min(count, 6); i++) {
             int party_hp = battle::word(ctx, (enemy ? 0xd8a4 : 0xd16b) + 44 * i);
             dl->AddCircleFilled({x + 12 * scale + i * 13 * scale, y + ph + 12 * scale}, 4 * scale,
-                                party_hp ? IM_COL32(222, 109, 84, 255) : IM_COL32(73, 87, 85, 255));
+                                party_hp ? ui_theme::PartyAlive : ui_theme::PartyFainted);
         }
     }
 }
@@ -344,7 +346,8 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     glViewport(0, h / 3, w, h - h / 3);
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_CULL_FACE);
-    glClearColor(.10f, .17f, .19f, 1);
+    glClearColor(ui_theme::BattleBackground.r, ui_theme::BattleBackground.g,
+                 ui_theme::BattleBackground.b, 1);
     glDepthMask(GL_TRUE);
     glClearDepthf(1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -362,12 +365,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     glUniform1f(sky_loc, 0);
     glUniform1f(xray_loc, 0);
     glUniform1i(glGetUniformLocation(program, "image"), 0);
-    const Color grounds[] = {{.46f, .43f, .31f},
-                             {.35f, .47f, .32f},
-                             {.23f, .43f, .49f},
-                             {.27f, .31f, .32f},
-                             {.43f, .42f, .49f}};
-    Color arena_color = grounds[terrain];
+    Color arena_color = ui_theme::Grounds[terrain];
     std::vector<Vertex> v;
     quad(v, {-35, -.02f, -40}, {35, -.02f, -40}, {35, -.02f, 30}, {-35, -.02f, 30}, arena_color);
     // A restrained grid gives the original flat terrain depth without replacing
@@ -438,7 +436,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     }
     if (intro) {
         auto name = battle::text(ctx, 0xd049);
-        ImGui::GetForegroundDrawList()->AddText(nullptr, 22, {24, 24}, IM_COL32(245, 241, 216, 255),
+        ImGui::GetForegroundDrawList()->AddText(nullptr, 22, {24, 24}, ui_theme::BattleCaption,
                                                 name.c_str());
     }
     if (framed_overlay && overlay_alpha > 0) {

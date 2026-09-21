@@ -7,6 +7,8 @@
 #include "firstperson.h"
 #include "interior_scene.h"
 #include "imgui.h"
+#include "ui_theme.h"
+#include "rom_font.h"
 #include "lcd_overlay.h"
 #include "fade_state.h"
 #include "menu_state.h"
@@ -31,9 +33,7 @@ constexpr int AW = 512, AH = 512;
 struct Vec {
     float x, y, z;
 };
-struct Color {
-    float r, g, b, a = 1;
-};
+using Color = ui_theme::Color;
 struct Vertex {
     Vec p;
     float u, v;
@@ -52,6 +52,7 @@ GLint fade_loc = -1, matrix_loc = -1, eye_loc = -1, fog_loc = -1, sky_loc = -1, 
 GLint dusk_loc = -1;
 GLint wind_loc = -1;
 daynight::Settings lighting_settings;
+ui_preferences::Style menu_style = ui_preferences::Style::Integrated;
 std::string preferences_path;
 bool preferences_error = false;
 world_effects::State effects;
@@ -1444,6 +1445,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
                           event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED))
             load_started = SDL_GetTicks();
     }
+    SDL_ShowCursor(menu_open || !window_focused ? SDL_ENABLE : SDL_DISABLE);
     pallet3d_poll_controls(input_context, menu_open);
     if (menu_open)
         return false;
@@ -1534,6 +1536,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
 }
 
 void pallet3d_shutdown() {
+    SDL_ShowCursor(SDL_ENABLE);
     effects.reset();
     title3d::shutdown();
     presentation::shutdown();
@@ -1887,7 +1890,9 @@ void pallet3d_world_effects(bool value) {
 
 void pallet3d_load_preferences(const char *path) {
     preferences_path = path ? path : "";
-    lighting_settings = daynight::load(preferences_path);
+    auto settings = ui_preferences::load(preferences_path);
+    lighting_settings = settings.lighting;
+    menu_style = settings.style;
     preferences_error = false;
 }
 bool pallet3d_daylight(daynight::Settings settings, bool persist) {
@@ -1897,7 +1902,7 @@ bool pallet3d_daylight(daynight::Settings settings, bool persist) {
     settings.hour = daynight::wrap(settings.hour);
     lighting_settings = settings;
     if (persist) {
-        preferences_error = !daynight::save(preferences_path, settings);
+        preferences_error = !ui_preferences::save(preferences_path, {settings, menu_style});
         return !preferences_error;
     }
     return true;
@@ -1909,6 +1914,7 @@ daynight::Light pallet3d_daylight_frame() {
     return world_frame.light;
 }
 void pallet3d_settings_ui(bool menu_open) {
+    SDL_ShowCursor(menu_open || !window_focused ? SDL_ENABLE : SDL_DISABLE);
     if (!menu_open)
         return;
     // ImGui supports appending to the same window with multiple Begin/End
@@ -1948,9 +1954,29 @@ void pallet3d_settings_ui(bool menu_open) {
     }
     if (changed)
         pallet3d_daylight(settings, true);
+    int style = int(menu_style);
+    if (ImGui::Combo("Estilo de menus", &style, "Clasico\0Integrado\0"))
+        pallet3d_menu_style(ui_preferences::Style(style), true);
     if (preferences_error)
-        ImGui::TextWrapped("No se pudo guardar la preferencia de iluminacion.");
+        ImGui::TextWrapped("No se pudieron guardar las preferencias de presentacion.");
     ImGui::Separator();
     ImGui::End();
     ImGui::PopStyleVar(6);
+}
+
+bool pallet3d_menu_style(ui_preferences::Style style, bool persist) {
+    if (style != ui_preferences::Style::Classic && style != ui_preferences::Style::Integrated)
+        return false;
+    menu_style = style;
+    if (persist) {
+        preferences_error = !ui_preferences::save(preferences_path, {lighting_settings, style});
+        return !preferences_error;
+    }
+    return true;
+}
+ui_preferences::Style pallet3d_menu_style() {
+    return menu_style;
+}
+bool pallet3d_window_focused() {
+    return window_focused;
 }

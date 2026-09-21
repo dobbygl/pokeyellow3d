@@ -62,6 +62,13 @@ static void capture_surface(const char *path) {
 
 int main(int argc, char **argv) {
     SDL_SetMainReady();
+    std::string requested_mode = argc > 3 ? argv[3] : "";
+    const bool styled = requested_mode.size() >= 7 &&
+                        requested_mode.compare(requested_mode.size() - 7, 7, "-styled") == 0;
+    if (styled) {
+        requested_mode.resize(requested_mode.size() - 7);
+        argv[3] = requested_mode.data();
+    }
     if (argc < 3) {
         std::fprintf(stderr, "Usage: pallet_render_smoke ROM SAVESTATE [camera]\n");
         std::fprintf(
@@ -88,6 +95,10 @@ int main(int argc, char **argv) {
     GBContext *ctx = gb_context_create(&config);
     if (!ctx || !qa_clock::install() || !gb_platform_init(5))
         return 4;
+    if (styled) {
+        pallet3d_menu_style(ui_preferences::Style::Integrated);
+        ui_style_qa::enabled = true;
+    }
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
     if (argc > 5 && (!std::strcmp(argv[2], "--title-audit") || !std::strcmp(argv[2], "boot"))) {
@@ -108,6 +119,32 @@ int main(int argc, char **argv) {
     }
     if (!gb_context_load_state_file(ctx, argv[2]))
         return 5;
+    if (argc > 5 &&
+        (!std::strcmp(argv[3], "preferences-write") || !std::strcmp(argv[3], "preferences-read"))) {
+        pallet3d_load_preferences(argv[4]);
+        auto expected = !std::strcmp(argv[5], "classic") ? ui_preferences::Style::Classic
+                                                         : ui_preferences::Style::Integrated;
+        bool write = !std::strcmp(argv[3], "preferences-write");
+        if (write && (!pallet3d_daylight({daynight::Mode::Fixed, 18.25}, true) ||
+                      !pallet3d_menu_style(expected, true)))
+            return 64;
+        bool ok = pallet3d_menu_style() == expected &&
+                  pallet3d_daylight_settings().mode == daynight::Mode::Fixed &&
+                  pallet3d_daylight_settings().hour == 18.25;
+        gb_platform_shutdown();
+        std::puts(ok ? "PASS: presentation preferences survive process restart"
+                     : "FAIL: presentation preferences changed after restart");
+        return ok ? 0 : 64;
+    }
+    if (argc > 4 && !std::strcmp(argv[3], "font-export")) {
+        FILE *font = std::fopen(argv[4], "wb");
+        if (!font)
+            return 19;
+        bool ok = std::fwrite(ctx->vram, 1, 0x2000, font) == 0x2000;
+        std::fclose(font);
+        gb_platform_shutdown();
+        return ok ? 0 : 19;
+    }
     if (argc > 3 &&
         (std::strcmp(argv[3], "firstperson") == 0 || std::strcmp(argv[3], "fp-camera") == 0)) {
         SDL_Event event{};

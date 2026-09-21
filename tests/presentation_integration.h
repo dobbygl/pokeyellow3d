@@ -131,6 +131,7 @@ inline void pause_checks(GBContext *ctx) {
     event.type = SDL_WINDOWEVENT;
     event.window.event = SDL_WINDOWEVENT_FOCUS_LOST;
     pallet3d_event(&event, false);
+    require(SDL_ShowCursor(SDL_QUERY) == SDL_ENABLE, "focus loss shows the system cursor");
     for (int i = 0; i < 3; i++) {
         SDL_Delay(40);
         auto paused = render(ctx);
@@ -141,6 +142,7 @@ inline void pause_checks(GBContext *ctx) {
     }
     event.window.event = SDL_WINDOWEVENT_FOCUS_GAINED;
     pallet3d_event(&event, false);
+    require(SDL_ShowCursor(SDL_QUERY) == SDL_DISABLE, "focused game hides the system cursor");
     auto resumed = render(ctx);
     require(!pallet3d_blend().paused && pallet3d_blend().progress == progress &&
                 differences(before, resumed) == 0,

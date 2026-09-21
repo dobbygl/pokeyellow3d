@@ -722,10 +722,15 @@ API_COMPARE_BINARY="$PWD/build/qa/interiors-3jiH2O/pallet_render_smoke" \
 Use that archived helper for the historical comparison: current main
 intentionally animates the 5A tiles. This entry changes documentation only.
 
-The requested point-1 gate runs separately on current main code with the new
-animation: full CTest, an independent ROM-free CTest build, clang-format,
-all fifteen `tests/*_qa.sh` suites and the 38-image exterior comparison.
-Its reproducible local driver is
-`bash build/qa/logs/run-a3-clock-doc-regressions.sh`; its logs use the
-`a3-clock-doc-` prefix under `build/qa/logs/`. Gate completion and PR merge
-are recorded only after their actual results are available.
+Follow-up validation on current code completed with **26/26 full CTest**,
+**10/10 independent ROM-free CTest**, clang-format, and **all fifteen QA
+suites passing**. The driver exited 0. The 38 exterior catalog captures in
+`build/qa/kanto-G2xYdv/logs/catalog` remain byte-identical to
+`build/qa/kanto-hvoPvo/logs/catalog`. Results are recorded in
+`build/qa/logs/a3-clock-doc-acceptance.json`,
+`a3-clock-doc-regressions.log` and `a3-clock-doc-exterior-comparison.txt`.
+Reproduce the complete gate with
+`bash build/qa/logs/run-a3-clock-doc-regressions.sh` and the retained private
+fixtures. This documentation-only follow-up is delivered through
+[PR #7](https://github.com/dobbygl/pokeyellow3d/pull/7), with required CI green
+before merge. No A3/B3 acceptance work or 5A implementation is reopened.

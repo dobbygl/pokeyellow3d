@@ -6,7 +6,7 @@ movimiento, colisiones, encuentros, combates, historia y guardado.
 
 ## Ejecutar
 
-Está disponible el [paquete Linux x86_64 v0.1.0](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.1.0), compilado en Ubuntu 24.04. Descomprímelo, coloca tu ROM en `roms/pokeyellow.gbc` junto al ejecutable y sigue `RUN.md`; las bibliotecas necesarias están en `DEPENDENCIES.txt`. No incluye ROM ni partida. Para la compilación local:
+Los [paquetes v0.2.0 para Linux y Windows x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.2.0) incluyen el launcher. Descomprime el ZIP completo, coloca tu ROM en `roms/pokeyellow.gbc` junto al ejecutable y sigue `RUN.md`. En Linux, abre un terminal en esa carpeta y ejecuta `./pokeyellow3d`; requiere las bibliotecas de Ubuntu 24.04 indicadas en `DEPENDENCIES.txt`. En Windows 10/11, usa `Start.cmd`; las DLL de SDL2, CURL, ANGLE y MSVC van incluidas. Cada ZIP tiene un archivo `.sha256`. No incluyen ROM, recursos extraídos ni partida. Para la compilación local:
 
 ```sh
 cd build
@@ -80,7 +80,7 @@ generar primero la evidencia privada con `tests/dex_portraits_qa.sh`.
 `ctest --test-dir build -LE rom --output-on-failure` ejecuta el grupo sin ROM;
 no se distribuye esa ROM.
 
-Windows/MSVC también compila y pasa los once tests sin ROM, incluido el renderer
+Windows/MSVC también compila y pasa los trece tests sin ROM, incluido el renderer
 sintético con el controlador Windows de SDL2 y ANGLE. Los comandos de compilación
 con las dependencias fijadas están en [README.md](README.md#building-on-windows).
 Los recorridos con ROM y las comparaciones de capturas se validan en Linux/Mesa;

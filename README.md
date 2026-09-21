@@ -48,9 +48,14 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 
 ## Get started
 
-### Prebuilt Linux package
+### Prebuilt packages
 
-Download [v0.1.0 for Linux x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.1.0), extract it, and follow its `RUN.md`. It is built on Ubuntu 24.04 and uses system SDL2, libcurl and OpenGL/GLES libraries; `DEPENDENCIES.txt` lists them. Supply your matching ROM as `roms/pokeyellow.gbc` beside the executable, then run `./pokeyellow3d` from that directory. The package includes no ROM or save.
+Download [v0.2.0 for Linux or Windows x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.2.0), extract the complete ZIP, and follow its `RUN.md`. Supply your matching ROM as `roms/pokeyellow.gbc` beside the executable. Packages contain no ROM, game assets or save.
+
+- **Linux:** built on Ubuntu 24.04; uses system SDL2, libcurl and OpenGL/GLES libraries listed in `DEPENDENCIES.txt`. Open a terminal in the package directory and run `./pokeyellow3d`.
+- **Windows 10/11 x64:** includes SDL2, CURL, ANGLE and MSVC runtime DLLs. Double-click `Start.cmd`, which selects the package directory before launching. Keep the DLLs beside the executable; no compiler or vcpkg installation is required.
+
+Each ZIP has a companion `.sha256` checksum. The launcher is included in `pokeyellow3d`; it starts the game once the matching user-supplied ROM is available.
 
 ### Requirements
 
@@ -116,7 +121,7 @@ Set-Location build/windows
 
 The first dependency build takes longer; subsequent builds reuse it. Saves,
 extracted assets and runtime settings live in the chosen build directory.
-No Windows binary package is included in the Linux `v0.1.0` release.
+For a prebuilt Windows package with its runtime DLLs, use the v0.2.0 download above.
 
 <details>
 <summary><strong>Build the original 2D executable</strong></summary>
@@ -295,4 +300,4 @@ git ls-files -z 'src/*.cpp' 'src/*.h' 'src/*.c' 'tests/*.cpp' 'tests/*.h' 'tests
   | xargs -0 build/format-tools/bin/clang-format --dry-run --Werror
 ```
 
-Tagging a commit `vX.Y.Z` triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds Linux and publishes `pokeyellow3d` packages (with `PALLET3D.md`, `README.md`, and a `RUN.md`) to the GitHub release. It never bundles a ROM either.
+Tagging a commit `vX.Y.Z` triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds Linux and Windows packages, runs the ROM-free tests and verifies the extracted launchers. The Windows artifact additionally runs the synthetic ANGLE renderer without the developer DLL search path. Packaging changes run these jobs on pull requests without publishing; only a version tag publishes the ZIPs and checksums. Packages include `PALLET3D.md`, `README.md` and `RUN.md`, and never bundle a ROM.

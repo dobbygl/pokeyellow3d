@@ -55,6 +55,7 @@ static void capture_surface(const char *path) {
 #include "pc_details_integration.h"
 #include "pc_hall_integration.h"
 #include "tile_animation_integration.h"
+#include "title_integration.h"
 
 int main(int argc, char **argv) {
     if (argc < 3) {
@@ -82,7 +83,16 @@ int main(int argc, char **argv) {
         return 4;
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
+    if (argc > 5 && !std::strcmp(argv[2], "--title-audit")) {
+        title_qa::battery_path = argv[5];
+        ctx->callbacks.load_battery_ram = title_qa::load_battery;
+    }
     pokeyellow_init(ctx);
+    if (argc > 4 && !std::strcmp(argv[2], "--title-audit")) {
+        int result = title_qa::audit(ctx, argv[3], std::atoi(argv[4]));
+        gb_platform_shutdown();
+        return result;
+    }
     if (!gb_context_load_state_file(ctx, argv[2]))
         return 5;
     if (argc > 3 &&

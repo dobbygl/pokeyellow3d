@@ -759,3 +759,56 @@ Directorios de evidencia de la regresión final:
 - `ui_special_transitions`: `build/qa/ui-special-transitions-Y8HxpK/`.
 - `ui_transitions`: `build/qa/ui-transitions-JULyLe/`.
 - `world`: `build/qa/kanto-jAHfVo/`.
+
+### B1 en curso: título desde el motor original — 2026-09-21
+
+Implementación en `title-scene-b1`, después de fusionar C3. Las cuatro
+casillas siguen pendientes de la regresión completa y de CI sobre la PR.
+
+- `title_state.h` verifica las instrucciones CALL de banco 1 y su retorno
+  exterior vivo en DFFD. Se rechazan palabras antiguas, registros guardados,
+  pilas desalineadas y llamadas distintas. `wSaveFileStatus` distingue las
+  rutas sin partida/con partida; OakSpeech conserva el retorno durante los
+  nombres. En Amarillo, el símbolo `vTitleLogo` (8800) contiene Pikachu, y el
+  logo de Pokémon está en 9000: ambos se comparan con sus transferencias de
+  ROM, en 3D:4E5B y 3D:46FB.
+- La traza de reposo descubrió 104 frames en `audioFadeLoop` sin CALL en la
+  pila. Se verifica su PC, banco activo, SP vacío, control de audio y los
+  nueve bytes originales de ese bucle. Así se conserva el título 3D hasta
+  que Init empieza realmente la siguiente intro, sin un salto prematuro a 2D.
+- `title3d.h` carga Paleta del catálogo, sin actores ni bloques de WRAM. Su
+  cámara recorre un bucle lento, con cielo, niebla y colores de atardecer
+  propios del título. Letras y copyright proceden del framebuffer a escala
+  entera; `title_picture.h` lee tiles, atributos, paletas y OAM vivos para el
+  billboard de Pikachu. Los menús originales usan el fondo atenuado de A3.
+  Los controles relativos quedan desactivados durante estas fases.
+- Primera comparación con el LCD original: **4.759 píxeles opacos del
+  retrato, cero diferencias**. Primer recorrido de Continuar: 295 frames de
+  título, 133 de menú, 30 de resumen y 771 de mundo, sin modificar la copia
+  de la batería. Revisión en `build/qa/logs/title-b1-continue-review.png`.
+- Primera batería `build/qa/title-H7nmvs/`: nueva partida (7.200 frames,
+  escritura de nombres y llegada al mundo), Continuar (2.800) y reposo
+  (7.200, dos entradas al título). Se comprueban WRAM, VRAM, RAM de cartucho
+  y framebuffer antes/después de cada presentación, errores GL y máscara
+  de controles neutral. Esta batería precede al ajuste del bucle de audio;
+  no sustituye a la regresión final.
+- Las 38 referencias exteriores iniciales siguen idénticas; comparación en
+  `build/qa/logs/title-b1-initial-exterior-comparison.txt`. Capturas revisadas
+  del título, menú y nombres en `title-b1-first-render-review.png` y del
+  billboard recolocado en `title-b1-render2-title.png`, dentro de ese mismo
+  directorio de logs.
+
+Comandos reproducibles (ROM y batería privadas; no se incluyen en Git):
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 4
+ctest --test-dir build --output-on-failure
+tests/title_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-FzHv3Q/menus/logs/menu-battery.sav
+bash build/qa/logs/run-title-b1-full-regressions.sh
+```
+
+La última orden ejecuta las 17 baterías registradas, CTest con/sin ROM,
+clang-format 18.1.8 y la comparación de las 38 referencias. Su resultado se
+registrará antes de cerrar B1. B2, incluida la grabación revisada del arranque
+completo y el modo público `boot`, sigue siendo el siguiente punto.

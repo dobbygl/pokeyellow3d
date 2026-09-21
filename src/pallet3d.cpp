@@ -1,6 +1,8 @@
 #include "pallet3d.h"
 #include "pallet_state.h"
 #include "tile_animation.h"
+#include "title_state.h"
+#include "title_picture.h"
 #include "firstperson.h"
 #include "interior_scene.h"
 #include "imgui.h"
@@ -43,6 +45,7 @@ constexpr UV Solid{511, 511, 0, 0};
 constexpr Color White{1, 1, 1, 1};
 GLuint program = 0, buffer = 0, atlas = 0;
 GLint fade_loc = -1, matrix_loc = -1, eye_loc = -1, fog_loc = -1, sky_loc = -1, xray_loc = -1;
+GLint dusk_loc = -1;
 bool first_person = false;
 firstperson::Camera eye;
 firstperson::Controls controls;
@@ -86,6 +89,7 @@ struct WorldFrame {
     float fog = 0;
     bool fp = false;
     Vec hero{};
+    float dusk = 0;
 } world_frame;
 bool world_frame_current = false;
 uint64_t world_frame_cycles = 0;
@@ -611,7 +615,8 @@ bool wants_scene(const GBContext *ctx) {
     if (!enabled || failed)
         return false;
     auto state = pallet::view(ctx);
-    return (preview_map >= 0 && presented_scene(ctx)) || state == pallet::View::Overworld ||
+    return title_state::sample(ctx) != title_state::Phase::None ||
+           (preview_map >= 0 && presented_scene(ctx)) || state == pallet::View::Overworld ||
            state == pallet::View::Battle || state == pallet::View::Pokedex || load_fade ||
            can_compose_area(ctx) || can_compose_menu(ctx) || can_compose_warp(ctx) ||
            can_compose_battle(ctx) || can_compose_pc(ctx);
@@ -647,6 +652,7 @@ bool initialize(const GBContext *ctx) {
     const char *fs = R"(
         precision mediump float;
         uniform vec2 fade_tone;
+        uniform float dusk;
         uniform sampler2D image; uniform float xray; uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
         void main() {
@@ -656,7 +662,9 @@ bool initialize(const GBContext *ctx) {
             } else {
                 if(sky>0.5) {
                     if(fog_enabled>1.5) {gl_FragColor=vec4(vec3(0.08,0.10,0.12)*fade_tone.x+fade_tone.y,1.0);return;}
-                    gl_FragColor=vec4(mix(vec3(0.70,0.80,0.75),vec3(0.23,0.42,0.55),smoothstep(0.4,1.0,uv.y))*fade_tone.x+fade_tone.y,1.0);
+                    vec3 horizon=mix(vec3(0.70,0.80,0.75),vec3(0.96,0.64,0.42),dusk);
+                    vec3 zenith=mix(vec3(0.23,0.42,0.55),vec3(0.22,0.25,0.43),dusk);
+                    gl_FragColor=vec4(mix(horizon,zenith,smoothstep(0.4,1.0,uv.y))*fade_tone.x+fade_tone.y,1.0);
                     return;
                 }
                 if(tint.a>1.5) {
@@ -667,7 +675,10 @@ bool initialize(const GBContext *ctx) {
                 }
                 else c=texture2D(image,uv)*tint;
                 if(fog_enabled>1.5)c.rgb=mix(c.rgb,vec3(0.08,0.10,0.12),smoothstep(4.0,18.0,distance_to_eye));
-                else c.rgb=mix(c.rgb,vec3(0.68,0.79,0.75),smoothstep(18.0,70.0,distance_to_eye));
+                else {
+                    c.rgb*=mix(vec3(1.0),vec3(1.0,0.79,0.63),dusk);
+                    c.rgb=mix(c.rgb,mix(vec3(0.68,0.79,0.75),vec3(0.86,0.60,0.46),dusk),smoothstep(18.0,70.0,distance_to_eye));
+                }
             }
             if(c.a<0.08) discard;
             if(xray>0.5) { c.rgb=vec3(0.98,0.80,0.29); c.a*=0.7; }
@@ -705,6 +716,7 @@ bool initialize(const GBContext *ctx) {
     sky_loc = glGetUniformLocation(program, "sky");
     xray_loc = glGetUniformLocation(program, "xray");
     fade_loc = glGetUniformLocation(program, "fade_tone");
+    dusk_loc = glGetUniformLocation(program, "dusk");
     glGenBuffers(1, &buffer);
     glGenTextures(1, &atlas);
     glBindTexture(GL_TEXTURE_2D, atlas);
@@ -946,6 +958,7 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glUniformMatrix4fv(matrix_loc, 1, GL_FALSE, matrix.data());
     glUniform3f(eye_loc, frame.eye.x, frame.eye.y, frame.eye.z);
     glUniform1f(fog_loc, frame.fog);
+    glUniform1f(dusk_loc, frame.dusk);
     glUniform1f(sky_loc, 0);
     glUniform1i(glGetUniformLocation(program, "image"), 0);
     glUniform1f(xray_loc, 0);
@@ -998,6 +1011,7 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
         glDisableVertexAttribArray(i);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    glUniform1f(dusk_loc, 0);
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);
 }
@@ -1005,6 +1019,7 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
 #include "pc_boxes.h"
 #include "pc_hall3d.h"
 #include "pc3d.h"
+#include "title3d.h"
 
 void hud(const GBContext *ctx) {
     ImGuiIO &io = ImGui::GetIO();
@@ -1044,6 +1059,29 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         return;
     }
     auto state = pallet::view(ctx);
+    auto title_phase = title_state::sample(ctx);
+    if (enabled && !failed && preview_map < 0 && title_phase != title_state::Phase::None &&
+        width > 0 && height > 0 && pallet::scene(0)) {
+        menu_overlay = warp_overlay = dialogue_overlay = battle_composed = pc_composed = false;
+        world_frame_current = false;
+        camera_ready = false;
+        eye.reset();
+        // Catalog-only Pallet: no actor or live-map WRAM is interpreted here.
+        preview_map = 0;
+        active = (program || initialize(ctx)) &&
+                 title3d::draw(ctx, width, height, title_phase, menu_open || !window_focused);
+        preview_map = -1;
+        if (active) {
+            ++active_frames;
+            return;
+        }
+        original_frame(ctx, width, height);
+        return;
+    }
+    if (title3d::presented) {
+        title3d::reset();
+        scene_filter::invalidate();
+    }
     if (!ctx || !ctx->wram || world_frame.map != pallet::read(ctx, pallet::Map) ||
         (pc_motion.initialized && uint32_t(ctx->cycles) < pc_motion.last &&
          pc_motion.last - uint32_t(ctx->cycles) < 0x80000000u))
@@ -1383,6 +1421,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
 }
 
 void pallet3d_shutdown() {
+    title3d::shutdown();
     presentation::shutdown();
     presented_lcd = nullptr;
     battle_sequence = battle_arena = battle_fighters = battle_dark = battle_composed = false;
@@ -1504,7 +1543,8 @@ void pallet3d_poll_controls(GBContext *ctx, bool menu_open) {
     bool blending = presentation::blend.running ||
                     (presentation::history.valid && wants_scene(ctx) != presentation::blend.target);
     relative_allowed = first_person && enabled && !failed && !blending && window_focused &&
-                       !menu_open && preview_map < 0 && !can_compose_battle(ctx) &&
+                       title_state::sample(ctx) == title_state::Phase::None && !menu_open &&
+                       preview_map < 0 && !can_compose_battle(ctx) &&
                        pallet::view(ctx) == pallet::View::Overworld && !can_compose_warp(ctx) &&
                        !can_compose_menu(ctx) && !can_compose_pc(ctx) && !can_compose_area(ctx) &&
                        !load_fade;
@@ -1527,6 +1567,7 @@ uint8_t pallet3d_input_mask() {
 }
 
 void pallet3d_state_loaded(GBContext *ctx) {
+    title3d::reset();
     world_frame_current = false;
     dex_area3d::reset();
     pc3d::reset();

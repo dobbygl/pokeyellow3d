@@ -66,7 +66,11 @@ inline int captures(GBContext *ctx, bool fp) {
         special_transition_qa::key(ctx, SDL_SCANCODE_F3);
     for (int i = 0; i < 90; ++i)
         presentation_qa::render(ctx);
+    const auto style = pallet3d_menu_style();
     pallet3d_load_preferences("logs/lighting.cfg");
+    // A new preferences file defaults to integrated. Keep the style selected
+    // by this QA run while exercising lighting persistence in isolation.
+    run.require(pallet3d_menu_style(style, true), "persist selected QA menu style");
     run.require(pallet3d_daylight({}, true), "save disabled setting separately from cartridge");
     auto disabled = presentation_qa::render(ctx);
     capture_surface("logs/disabled-before.ppm");
@@ -75,6 +79,7 @@ inline int captures(GBContext *ctx, bool fp) {
         run.require(pallet3d_daylight({daynight::Mode::Fixed, double(hour)}, true),
                     "persist fixed lighting");
         pallet3d_load_preferences("logs/lighting.cfg");
+        run.require(pallet3d_menu_style() == style, "lighting reload preserves selected QA style");
         auto image = presentation_qa::render(ctx);
         auto light = pallet3d_daylight_frame();
         run.require(light.enabled && light.hour == hour && image != disabled,
@@ -103,16 +108,21 @@ inline int captures(GBContext *ctx, bool fp) {
     special_transition_qa::key(ctx, SDL_SCANCODE_ESCAPE);
     run.require(world_animation_qa::snapshot(run, "logs/after.state") == state,
                 "opening lighting controls leaves the original machine untouched");
+    run.require(pallet3d_menu_style() == style, "lighting controls preserve selected QA style");
+    std::printf("[DAYLIGHT] menu style=%s\n",
+                style == ui_preferences::Style::Classic ? "classic" : "integrated");
     std::puts(
         "PASS: four hours and local clock, exact disabled restoration, settings and memory guards");
     return 0;
 }
 inline int reload(GBContext *ctx, const char *path) {
+    const auto style = pallet3d_menu_style();
     pallet3d_load_preferences(path);
     auto settings = pallet3d_daylight_settings();
     QaWalk run{ctx};
     run.require(settings.mode == daynight::Mode::Fixed && settings.hour == 18.5,
                 "fresh process restores separately persisted fixed time");
+    run.require(pallet3d_menu_style() == style, "fresh process restores selected QA menu style");
     std::puts("PASS: fresh-process lighting preference reload");
     return 0;
 }

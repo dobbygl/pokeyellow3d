@@ -30,15 +30,7 @@ void initialize(const GBContext *ctx) {
     if (texture)
         return;
     std::vector<uint8_t> rgba(AW * AH * 4);
-    for (int glyph = 0; glyph < 128; glyph++)
-        for (int y = 0; y < 8; y++)
-            for (int x = 0; x < 8; x++) {
-                int dest = ((256 + (glyph / 16) * 8 + y) * AW + (glyph % 16) * 8 + x) * 4;
-                bool ink = ctx->rom[0x10600 + glyph * 8 + y] & (1 << (7 - x));
-                for (int c = 0; c < 3; c++)
-                    rgba[dest + c] = 255;
-                rgba[dest + 3] = ink ? 255 : 0;
-            }
+    rom_font::copy_to(ctx->rom, ctx->rom_size, rgba.data(), AW, AH, 0, 256);
     for (int c = 0; c < 4; c++)
         rgba[((AH - 1) * AW + AW - 1) * 4 + c] = 255;
     glGenTextures(1, &texture);
@@ -68,7 +60,7 @@ void block(std::vector<Vertex> &v, float x, float y, float w, float h, Color col
     box(v, px(x), -.28f, w * 18.f / height, .28f, py(y + h), py(y), color);
 }
 void text(std::vector<Vertex> &v, const uint8_t *chars, int length, float x, float y, float size,
-          Color color = {.94f, .93f, .81f}) {
+          Color color = ui_theme::ShelfInk) {
     x = std::round(x);
     y = std::round(y);
     for (int i = 0; i < length && chars[i] != 0x50; i++)
@@ -80,7 +72,7 @@ void text(std::vector<Vertex> &v, const uint8_t *chars, int length, float x, flo
         }
 }
 void label(std::vector<Vertex> &v, const char *value, float x, float y, float size,
-           Color color = {.94f, .93f, .81f}) {
+           Color color = ui_theme::ShelfInk) {
     std::array<uint8_t, 32> chars{};
     size_t n = std::min(std::strlen(value), chars.size());
     for (size_t i = 0; i < n; i++)
@@ -105,7 +97,7 @@ void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next)
     // This keeps portraits visible while the original lists are being used.
     float pad = std::max(6.f, h * .011f), font = 8.f * std::max(1, h / 720);
     float card_h = (top - 3 * pad - font) / 2, portrait_h = std::max(8.f, card_h - 2 * font - 3);
-    block(geometry, pad, pad, w - 2 * pad, top - 2 * pad, {.15f, .26f, .25f});
+    block(geometry, pad, pad, w - 2 * pad, top - 2 * pad, ui_theme::BoxHeader);
     char heading[32];
     std::snprintf(heading, sizeof(heading), "BOX %02d   %02d", data.active + 1,
                   data.boxes[data.active].count);
@@ -140,7 +132,7 @@ void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next)
         float x = i < 6 ? pad : w - pad - side, y = top + (i % 6) * row + pad;
         bool current_box = i == data.active;
         block(geometry, x, y, side, row - 2 * pad,
-              current_box ? Color{.39f, .37f, .20f} : Color{.17f, .21f, .23f});
+              current_box ? ui_theme::BoxActive : ui_theme::BoxInactive);
         char name[20];
         std::snprintf(name, sizeof(name), "BOX %02d", i + 1);
         float glyph = font;
@@ -148,10 +140,10 @@ void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next)
         std::snprintf(name, sizeof(name), "%02d", data.boxes[i].count);
         label(geometry, name, x + 5, y + glyph + 10, glyph);
         panel(geometry, x + side - 12, y + row - 2 * pad - 10, 6, 3,
-              current_box ? Color{.83f, .73f, .36f} : Color{.36f, .53f, .52f});
+              current_box ? ui_theme::BoxActiveLed : ui_theme::BoxInactiveLed);
     }
     float bottom = h - top + pad;
-    block(geometry, pad, bottom, w - 2 * pad, top - 2 * pad, {.16f, .20f, .24f});
+    block(geometry, pad, bottom, w - 2 * pad, top - 2 * pad, ui_theme::PartyShelf);
     std::snprintf(heading, sizeof(heading), "PARTY %02d", data.party.count);
     label(geometry, heading, pad * 2, bottom + pad, font);
     float party_cell = (w - 4 * pad) / 6.f,
@@ -182,7 +174,8 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glClearDepthf(1);
-    glClearColor(.035f, .055f, .065f, 1);
+    glClearColor(ui_theme::BoxBackground.r, ui_theme::BoxBackground.g, ui_theme::BoxBackground.b,
+                 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -215,7 +208,7 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
     if (selected.index >= 0) {
         auto r = slots[(selected.party ? 20 : 0) + selected.index];
         std::vector<Vertex> highlight;
-        Color amber{.96f, .77f, .28f};
+        Color amber = ui_theme::BoxSelection;
         float x = r[0] - 2, y = r[1] - 2, s = r[2] + 4;
         panel(highlight, x, y, s, 2, amber, Solid, .04f);
         panel(highlight, x, y + s - 2, s, 2, amber, Solid, .04f);

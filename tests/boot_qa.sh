@@ -25,7 +25,8 @@ mkdir -p menu/logs new/logs continue/logs
 # Exercise the public default, without a savestate or any optional argument.
 (cd menu; env -u BOOT_VIDEO ../pallet_render_smoke ../roms/pokeyellow.gbc boot > logs/run.log 2>&1)
 # Record every frame, including all of the original intro, with a 60 Hz cap.
-# The presentation fade still uses its real clock, including rendering stalls.
+# Linux smoke tests use a virtual presentation clock; QA_FRAME_SECONDS=wall
+# restores host timing. The playable application keeps its original clock.
 (cd new; BOOT_VIDEO=1 ../pallet_render_smoke ../roms/pokeyellow.gbc boot new 12000 > logs/run.log 2>&1)
 (cd continue; BOOT_VIDEO=1 ../pallet_render_smoke ../roms/pokeyellow.gbc boot continue 4000 ../battery.sav > logs/run.log 2>&1)
 python3 - <<'CHECK'

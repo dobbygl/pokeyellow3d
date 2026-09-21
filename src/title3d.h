@@ -73,7 +73,7 @@ inline void original_lettering(const uint32_t *lcd, int w, int h) {
     dl->AddImage((ImTextureID)(intptr_t)lettering, {left, 16},
                  {left + 160 * scale, 16 + 64 * scale}, {0, 0}, {1, 64.f / 144});
     dl->AddRectFilled({left - 4, h - 20 - 8 * scale}, {left + 160 * scale + 4, h - 12.f},
-                      IM_COL32(250, 238, 205, 225));
+                      ui_theme::TitleStrip);
     dl->AddImage((ImTextureID)(intptr_t)lettering, {left, h - 16 - 8 * scale},
                  {left + 160 * scale, h - 16.f}, {0, 136.f / 144}, {1, 1});
 }

@@ -28,6 +28,7 @@ for scene in world battle warp; do
         fixture=$scene
         if [[ $scene == warp ]]; then mode=crossfade-warp; fixture=world; fi
         if [[ $camera == fp ]]; then mode=$mode-fp; fi
+        if [[ ${QA_MENU_STYLE:-classic} == integrated ]]; then mode=$mode-styled; fi
         name=$scene-$camera
         mkdir -p "$name/logs"
         echo "Checking $name"

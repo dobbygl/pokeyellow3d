@@ -29,14 +29,7 @@ void initialize(const GBContext *ctx) {
     if (texture)
         return;
     std::vector<uint8_t> rgba(AW * AH * 4);
-    for (int glyph = 0; glyph < 128; ++glyph)
-        for (int y = 0; y < 8; ++y)
-            for (int x = 0; x < 8; ++x) {
-                size_t dest = ((256 + glyph / 16 * 8 + y) * AW + glyph % 16 * 8 + x) * 4;
-                for (int c = 0; c < 3; ++c)
-                    rgba[dest + c] = 255;
-                rgba[dest + 3] = ctx->rom[0x10600 + glyph * 8 + y] & (1 << (7 - x)) ? 255 : 0;
-            }
+    rom_font::copy_to(ctx->rom, ctx->rom_size, rgba.data(), AW, AH, 0, 256);
     for (int c = 0; c < 4; ++c)
         rgba[((AH - 1) * AW + AW - 1) * 4 + c] = 255;
     glGenTextures(1, &texture);

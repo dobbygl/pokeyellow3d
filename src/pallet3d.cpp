@@ -7,6 +7,8 @@
 #include "firstperson.h"
 #include "interior_scene.h"
 #include "imgui.h"
+#include "ui_theme.h"
+#include "rom_font.h"
 #include "lcd_overlay.h"
 #include "fade_state.h"
 #include "menu_state.h"
@@ -31,9 +33,7 @@ constexpr int AW = 512, AH = 512;
 struct Vec {
     float x, y, z;
 };
-struct Color {
-    float r, g, b, a = 1;
-};
+using Color = ui_theme::Color;
 struct Vertex {
     Vec p;
     float u, v;
@@ -46,12 +46,13 @@ struct UV {
     float x, y, w, h;
 };
 constexpr UV Solid{511, 511, 0, 0};
-constexpr Color White{1, 1, 1, 1};
+constexpr Color White = ui_theme::TexturedWhite;
 GLuint program = 0, buffer = 0, atlas = 0;
 GLint fade_loc = -1, matrix_loc = -1, eye_loc = -1, fog_loc = -1, sky_loc = -1, xray_loc = -1;
 GLint dusk_loc = -1;
 GLint wind_loc = -1;
 daynight::Settings lighting_settings;
+ui_preferences::Style menu_style = ui_preferences::Style::Integrated;
 std::string preferences_path;
 bool preferences_error = false;
 world_effects::State effects;
@@ -61,6 +62,19 @@ firstperson::Camera eye;
 firstperson::Controls controls;
 GBContext *input_context = nullptr;
 bool relative_allowed = false, window_focused = true;
+void update_cursor(bool menu_open) {
+    bool visible = menu_open || !window_focused;
+    // The SDL ImGui backend otherwise enables the system cursor at NewFrame,
+    // briefly undoing SDL_ShowCursor(false) before our scene gets drawn.
+    if (ImGui::GetCurrentContext()) {
+        auto &flags = ImGui::GetIO().ConfigFlags;
+        if (visible)
+            flags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+        else
+            flags |= ImGuiConfigFlags_NoMouseCursorChange;
+    }
+    SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE);
+}
 uint8_t input_mask = 0xff;
 bool dialogue_overlay = false;
 int actors_drawn = 0;
@@ -1444,6 +1458,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
                           event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED))
             load_started = SDL_GetTicks();
     }
+    update_cursor(menu_open);
     pallet3d_poll_controls(input_context, menu_open);
     if (menu_open)
         return false;
@@ -1534,6 +1549,7 @@ bool pallet3d_event(const SDL_Event *event, bool menu_open) {
 }
 
 void pallet3d_shutdown() {
+    update_cursor(true);
     effects.reset();
     title3d::shutdown();
     presentation::shutdown();
@@ -1613,6 +1629,7 @@ bool pallet3d_active() {
 }
 
 void pallet3d_begin_frame(GBContext *ctx, bool menu_open, const uint32_t *framebuffer) {
+    update_cursor(menu_open);
     presented_lcd = framebuffer;
     if (effects_enabled && enabled && preview_map < 0 && ctx &&
         pallet::view(ctx) == pallet::View::Overworld) {
@@ -1887,7 +1904,9 @@ void pallet3d_world_effects(bool value) {
 
 void pallet3d_load_preferences(const char *path) {
     preferences_path = path ? path : "";
-    lighting_settings = daynight::load(preferences_path);
+    auto settings = ui_preferences::load(preferences_path);
+    lighting_settings = settings.lighting;
+    menu_style = settings.style;
     preferences_error = false;
 }
 bool pallet3d_daylight(daynight::Settings settings, bool persist) {
@@ -1897,7 +1916,7 @@ bool pallet3d_daylight(daynight::Settings settings, bool persist) {
     settings.hour = daynight::wrap(settings.hour);
     lighting_settings = settings;
     if (persist) {
-        preferences_error = !daynight::save(preferences_path, settings);
+        preferences_error = !ui_preferences::save(preferences_path, {settings, menu_style});
         return !preferences_error;
     }
     return true;
@@ -1909,6 +1928,7 @@ daynight::Light pallet3d_daylight_frame() {
     return world_frame.light;
 }
 void pallet3d_settings_ui(bool menu_open) {
+    update_cursor(menu_open);
     if (!menu_open)
         return;
     // ImGui supports appending to the same window with multiple Begin/End
@@ -1948,9 +1968,29 @@ void pallet3d_settings_ui(bool menu_open) {
     }
     if (changed)
         pallet3d_daylight(settings, true);
+    int style = int(menu_style);
+    if (ImGui::Combo("Estilo de menus", &style, "Clasico\0Integrado\0"))
+        pallet3d_menu_style(ui_preferences::Style(style), true);
     if (preferences_error)
-        ImGui::TextWrapped("No se pudo guardar la preferencia de iluminacion.");
+        ImGui::TextWrapped("No se pudieron guardar las preferencias de presentacion.");
     ImGui::Separator();
     ImGui::End();
     ImGui::PopStyleVar(6);
+}
+
+bool pallet3d_menu_style(ui_preferences::Style style, bool persist) {
+    if (style != ui_preferences::Style::Classic && style != ui_preferences::Style::Integrated)
+        return false;
+    menu_style = style;
+    if (persist) {
+        preferences_error = !ui_preferences::save(preferences_path, {lighting_settings, style});
+        return !preferences_error;
+    }
+    return true;
+}
+ui_preferences::Style pallet3d_menu_style() {
+    return menu_style;
+}
+bool pallet3d_window_focused() {
+    return window_focused;
 }

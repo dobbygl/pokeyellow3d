@@ -2,6 +2,7 @@
 
 #include "gbrt.h"
 #include "daylight.h"
+#include "ui_preferences.h"
 #include <SDL.h>
 #include <array>
 
@@ -11,6 +12,9 @@ GBPresentationHooks pallet3d_presentation_hooks();
 
 // Register before initializing the runtime SDL frontend.
 bool pallet3d_register();
+bool pallet3d_menu_style(ui_preferences::Style style, bool persist = false);
+ui_preferences::Style pallet3d_menu_style();
+bool pallet3d_window_focused();
 
 // Presentation only: these functions never write to the emulated machine.
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open);

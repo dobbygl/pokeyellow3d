@@ -1,5 +1,6 @@
 #pragma once
 #include "imgui.h"
+#include "ui_theme.h"
 #include <SDL_opengles2.h>
 #include <algorithm>
 #include <array>
@@ -79,8 +80,7 @@ inline void draw(const uint32_t *framebuffer, Rect r, float w, float h, float al
     ImGui::GetForegroundDrawList()->AddImage(
         (ImTextureID)(intptr_t)texture, {left + r.x * 8 * scale, top + r.y * 8 * scale},
         {left + (r.x + r.w) * 8 * scale, top + (r.y + r.h) * 8 * scale}, {r.x / 20.f, r.y / 18.f},
-        {(r.x + r.w) / 20.f, (r.y + r.h) / 18.f},
-        IM_COL32(255, 255, 255, int(std::clamp(alpha, 0.f, 1.f) * 255)));
+        {(r.x + r.w) / 20.f, (r.y + r.h) / 18.f}, ui_theme::opacity(ui_theme::White, alpha));
 }
 inline int framed_scale(float w, float h) {
     // Leave enough of small interiors visible to establish the retained scene.
@@ -95,12 +95,12 @@ inline void framed(const uint32_t *framebuffer, float w, float h, float alpha = 
     auto *dl = ImGui::GetForegroundDrawList();
     alpha = std::clamp(alpha, 0.f, 1.f);
     dl->AddRectFilled({left - 5, top - 5}, {left + 160 * scale + 5, top + 144 * scale + 5},
-                      IM_COL32(12, 18, 18, int(240 * alpha)));
+                      ui_theme::opacity(ui_theme::Frame, alpha));
     dl->AddRect({left - 2, top - 2}, {left + 160 * scale + 2, top + 144 * scale + 2},
-                IM_COL32(163, 181, 167, int(220 * alpha)));
+                ui_theme::opacity(ui_theme::FrameEdge, alpha));
     dl->AddImage((ImTextureID)(intptr_t)texture, {left, top},
                  {left + 160 * scale, top + 144 * scale}, {0, 0}, {1, 1},
-                 IM_COL32(255, 255, 255, int(255 * alpha)));
+                 ui_theme::opacity(ui_theme::White, alpha));
 }
 inline void regions(const uint32_t *framebuffer, const menu_layout::Layout &layout, float w,
                     float h) {
@@ -114,7 +114,7 @@ inline void regions(const uint32_t *framebuffer, const menu_layout::Layout &layo
         for (int pad = 3; pad >= 1; pad--)
             dl->AddRectFilled({x - pad, y - pad + 2},
                               {x + r.w * 8 * scale + pad, y + r.h * 8 * scale + pad + 2},
-                              IM_COL32(0, 0, 0, 35));
+                              ui_theme::Shadow);
     }
     for (size_t i = 0; i < layout.count; i++) {
         auto r = layout.regions[i];

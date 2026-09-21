@@ -821,9 +821,10 @@ La sintaxis ampliada es `ROM boot [menu|new|continue] [MAX_FRAMES] [BATTERY]`.
 `new` parte sin batería y escribe los nombres mediante botones originales;
 `continue` exige una copia de batería válida. `BOOT_VIDEO=1` graba todos los
 frames a 60 fps en `logs/boot-composed.mp4` y `logs/boot-original.mp4`, sin
-audio. El helper limita el avance a 60 fps; el fundido conserva su reloj
-real, por lo que su número de frames depende del tiempo de renderizado.
-No cambia el reloj ni el ejecutable jugable.
+audio. En Linux el helper usa un reloj virtual de presentación para que
+los fundidos sean reproducibles, con 60 pasos por segundo.
+`QA_FRAME_SECONDS=wall` recupera la temporización real. El reloj del motor
+y el ejecutable jugable conservan su comportamiento original.
 
 La batería de vídeos requiere `ffmpeg` y `ffprobe`. Deja vídeos, capturas, traza CSV y estado final en
 `build/qa/boot-*/`. Cada frame anterior al título se compara con los píxeles
@@ -831,3 +832,55 @@ del LCD original, sin pulsaciones; la primera imagen del fundido coincide
 con el último frame de la intro. También se comprueban la finalización del
 fundido, la llegada al menú y al mundo, la cantidad de frames de los vídeos,
 los hashes de entrada y los guardas de memoria y controles por frame.
+
+
+### Estilo de menús: base A1
+
+Esc incluye **Estilo de menus: Clasico / Integrado**. Integrado es el
+valor inicial; la elección se guarda junto a la iluminación en
+`lighting.cfg`, formato v2. Los archivos v1 siguen cargando su iluminación.
+A1 prepara el tema y la fuente común; ambos estilos conservan todavía las
+mismas disposiciones y píxeles. Las fases siguientes aplicarán el nuevo
+panel a las regiones reconocidas. El cursor del ratón se oculta al jugar
+con foco y vuelve en Esc o al perderlo.
+
+La fuente compartida es `FontGraphics` de la ROM, sin reemplazar sus 128
+glifos. Los atlas del PC conservan sus coordenadas y filtrado. Los tokens
+visuales se encuentran en `src/ui_theme.h`.
+
+| Disposición del motor | Regiones en tiles (x, y, ancho, alto) |
+| --- | --- |
+| Cuadro inferior | (0, 12, 20, 6) |
+| Start | (10, 0, 10, 14) o (10, 0, 10, 16) |
+| Sí / No | (14, 7, 6, 5), sobre el cuadro inferior |
+| Guardado | Tarjeta (4, 0, 16, 10); confirmación (0, 7, 6, 5) |
+| Centro | Heal/Cancel (11, 6, 9, 6), con cuadro inferior |
+| Tienda | Buy (0, 0, 11, 7), dinero (11, 0, 9, 3), stock (4, 2, 16, 11), cantidad (7, 9, 13, 3) |
+| Equipo, mochila y pantalla desconocida | LCD completo enmarcado |
+
+El orden de las regiones conserva los solapamientos originales. Las nuevas
+pruebas se ejecutan con `tests/ui_style_qa.sh ROM WORLD ROUTE1 ROUTE22 PALLET
+READY_BATTLE`. El helper acepta `menus-styled`, `menus-fp-styled`,
+`battle3d-styled` y `crossfade-styled`, además de las variantes de los
+recorridos. Los modos clásicos existentes siguen siendo la referencia.
+La comparación byte a byte se hace con
+`tests/compare_classic_captures.py BASE CANDIDATE --report REPORTE.json`;
+`--settings-ui-changed` registra aparte las dos capturas del panel Esc
+que contienen el control nuevo, sin excluir capturas del juego.
+
+
+La base A1 está validada: veinte baterías clásicas, 2.159 capturas de juego
+idénticas a v0.2.0 y 1.831 estados completos pareados sin diferencias; las
+38 vistas exteriores siguen idénticas al archivo original. La comparación
+exacta usa el mismo renderizador Intel que ese archivo. CTest pasa 34/34
+con ROM y 15/15 en el build independiente sin ROM, donde también se prueba
+el renderizado por software.
+
+`ui_style_qa.sh` hereda el renderizador elegido por el entorno, como las
+otras baterías; `LIBGL_ALWAYS_SOFTWARE=1` permite ejecutarlo con llvmpipe.
+La ejecución integrada de A1 comprobó 478.265 glifos en 15.817 frames
+observados, además del cursor y la persistencia entre procesos. La prueba
+de iluminación conserva explícitamente el estilo seleccionado al crear y
+recargar sus preferencias. La evidencia y los comandos completos están en
+el registro de `PLAN_ESTILO_MENUS.md` y en
+`build/qa/logs/menu-style-a1-evidence.json`.

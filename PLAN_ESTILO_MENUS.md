@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: confirmado para ejecución; ninguna fase iniciada.
+Fecha: 2026-09-21. Estado: A1 validada; A2, B1, B2 y C1 pendientes.
 
 ## Análisis del estado actual
 
@@ -110,10 +110,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Con el estilo clásico, las 60 capturas de menús y las capturas de combate, PC, Pokédex y título son idénticas byte a byte a v0.2.0.
-- [ ] El ajuste se conserva tras reiniciar la aplicación y un fichero de preferencias de versión 1 sigue cargando.
-- [ ] El cursor del ratón no aparece en ninguna captura de juego y sí con el menú Esc abierto.
-- [ ] `rom_font` decodifica los 128 glifos y cada uno coincide bit a bit con el tile de VRAM correspondiente en un savestate con texto en pantalla.
+- [x] Con el estilo clásico, las 60 capturas de menús y las capturas de combate, PC, Pokédex y título son idénticas byte a byte a v0.2.0.
+- [x] El ajuste se conserva tras reiniciar la aplicación y un fichero de preferencias de versión 1 sigue cargando.
+- [x] El cursor del ratón no aparece en ninguna captura de juego y sí con el menú Esc abierto.
+- [x] `rom_font` decodifica los 128 glifos y cada uno coincide bit a bit con el tile de VRAM correspondiente en un savestate con texto en pantalla.
 
 ### Fase A2: renderizado de regiones desde `wTileMap`
 
@@ -293,3 +293,122 @@ La fase A1 aún no está iniciada. Validación documental: 19 casillas abiertas,
 `git diff --check` y CI de esta PR antes de fusionar. Las veinte baterías
 clásicas y la nueva integrada se ejecutarán tras cada fase; este commit no
 modifica código ni cambia el binario de v0.2.0.
+
+### A1 — implementación y referencia, 2026-09-21
+
+Plan confirmado y fusionado en PR #16, merge `f2f6d75`, con CI
+`35612560495` verde. Rama de implementación: `menu-style-a1`. Las 19
+casillas siguen abiertas hasta terminar la evidencia de aceptación.
+
+- `ui_theme.h` conserva los valores previos y centraliza paneles, barras,
+  marcos y paletas. `rom_font.h` decodifica una vez los 128 glifos y copia
+  el atlas compartido en los rectángulos originales de PC, cajas y Hall.
+- `ui_preferences.h` lee v1 y v2. V2 conserva iluminación y estilo; el
+  valor inicial del estilo es integrado. Esc permite cambiarlo. El cursor
+  del sistema se oculta con foco durante el juego y se muestra en Esc o
+  al perder foco.
+- Referencia independiente: worktree privado `build/qa/menu-style-v020`,
+  tag `2544f9fe6895213965439162511f4a87b9a87526`, con **solo** el adaptador
+  de reloj de QA y su enlace. Ningún archivo de `src/` de v0.2.0 se modifica.
+  En Linux, el helper intercepta SDL_GetTicks/SDL_Delay y avanza un reloj
+  virtual por frame. El ejecutable jugable y el reloj del motor no cambian.
+  La batería de fundidos de esa referencia ya pasa, incluida inversión y
+  pausa de Esc/foco. Las veinte baterías completas están en ejecución.
+- Las capturas del juego se compararán sin tolerancia. Las dos vistas del
+  **panel de ajustes del runtime** (`settings.ppm` y `settings-paused.ppm`)
+  se registran aparte porque ahora incluyen el nuevo control autorizado;
+  esa separación no excluye ningún menú original del juego. Sus estados
+  del motor también se comparan.
+- `ui_style_qa.sh` reutiliza los recorridos de menús, combate y fundidos
+  en ambas cámaras. A1 aún conserva la composición clásica en ambos
+  estilos; su observador compara por frame los bits de los glifos y sus
+  píxeles LCD presentados. A2 añadirá la comparación de los glifos
+  reestilizados, y B1 la del menú de combate integrado.
+
+Primeras comprobaciones: compilación correcta; CTest inicial 32/32;
+128 glifos iguales a ambos planos de VRAM del estado privado
+`build/qa/ui-menus-YdVuWy/menus/logs/start.state`. La nueva configuración
+registra 34 pruebas con ROM y 15 sin ROM; su ejecución completa está
+pendiente junto con las baterías. No se da por cerrada A1.
+
+Comandos y evidencia reproducibles:
+
+```sh
+# La referencia usa los mismos tests/qa_sdl_clock.cpp y adaptador de reloj,
+# sin los observadores posteriores ni cambios de presentación de A1.
+bash build/qa/logs/run-menu-style-baseline.sh
+bash build/qa/logs/run-menu-style-a1-regressions.sh
+SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy build/pallet_render_smoke \
+  build/roms/pokeyellow.gbc build/qa/ui-menus-YdVuWy/menus/logs/start.state \
+  font-export build/qa/ui/font.vram
+build/rom_font_test build/roms/pokeyellow.gbc build/qa/ui/font.vram
+ctest --test-dir build --output-on-failure
+ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+```
+
+Los drivers, logs y datos de comparación se guardan bajo
+`build/qa/logs/menu-style-*`. Para conservar espacio se aplicó compresión
+Btrfs zstd transparente a 32.461 capturas existentes: SHA-256 idéntico antes
+y después de cada archivo, rutas conservadas. Registro en
+`private-captures-compression-summary.json` y su manifiesto JSONL privado.
+
+
+### Cierre de A1 — 2026-09-21
+
+Código validado: `82ee5b6f3eda36c42a70fcf3f0b96a463fdaff7c`, PR #17.
+CI `35628041008`: Linux GCC, Clang, 2D, Windows MSVC y formato aprobados.
+Este cierre documental no modifica el código probado. La PR se fusiona
+solo después de comprobar también la CI de su último commit.
+
+Evidencia consolidada: `build/qa/logs/menu-style-a1-evidence.json`.
+Las veinte baterías clásicas terminaron con código 0 en la referencia
+independiente de v0.2.0 y en A1: **2.159 capturas de juego y 1.831 estados
+completos pareados idénticos**, sin archivos ausentes ni adicionales.
+Incluyen las 72 capturas de menús y las de combate, PC, Pokédex y título.
+Las 38 vistas exteriores coinciden también con el archivo original
+`build/qa/kanto-hvoPvo/logs/catalog`, sin tolerancia.
+
+La comparación usa **Mesa Intel UHD Graphics 620**, el renderizador de esas
+capturas originales. La prueba inicial con llvmpipe evidenció diferencias
+de rasterizado incluso al ejecutar el código intacto de v0.2.0; no se
+aceptaron como regresiones del candidato ni se relajó la igualdad. Ambas
+versiones se ejecutaron de nuevo con Intel. Los ensayos de software se
+conservan en `build/qa/logs/menu-style-software-before-intel/`; la prueba
+independiente sin ROM sigue verificando llvmpipe. El parche completo del
+reloj de referencia, sus hashes y los comandos de preparación quedan en
+`menu-style-v020-qa-clock.patch` y
+`menu-style-v020-reference-reproduction.{json,md}` dentro de ese directorio
+de logs. Ningún archivo `src/` de la referencia se modificó.
+
+`ui_style_qa.sh` completó sus 18 recorridos de menús, combate y fundidos:
+15.817 frames observados, 478.265 glifos y 30.608.960 bits comprobados.
+Los tiles cuya fuente no está disponible en VRAM se registran conservando
+la composición clásica. A1 todavía no rediseña los paneles. Las guardas
+de cursor, OpenGL, memoria y controles originales pasan. El estilo clásico
+y el integrado se guardan y restauran en procesos separados; un fichero
+v1 conserva la iluminación. Se corrigió la preparación de iluminación para
+que un fichero vacío no sustituyera el estilo clásico de QA por el valor
+integrado predeterminado: los seis escenarios lo comprueban explícitamente.
+
+CTest completo: **34/34**, sin saltos. Build independiente sin ROM:
+**15/15**, sin saltos. `clang-format` **18.1.8** aprobado. Los 128 glifos
+coinciden con ambos planos de VRAM; el atlas común conserva las coordenadas
+y el filtrado clásicos. Se revisaron los contactos privados de las ocho
+variantes de menús, título, ajustes, detalles del PC y combate, con
+manifiestos `menu-style-a1-*-review.json` bajo `build/qa/logs/`.
+
+Comandos de la ejecución definitiva, desde la raíz del proyecto:
+
+```sh
+# Los drivers desactivan la imposición de software para usar la GPU original.
+bash build/qa/logs/run-menu-style-baseline.sh
+bash build/qa/logs/run-menu-style-a1-regressions.sh
+python3 build/qa/logs/collect-menu-style-a1-evidence.py
+```
+
+Los drivers enumeran las veinte baterías y sus fixtures privados, ejecutan
+CTest completo y sin ROM, y terminan con `tests/ui_style_qa.sh` en integrado.
+El comparador separa diez vistas de ajustes de Esc que contienen el control
+nuevo, pero compara sus estados del motor; no excluye ningún menú del juego.
+Los cuatro criterios de A1 quedan acreditados. Los quince criterios de
+A2, B1, B2 y C1 permanecen abiertos; A2 empieza tras la fusión de esta PR.

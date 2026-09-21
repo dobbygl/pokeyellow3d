@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: A1 fusionada; A2 en validación; B1, B2 y C1 pendientes.
+Fecha: 2026-09-21. Estado: A1 fusionada; A2 validada, pendiente de fusión; B1, B2 y C1 pendientes.
 
 ## Análisis del estado actual
 
@@ -138,11 +138,11 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Cada glifo presentado coincide bit a bit con el patrón de tinta del tile de `wTileMap` que representa, comprobado por frame en las ocho variantes de `ui_menus_qa.sh`.
-- [ ] El cursor de selección se presenta en la fila que indica `wCurrentMenuItem` y sigue al cursor original frame a frame al recorrer Start, tienda y sí/no.
-- [ ] Start, guardar con confirmación, comprar en la tienda y curar en el centro mantienen la escena y son operables con los controles originales.
-- [ ] Las regiones no reconocidas y las pantallas completas conservan su presentación actual sin frames en blanco.
-- [ ] Cero errores OpenGL y WRAM, VRAM, RAM de cartucho y framebuffer intactos por frame.
+- [x] Cada glifo presentado coincide bit a bit con el patrón de tinta del tile de `wTileMap` que representa, comprobado por frame en las ocho variantes de `ui_menus_qa.sh`.
+- [x] El cursor de selección se presenta en la fila que indica `wCurrentMenuItem` y sigue al cursor original frame a frame al recorrer Start, tienda y sí/no.
+- [x] Start, guardar con confirmación, comprar en la tienda y curar en el centro mantienen la escena y son operables con los controles originales.
+- [x] Las regiones no reconocidas y las pantallas completas conservan su presentación actual sin frames en blanco.
+- [x] Cero errores OpenGL y WRAM, VRAM, RAM de cartucho y framebuffer intactos por frame.
 
 ## Bloque B: combate y HUD
 
@@ -457,3 +457,66 @@ de tienda, curación y sí/no mediante pulsaciones reales.
 Validación completa pendiente: veinte baterías clásicas frente a la
 referencia inmutable de v0.2.0, `ui_style_qa.sh` integrado, CTest con y sin
 ROM, formato y CI de la PR. No se inicia B1 antes de fusionar A2.
+
+
+### Cierre de A2 — 2026-09-21
+
+Implementación probada: `7d6a346a6cb0ec039d53524e716b88123796fa31`, PR #18.
+CI `35635073833` aprobada: Linux GCC, Clang, 2D, Windows MSVC y formato.
+El cierre documental no cambia ese código. La fusión espera la CI también
+aprobada de este último commit.
+
+Evidencia consolidada: `build/qa/logs/menu-style-a2-evidence.json`.
+Las veinte baterías clásicas pasan: **2.159 capturas de juego y 1.831
+estados completos idénticos** a la referencia independiente de v0.2.0,
+sin archivos ausentes ni adicionales. Incluyen los 72 menús, combate, PC,
+Pokédex, título y las 38 vistas exteriores, iguales también al archivo
+original. Diez capturas de ajustes Esc se registran aparte; sus estados
+sí se comparan. El runtime permanece limpio en `00cc26d`.
+
+CTest completo: **35/35**, sin saltos. Build independiente sin ROM:
+**16/16**, sin saltos, con llvmpipe verificado. Formato **18.1.8** aprobado.
+Los tests de disposición verifican propiedad única de celdas, escalas,
+relleno y respaldo por región; también se ejecutaron contra los mapas de
+tiles privados exportados de las ocho variantes.
+
+`ui_style_qa.sh` completó los 18 recorridos de menús, combate y fundidos:
+**16.517 frames, 514.558 glifos y 32.931.712 bits** comprobados, además de
+**5.400 comprobaciones del cursor activo** contra los campos del motor.
+Los menús integrados incluyen pulsaciones adicionales de abajo/arriba en
+Start, tienda, guardado, curación y sí/no, conservando los recorridos
+clásicos. Guardado, compra, curación y cambio de nombre siguen ejecutados
+por el motor original, con las guardas de memoria, controles y OpenGL.
+
+El contacto de las ocho variantes y el de respaldos clásicos están
+revisados: `menu-style-a2-eight-variants-review.{png,json}` y
+`menu-style-a2-fallback-review.{png,json}` bajo `build/qa/logs/`.
+La comprobación adicional parte de una partida sin Pokédex y de una compra
+real: Start de 14 filas y confirmación de tienda con seis regiones; suma
+1.237 frames y 73.704 glifos observados. Capturas y comandos en
+`menu-style-a2-additional-live-review.json`. Una carga fría de la tienda
+sin escena 3D residente conserva el LCD original; se registró aparte y
+no se contabiliza como presentación integrada. El recorrido con la escena
+residente verifica la confirmación integrada completa.
+
+Comandos reproducibles desde la raíz del proyecto (fixtures privados):
+
+```sh
+bash build/qa/logs/run-menu-style-a2-regressions.sh
+tests/ui_style_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/battles-LojUdN/logs/route22-trainer.state \
+  build/qa/ui-crossfade-5bOG41/world.state \
+  build/qa/ui-crossfade-5bOG41/battle.state
+build/menu_text_test build/qa/ui-menus-HhOLvt/*/logs/*.tiles
+python3 build/qa/logs/collect-menu-style-a2-evidence.py
+```
+
+La comparación usa Intel UHD 620 como el archivo original; el test sin ROM
+conserva la comprobación por software. La referencia v0.2.0 reutilizada es
+inmutable y se verifican su código y el parche exclusivo del reloj de QA.
+La compresión Btrfs transparente de capturas cerradas conserva su SHA-256;
+no elimina evidencia. Los cinco criterios de A2 quedan acreditados: nueve
+de los diecinueve están verificados. B1 empieza solo después de fusionar
+esta fase; B1, B2 y C1 conservan sus diez criterios abiertos.

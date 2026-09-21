@@ -892,3 +892,15 @@ de iluminación conserva explícitamente el estilo seleccionado al crear y
 recargar sus preferencias. La evidencia y los comandos completos están en
 el registro de `PLAN_ESTILO_MENUS.md` y en
 `build/qa/logs/menu-style-a1-evidence.json`.
+
+
+La presentación A2 está validada: las veinte baterías clásicas conservan
+2.159 capturas y 1.831 estados idénticos a v0.2.0, incluidas las 38 vistas
+exteriores. CTest pasa 35/35 y el build independiente sin ROM 16/16. Los
+18 recorridos integrados comprobaron 514.558 glifos en 16.517 frames y el
+cursor activo en 5.400 ocasiones. Los contactos revisados y la evidencia
+se guardan en `build/qa/logs/menu-style-a2-*`. La tarjeta de guardado
+conserva su región LCD por el colon adicional de la fuente; una carga fría
+sin escena residente conserva el LCD completo hasta poder presentar la
+escena con seguridad. Los menús de combate aún usan su composición previa,
+a la espera de B1.

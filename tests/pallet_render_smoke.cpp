@@ -57,6 +57,7 @@ static void capture_surface(const char *path) {
 #include "tile_animation_integration.h"
 #include "title_integration.h"
 #include "boot_integration.h"
+#include "world_animation_integration.h"
 
 int main(int argc, char **argv) {
     SDL_SetMainReady();
@@ -121,6 +122,21 @@ int main(int argc, char **argv) {
         stderr, "[SMOKE] party=%u hp=%u level=%u script=%u/%u font=%u\n", pallet::read(ctx, 0xd162),
         pallet::read(ctx, 0xd16b) * 256 + pallet::read(ctx, 0xd16c), pallet::read(ctx, 0xd18b),
         pallet::read(ctx, 0xd5f0), pallet::read(ctx, 0xd5ef), pallet::read(ctx, pallet::Font));
+    if (argc > 3 && (!std::strcmp(argv[3], "world-animation-grass") ||
+                     !std::strcmp(argv[3], "world-animation-grass-fp") ||
+                     !std::strcmp(argv[3], "world-animation-surf") ||
+                     !std::strcmp(argv[3], "world-animation-surf-fp"))) {
+        int result = world_animation_qa::effects(ctx, std::strstr(argv[3], "-fp") != nullptr,
+                                                 std::strstr(argv[3], "-surf") != nullptr);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && (!std::strcmp(argv[3], "world-animation-npc") ||
+                     !std::strcmp(argv[3], "world-animation-npc-fp"))) {
+        int result = world_animation_qa::npc(ctx, !std::strcmp(argv[3], "world-animation-npc-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 3 &&
         (!std::strcmp(argv[3], "tile-animation") || !std::strcmp(argv[3], "tile-animation-fp"))) {
         int result = tile_animation_qa::run(ctx, !std::strcmp(argv[3], "tile-animation-fp"));

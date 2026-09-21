@@ -143,3 +143,13 @@ struct PalletTileAnimationInfo {
     size_t uploads = 0;
 };
 PalletTileAnimationInfo pallet3d_tile_animation();
+
+struct PalletWorldAnimationInfo {
+    bool enabled;
+    float wind;
+    size_t particles;
+    uint32_t emitted;
+};
+PalletWorldAnimationInfo pallet3d_world_animation();
+// Presentation preference and replay comparison; never changes engine state.
+void pallet3d_world_effects(bool enabled);

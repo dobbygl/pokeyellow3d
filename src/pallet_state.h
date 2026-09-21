@@ -6,6 +6,7 @@
 #include "dex_state.h"
 #include "dex_area_state.h"
 #include "pc_state.h"
+#include "npc_animation.h"
 #include <array>
 #include <cstdint>
 
@@ -149,7 +150,10 @@ inline bool actor(const GBContext *ctx, int slot, Actor &out) {
         int base = read(ctx, b + 14);
         if (slot == 15 || base < 1 || base > 11)
             return false;
-        image = ((base - 1) << 4) | (read(ctx, a + 9) & 12);
+        auto motion = npc_animation::sample(ctx, slot);
+        x += motion.dx;
+        z += motion.dz;
+        image = ((base - 1) << 4) | motion.frame;
     }
     const Scene *s = scene(read(ctx, Map));
     if (!s || x < 0 || z < 0 || x >= s->width || z >= s->height)

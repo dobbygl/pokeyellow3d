@@ -39,6 +39,8 @@ struct Vertex {
     float u, v;
     Color c;
     float wind = 0;
+    Vec normal{0, 1, 0};
+    float emissive = 0;
 };
 struct UV {
     float x, y, w, h;
@@ -49,6 +51,9 @@ GLuint program = 0, buffer = 0, atlas = 0;
 GLint fade_loc = -1, matrix_loc = -1, eye_loc = -1, fog_loc = -1, sky_loc = -1, xray_loc = -1;
 GLint dusk_loc = -1;
 GLint wind_loc = -1;
+daynight::Settings lighting_settings;
+std::string preferences_path;
+bool preferences_error = false;
 world_effects::State effects;
 bool effects_enabled = true;
 bool first_person = false;
@@ -96,6 +101,7 @@ struct WorldFrame {
     Vec hero{};
     float dusk = 0;
     float wind = 0;
+    daynight::Light light{};
 } world_frame;
 bool world_frame_current = false;
 uint64_t world_frame_cycles = 0;
@@ -205,7 +211,18 @@ Color shade(Color c, float f) {
     return {c.r * f, c.g * f, c.b * f, c.a};
 }
 
-void quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color color = White, UV uv = Solid) {
+void surface_normal(std::vector<Vertex> &v, size_t start, Vec a, Vec b, Vec d, float emissive = 0) {
+    Vec u{d.x - a.x, d.y - a.y, d.z - a.z}, w{b.x - a.x, b.y - a.y, b.z - a.z};
+    Vec n{u.y * w.z - u.z * w.y, u.z * w.x - u.x * w.z, u.x * w.y - u.y * w.x};
+    float length = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+    n = length > .0001f ? Vec{n.x / length, n.y / length, n.z / length} : Vec{0, 1, 0};
+    for (size_t i = start; i < v.size(); ++i) {
+        v[i].normal = n;
+        v[i].emissive = emissive;
+    }
+}
+void quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color color = White, UV uv = Solid,
+          float emissive = 0) {
     float u0 = (uv.x + .25f) / AW, v0 = (uv.y + .25f) / AH;
     float u1 = (uv.x + std::max(uv.w - .25f, .25f)) / AW;
     float v1 = (uv.y + std::max(uv.h - .25f, .25f)) / AH;
@@ -215,6 +232,7 @@ void quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color color = Whit
                        {a, u0, v0, color},
                        {c, u1, v1, color},
                        {d, u0, v1, color}});
+    surface_normal(v, v.size() - 6, a, b, d, emissive);
 }
 
 void detailed_quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color color, UV detail) {
@@ -237,6 +255,7 @@ void detailed_quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color col
                        {a, 0, 0, color},
                        {c, u, t, color},
                        {d, 0, t, color}});
+    surface_normal(v, v.size() - 6, a, b, d);
 }
 
 void box(std::vector<Vertex> &v, float x, float z, float w, float d, float bottom, float top,
@@ -283,7 +302,7 @@ void make_house(const pallet::Scene &scene, const pallet::House &h,
                   bottom = eave - (row + 1) * (eave - .03f) / facade_rows;
             quad(scenery, {left, top, z + d + .006f}, {right, top, z + d + .006f},
                  {right, bottom, z + d + .006f}, {left, bottom, z + d + .006f}, White,
-                 tile_uv(scene, tile, 1));
+                 tile_uv(scene, tile, 1), scene.tileset == 0 && tile == 0x0a ? 1.f : 0.f);
         }
     Color roof = h.lab ? Color{.28f, .48f, .53f} : Color{.69f, .31f, .23f};
     float left = x - .17f, right = x + w + .17f, back = z - .14f, front = z + d + .17f,
@@ -646,7 +665,11 @@ void original_frame(GBContext *ctx, int w, int h) {
 bool initialize(const GBContext *ctx) {
     const char *vs = R"(
         attribute vec3 position; attribute vec2 texcoord; attribute vec4 color; attribute float wind;
+        attribute vec4 material;
         uniform float wind_time;
+        uniform mediump float daylight_enabled;
+        uniform vec3 sun_direction, ambient_light, direct_light;
+        varying mediump vec3 lighting_tint; varying mediump float glass;
         uniform mat4 view_projection; uniform vec3 eye;
         uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
@@ -660,6 +683,9 @@ bool initialize(const GBContext *ctx) {
             gl_Position=sky>0.5?vec4(position.xy,0.999,1.0):view_projection*vec4(moved,1.0);
             distance_to_eye=fog_enabled>0.5?length(position-eye):0.0;
             uv=texcoord; tint=color;
+            lighting_tint=vec3(1.0); glass=material.w;
+            if(daylight_enabled>0.5)
+                lighting_tint=ambient_light+direct_light*max(dot(material.xyz,sun_direction),0.0);
             // Resolve flat materials once per vertex for the orthographic view.
             // Its fragment path remains a single texture lookup, as before FP.
             if(fog_enabled<0.5 && color.a>1.5) {uv=vec2(511.25/512.0);tint.a=1.0;}
@@ -669,17 +695,21 @@ bool initialize(const GBContext *ctx) {
         precision mediump float;
         uniform vec2 fade_tone;
         uniform float dusk;
+        uniform mediump float daylight_enabled, window_light;
+        uniform vec3 day_horizon, day_zenith, day_fog;
+        varying mediump vec3 lighting_tint; varying mediump float glass;
         uniform sampler2D image; uniform float xray; uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
         void main() {
             vec4 c;
-            if(fog_enabled<0.5) {
+            if(fog_enabled<0.5 && sky<0.5) {
                 c=texture2D(image,uv)*tint;
             } else {
                 if(sky>0.5) {
                     if(fog_enabled>1.5) {gl_FragColor=vec4(vec3(0.08,0.10,0.12)*fade_tone.x+fade_tone.y,1.0);return;}
                     vec3 horizon=mix(vec3(0.70,0.80,0.75),vec3(0.96,0.64,0.42),dusk);
                     vec3 zenith=mix(vec3(0.23,0.42,0.55),vec3(0.22,0.25,0.43),dusk);
+                    if(daylight_enabled>0.5) {horizon=day_horizon;zenith=day_zenith;}
                     gl_FragColor=vec4(mix(horizon,zenith,smoothstep(0.4,1.0,uv.y))*fade_tone.x+fade_tone.y,1.0);
                     return;
                 }
@@ -691,12 +721,18 @@ bool initialize(const GBContext *ctx) {
                 }
                 else c=texture2D(image,uv)*tint;
                 if(fog_enabled>1.5)c.rgb=mix(c.rgb,vec3(0.08,0.10,0.12),smoothstep(4.0,18.0,distance_to_eye));
-                else {
+                else if(daylight_enabled<0.5) {
                     c.rgb*=mix(vec3(1.0),vec3(1.0,0.79,0.63),dusk);
                     c.rgb=mix(c.rgb,mix(vec3(0.68,0.79,0.75),vec3(0.86,0.60,0.46),dusk),smoothstep(18.0,70.0,distance_to_eye));
                 }
             }
             if(c.a<0.08) discard;
+            if(daylight_enabled>0.5) {
+                float pane=glass*step(0.55,c.r)*step(0.55,c.g)*window_light;
+                c.rgb=mix(c.rgb*lighting_tint,vec3(1.0,0.76,0.32),pane*0.9);
+                if(fog_enabled>0.5)
+                    c.rgb=mix(c.rgb,day_fog,smoothstep(18.0,70.0,distance_to_eye));
+            }
             if(xray>0.5) { c.rgb=vec3(0.98,0.80,0.29); c.a*=0.7; }
             c.rgb=c.rgb*fade_tone.x+fade_tone.y;
             gl_FragColor=c;
@@ -716,6 +752,7 @@ bool initialize(const GBContext *ctx) {
     glBindAttribLocation(program, 1, "texcoord");
     glBindAttribLocation(program, 2, "color");
     glBindAttribLocation(program, 3, "wind");
+    glBindAttribLocation(program, 4, "material");
     glLinkProgram(program);
     glDeleteShader(a);
     glDeleteShader(b);
@@ -957,6 +994,9 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
                    fp,
                    {player_position[0], .6f, player_position[1]}};
     world_frame.wind = effects_enabled && preview_map < 0 && !current.interior ? effects.wind() : 0;
+    if (!current.interior)
+        world_frame.light =
+            daynight::sample(lighting_settings, daynight::local_hour(std::time(nullptr)));
     world_frame_current = true;
     world_frame_cycles = ctx->cycles;
     draw_world_frame(w, h, tone);
@@ -1008,10 +1048,21 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glUniform1f(fog_loc, frame.fog);
     glUniform1f(dusk_loc, frame.dusk);
     glUniform1f(wind_loc, frame.wind);
+    glUniform1f(glGetUniformLocation(program, "daylight_enabled"), frame.light.enabled ? 1.f : 0.f);
+    auto light_vector = [](const char *name, const daynight::RGB &value) {
+        glUniform3fv(glGetUniformLocation(program, name), 1, value.data());
+    };
+    light_vector("sun_direction", frame.light.sun);
+    light_vector("ambient_light", frame.light.ambient);
+    light_vector("direct_light", frame.light.direct);
+    light_vector("day_horizon", frame.light.horizon);
+    light_vector("day_zenith", frame.light.zenith);
+    light_vector("day_fog", frame.light.fog);
+    glUniform1f(glGetUniformLocation(program, "window_light"), frame.light.windows);
     glUniform1f(sky_loc, 0);
     glUniform1i(glGetUniformLocation(program, "image"), 0);
     glUniform1f(xray_loc, 0);
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 5; i++)
         glEnableVertexAttribArray(i);
     auto bind_vertices = [](GLuint id) {
         glBindBuffer(GL_ARRAY_BUFFER, id);
@@ -1023,8 +1074,10 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
                               (void *)offsetof(Vertex, c));
         glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                               (void *)offsetof(Vertex, wind));
+        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void *)offsetof(Vertex, normal));
     };
-    if (frame.fp) {
+    if (frame.fp || frame.light.enabled) {
         std::vector<Vertex> sky;
         quad(sky, {-1, 1, 0}, {1, 1, 0}, {1, -1, 0}, {-1, -1, 0});
         bind_vertices(buffer);
@@ -1058,12 +1111,13 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
         glDepthMask(GL_TRUE);
         glUniform1f(xray_loc, 0);
     }
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 5; i++)
         glDisableVertexAttribArray(i);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glUniform1f(dusk_loc, 0);
     glUniform1f(wind_loc, 0);
+    glUniform1f(glGetUniformLocation(program, "daylight_enabled"), 0);
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);
 }
@@ -1829,4 +1883,74 @@ void pallet3d_world_effects(bool value) {
         effects_enabled = value;
         effects.reset();
     }
+}
+
+void pallet3d_load_preferences(const char *path) {
+    preferences_path = path ? path : "";
+    lighting_settings = daynight::load(preferences_path);
+    preferences_error = false;
+}
+bool pallet3d_daylight(daynight::Settings settings, bool persist) {
+    if (settings.mode != daynight::Mode::Disabled && settings.mode != daynight::Mode::Automatic &&
+        settings.mode != daynight::Mode::Fixed)
+        return false;
+    settings.hour = daynight::wrap(settings.hour);
+    lighting_settings = settings;
+    if (persist) {
+        preferences_error = !daynight::save(preferences_path, settings);
+        return !preferences_error;
+    }
+    return true;
+}
+daynight::Settings pallet3d_daylight_settings() {
+    return lighting_settings;
+}
+daynight::Light pallet3d_daylight_frame() {
+    return world_frame.light;
+}
+void pallet3d_settings_ui(bool menu_open) {
+    if (!menu_open)
+        return;
+    // ImGui supports appending to the same window with multiple Begin/End
+    // pairs. This section precedes the runtime's own settings and footer,
+    // using the existing frame callback, without patching the runtime.
+    auto &io = ImGui::GetIO();
+    float scale = io.FontGlobalScale;
+    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(.96f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {18 * scale, 16 * scale});
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {14 * scale, 10 * scale});
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {10 * scale, 10 * scale});
+    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 18 * scale);
+    ImGui::Begin("GameBoy Recompiled", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoCollapse);
+    ImGui::TextDisabled("Mundo 3D / Iluminacion");
+    auto settings = lighting_settings;
+    int mode = int(settings.mode);
+    bool changed = ImGui::Combo("Hora del mundo", &mode, "Desactivada\0Hora local\0Hora fija\0");
+    settings.mode = daynight::Mode(mode);
+    if (settings.mode == daynight::Mode::Fixed) {
+        int minutes = int(std::round(settings.hour * 60)) % 1440;
+        char label[16];
+        std::snprintf(label, sizeof(label), "%02d:%02d", minutes / 60, minutes % 60);
+        if (ImGui::SliderInt("Hora fija", &minutes, 0, 1439, label)) {
+            settings.hour = minutes / 60.0;
+            changed = true;
+        }
+    } else if (settings.mode == daynight::Mode::Automatic) {
+        int minutes = int(daynight::local_hour(std::time(nullptr)) * 60);
+        ImGui::TextDisabled("Hora local: %02d:%02d", minutes / 60, minutes % 60);
+    }
+    if (changed)
+        pallet3d_daylight(settings, true);
+    if (preferences_error)
+        ImGui::TextWrapped("No se pudo guardar la preferencia de iluminacion.");
+    ImGui::Separator();
+    ImGui::End();
+    ImGui::PopStyleVar(6);
 }

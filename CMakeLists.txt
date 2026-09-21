@@ -39,7 +39,7 @@ endif()
 # ---------------------------------------------------------------------------
 if(NOT TARGET gbrt)
     set(GBRT_URL "https://github.com/dobbygl/gb-recompiled.git" CACHE STRING "Runtime repository URL")
-    set(GBRT_REF "6f88e30aa15ae657a8b2e19c58c96c64bdd1c979" CACHE STRING "Runtime git ref with presentation API v1")
+    set(GBRT_REF "00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e" CACHE STRING "Runtime git ref with presentation API v1")
     FetchContent_Declare(gb_recompiled
         GIT_REPOSITORY ${GBRT_URL}
         GIT_TAG ${GBRT_REF}

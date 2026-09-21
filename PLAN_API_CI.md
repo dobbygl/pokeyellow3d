@@ -605,3 +605,30 @@ The complete Linux consumer build and its **11/11** ROM-free tests pass locally
 (`api-phase5-consumer-{build,build-refresh,tests}.log`). Windows CI and the full
 ROM-backed acceptance gate still need completion. The earlier runtime pin and
 pending-CI notes above describe the preceding checkpoints, not a final acceptance.
+
+### Phase 5: native runtime validation, 2026-09-21
+
+Fork revision `00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e` passes all four
+jobs at https://github.com/dobbygl/gb-recompiled/actions/runs/35583610428:
+Linux and Windows/MSVC host portability, Linux/Mesa presentation, and the
+complete Windows SDL/ANGLE runtime with the presentation contract. The upstream
+[PR #2](https://github.com/GB-Recomp/gb-recompiled/pull/2) is now ready for review
+and includes these results. Its own repository still reports no CI checks;
+the passing fork run does not satisfy that separate acceptance criterion.
+
+The consumer's initial GCC run found an optimized libstdc++ directory-iterator
+link failure in exception cleanup. The wrapper now records terminal iteration
+without assigning another iterator and releases resources on close. Host CI
+uses MinSizeRel to cover that consumer configuration. Windows exposed a test
+baseline taken before ANGLE completed an SDL window resize; the contract now
+warms the resized surface and requires consecutive ordinary frames to match
+before comparing exact same-frame fallback pixels. No pixel tolerance was added.
+
+Local verification includes the 4/4 optimized host tests, the presentation
+contract, regeneration/rebuild of the procedural cartridge and exact original
+frames 1/30/60 (`bash logs/run-windows-resize-sync.sh` in the runtime worktree).
+The game pins this immutable revision. Its full 28/28 CTest preflight passed;
+the complete 18-suite ROM-backed regression is running through
+`bash build/qa/logs/run-api-phase5-final-regressions.sh`. The game's first native
+Windows consumer CI is still building its dependencies in
+https://github.com/dobbygl/pokeyellow3d/actions/runs/35582586562 .

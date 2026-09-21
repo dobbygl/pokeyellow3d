@@ -24,6 +24,7 @@ inline int audit(GBContext *ctx, const char *mode, int frames) {
     const char *previous_button = nullptr;
     int title_frames = 0, menu_frames = 0, continue_frames = 0, name_frames = 0, world_frames = 0;
     int title_entries = 0, phase_age = 0;
+    bool lighting_checked = false;
     auto previous_phase = title_state::Phase::None;
     for (int frame = 0; frame < frames; ++frame) {
         const char *button = nullptr;
@@ -63,6 +64,19 @@ inline int audit(GBContext *ctx, const char *mode, int frames) {
         world_frames += pallet::view(ctx) == pallet::View::Overworld;
         if (phase != title_state::Phase::None && !pallet3d_active())
             return 66;
+        if (!lighting_checked && phase == title_state::Phase::Title && phase_age > 30 &&
+            !pallet3d_blend().active) {
+            auto settings = pallet3d_daylight_settings();
+            auto reference = presentation_qa::render(ctx);
+            for (double hour : {0., 6., 12., 18.}) {
+                if (!pallet3d_daylight({daynight::Mode::Fixed, hour}) ||
+                    presentation_qa::render(ctx) != reference)
+                    return 70;
+            }
+            pallet3d_daylight(settings);
+            lighting_checked = true;
+            std::fprintf(stderr, "[TITLE] fixed sunset pixels independent of four world hours\n");
+        }
         bool logo = title_state::logo(ctx);
         if (frame == 1700 && std::strcmp(mode, "idle")) {
             auto portrait = title_picture::decode(ctx);
@@ -109,7 +123,7 @@ inline int audit(GBContext *ctx, const char *mode, int frames) {
     std::fprintf(stderr, "[TITLE] phases title=%d menu=%d continue=%d new=%d world=%d battery=%d\n",
                  title_frames, menu_frames, continue_frames, name_frames, world_frames,
                  battery_loaded);
-    if (!title_frames ||
+    if (!title_frames || !lighting_checked ||
         (!std::strcmp(mode, "continue") && (!battery_loaded || !continue_frames || !world_frames)))
         return 67;
     if (!std::strcmp(mode, "idle") && frames >= 7200 && title_entries < 2)

@@ -29,6 +29,16 @@ for style in classic integrated; do
             "$qa_dir/logs/preferences.cfg" "$style" > "$qa_dir/logs/preferences-$operation-$style.log" 2>&1
     done
 done
+for camera in menu-motion menu-motion-fp; do
+    motion_dir="$qa_dir/$camera"
+    mkdir -p "$motion_dir/logs"
+    (
+        cd "$motion_dir"
+        SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy QA_MENU_MOTION_AUDIT=1 \
+            "$project/build/pallet_render_smoke" "$rom" "$pallet" "$camera-styled" \
+            > logs/run.log 2>&1
+    )
+done
 python3 - "$qa_dir" <<'CHECK'
 import json
 import re
@@ -52,6 +62,11 @@ for suite in ('menus', 'battles', 'crossfade'):
     assert samples, suite
     report[suite] = dict(directory=str(directory), scenarios=samples)
 assert sum(s['glyphs'] for s in report['menus']['scenarios']) > 0
+for camera in ('menu-motion', 'menu-motion-fp'):
+    content = (root / camera / 'logs/run.log').read_text()
+    assert 'PASS: real Start animation' in content, camera
+    assert '[UI-MOTION] FAIL' not in content, camera
+    report[camera] = dict(log=str(root / camera / 'logs/run.log'))
 (root / 'logs' / 'glyphs.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, indent=2))
 CHECK

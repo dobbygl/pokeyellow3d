@@ -261,6 +261,7 @@ void panel(const GBContext *ctx, bool enemy, float w, float h) {
     }
 }
 void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
+    menu_text::prime();
     integrated_menu = false;
     menu_kind = battle_menu::Kind::Unknown;
     menu_panels = 0;

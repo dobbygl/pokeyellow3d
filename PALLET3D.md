@@ -845,6 +845,13 @@ superiores usan escala 3; el diálogo inferior usa escala 4. El relleno es
 14 píxeles y el radio 6. Clásico conserva la composición de v0.2.0.
 El cursor del ratón se oculta al jugar con foco y vuelve en Esc o al perderlo.
 
+Los paneles integrados aparecen y desaparecen en unos 150 ms, con un fundido
+y un desplazamiento de 8 píxeles. Solo se anima su fondo: los glifos conservan
+su posición y su tinta completa desde el primer frame que los pinta el motor.
+El tiempo procede de `ctx->cycles`; Esc y la pérdida de foco lo congelan.
+Las regiones compartidas conservan su fase aunque otra ventana las tape.
+Cargar una partida con un menú abierto lo presenta directamente completo.
+
 La fuente compartida es `FontGraphics` de la ROM, sin reemplazar sus 128
 glifos. Los atlas del PC conservan sus coordenadas y filtrado. Los tokens
 visuales se encuentran en `src/ui_theme.h`.
@@ -951,5 +958,34 @@ sin diferencias. Los 18 recorridos integrados comprueban 659.726 glifos en
 25.613 frames. La auditoría del HUD no detecta fuente ImGui durante el
 juego; los 47 nombres de clase de entrenador pasan en ambas cámaras.
 Los cinco contactos revisados y el informe completo se conservan en
-`build/qa/logs/menu-style-b2-*`. Las animaciones de apertura y cierre de
-paneles de C1 aún están pendientes.
+`build/qa/logs/menu-style-b2-*`. C1 incorpora las animaciones de paneles;
+sus tres criterios están acreditados en `PLAN_ESTILO_MENUS.md`.
+
+La prueba de C1 `menu-motion-styled` (y `menu-motion-fp-styled`) comprueba
+Esc, foco y cargas de estado con el motor real, y forma parte de
+`ui_style_qa.sh`. Para comparar todas las entradas con animaciones activadas
+y desactivadas, se reutilizan los fixtures privados preparados por
+`ui_menus_qa.sh`:
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE python3 tests/compare_menu_motion.py \
+  build/roms/pokeyellow.gbc RUTA_QA/pallet.state \
+  --center RUTA_QA/center.state --shop RUTA_QA/shop.state
+```
+
+El informe compara cada byte de cada estado completo del motor por frame,
+incluidas las pulsaciones durante la aparición, y las capturas al terminar
+el fundido. Los estados se comprimen durante la ejecución; las secuencias
+visuales y las fases se guardan aparte bajo `build/qa/menu-motion-pair-*`.
+Las opciones `QA_MENU_MOTION` y de auditoría solo pertenecen al helper.
+
+
+C1 está validada: CTest 38/38 y sin ROM 19/19; veinte baterías clásicas
+con 2.159 capturas y 1.831
+estados idénticos a v0.2.0, más las 38 vistas exteriores originales.
+Los dieciocho recorridos integrados mantienen la comprobación de glifos
+por frame. Ocho recorridos comparan 20.520 frames
+completos del motor con animaciones activadas y desactivadas; las
+62 capturas a fase fija coinciden con B2.
+Los contactos de apertura y cierre, la pausa/carga real en ambas cámaras
+y el informe final se conservan en `build/qa/logs/menu-style-c1-*`.

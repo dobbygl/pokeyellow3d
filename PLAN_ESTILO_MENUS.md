@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: A1, A2, B1 y B2 validadas; C1 pendiente.
+Fecha: 2026-09-22. Estado: A1, A2, B1, B2 y C1 validadas; 19/19 criterios acreditados.
 
 ## Análisis del estado actual
 
@@ -204,9 +204,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Abrir y cerrar Start, sí/no y la tienda animan sin retrasar ninguna pulsación: el estado del motor es idéntico con animación y sin ella para la misma entrada.
-- [ ] Ninguna animación deja un frame sin el texto que `wTileMap` contiene.
-- [ ] Las capturas de referencia a fase fija siguen idénticas y una secuencia de frames aparte demuestra la animación.
+- [x] Abrir y cerrar Start, sí/no y la tienda animan sin retrasar ninguna pulsación: el estado del motor es idéntico con animación y sin ella para la misma entrada.
+- [x] Ninguna animación deja un frame sin el texto que `wTileMap` contiene.
+- [x] Las capturas de referencia a fase fija siguen idénticas y una secuencia de frames aparte demuestra la animación.
 
 ## Limitaciones asumidas
 
@@ -773,3 +773,111 @@ Los tres criterios de B2 quedan acreditados: **16 de 19**. El commit de
 cierre incorpora solo documentación e imágenes; no cambia el código ni
 los binarios validados. C1 y la release v0.3.0 siguen pendientes. La fase
 C1 comenzará después de fusionar la PR #20 con su CI final aprobada.
+
+
+### C1 — animación de paneles, 2026-09-22
+
+Parte del merge B2 `3ffc0b1` en `menu-style-c1`. Los tres criterios siguen
+abiertos hasta completar la cohorte final y la CI.
+
+El fondo de cada región reconocida usa 629.146 ciclos (unos 150 ms) y
+8 píxeles de desplazamiento. Los glifos originales mantienen posición y
+opacidad completas. La identidad es el rectángulo fuente y su contexto de
+mundo o combate; las regiones compartidas u ocultas conservan la fase.
+La decoración que se cierra no conserva texto. El contador de 32 bits
+admite su desbordamiento normal; cargar una partida reinicia explícitamente
+la presentación para mostrar completo cualquier menú ya abierto.
+
+El test puro cubre apertura, cierre sin nuevas regiones, solapamientos,
+pausa, carga, modo sin animación y desbordamiento. El build independiente
+sin ROM pasa 19/19. Las pruebas reales de foco, Esc y carga hacia delante
+y atrás pasan en ambas cámaras en `build/qa/menu-motion-pause-ohg2vs0c`.
+Las pulsaciones rápidas pasan una comparación completa con y sin animación:
+339 frames por cámara, 83.057.712 bytes del motor por recorrido, sin
+diferencias. Evidencia preliminar en `build/qa/menu-motion-pair-_jr497id`;
+la comparación de Start/guardado/centro/tienda sigue ejecutándose.
+
+Comandos reproducibles y pendientes:
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 2
+ctest --test-dir build --output-on-failure
+cmake --build build/qa/no-rom --parallel 2
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+env -u LIBGL_ALWAYS_SOFTWARE python3 tests/compare_menu_motion.py \
+  build/roms/pokeyellow.gbc build/qa/ui-menus-DPPi1E/pallet.state \
+  --center build/qa/ui-menus-DPPi1E/center.state \
+  --shop build/qa/ui-menus-DPPi1E/shop.state
+```
+
+Pendientes: contacto de secuencia revisado, comparación de capturas de fase
+fija contra B2, veinte baterías clásicas contra v0.2.0, dieciocho recorridos
+integrados y las nuevas pruebas de pausa/carga, CTest completo final, formato
+y CI. No hay fusión de C1 ni release v0.3.0 todavía.
+
+
+La revisión temporal de la primera cohorte detectó un cierre truncado en
+Heal/Cancel: un plan sin regiones eliminaba inmediatamente la decoración
+pendiente. Se conserva ahora hasta terminar su fundido, bajo el respaldo
+LCD original. `compare_menu_motion.py` exige que cada fase de cierre
+persista durante sus ciclos restantes; el control negativo sobre la cohorte
+anterior detecta exactamente el frame 836 del centro. Esa cohorte valida
+las comparaciones de motor, pero no acredita el cierre de C1. Se repite la
+validación con la corrección antes de marcar criterios.
+
+
+### Cierre de C1 — 2026-09-22
+
+Código probado: `57de503f2af759f0ddec1760f4b12ad6c9af5699`, PR #21. CI `35664170266` aprobada en GCC,
+Clang, Linux 2D, Windows MSVC y formato. El commit de cierre solo modifica
+documentación; también debe superar CI antes de fusionarse.
+
+Informe final: `build/qa/logs/menu-style-c1-evidence.json`. CTest completo
+**38/38**, build independiente sin ROM **19/19**, sin pruebas omitidas,
+renderizador llvmpipe comprobado y clang-format **18.1.8** aprobado.
+Las veinte baterías clásicas conservan **2.159 capturas
+y 1.831 estados completos idénticos** a v0.2.0.
+Las 38 vistas exteriores coinciden también con su archivo original;
+los diez paneles de ajustes Esc quedan registrados por separado.
+El runtime permanece limpio en `00cc26d`; no se modifica el C generado.
+
+Los dieciocho recorridos integrados comprueban **659.726
+glifos en 25.613 frames**, con
+7.648 comprobaciones del cursor,
+respaldos LCD y cero glifos de la fuente ImGui durante el juego.
+La batería integrada adicional de combate también pasa.
+Las pruebas reales de pausa con Esc, pérdida de foco y cargas con el menú
+abierto —hacia delante y atrás en el reloj— pasan en ambas cámaras.
+
+Los ocho recorridos de C1 comparan **20.520 frames
+completos del motor (5.027.564.160 bytes)** con animación
+activada y desactivada, incluidas pulsaciones durante la aparición.
+Sus 64 capturas finales coinciden; las
+62 comparables con B2 también son idénticas.
+Se verifican 22.240 muestras de regiones
+compartidas y 447 pasos de cierre,
+303 de ellos visibles. La prueba negativa
+detecta el cierre prematuro anterior y la corrección completa el fundido.
+Los contactos de apertura y cierre en ambas cámaras están revisados:
+`build/qa/logs/menu-style-c1-opening-review.png` y
+`build/qa/logs/menu-style-c1-closing-review.png`, con manifiestos de origen.
+Cuarenta muestras independientes verifican la curva y su desplazamiento.
+
+Comandos de la cohorte y del informe (fixtures privados):
+
+```sh
+bash build/qa/logs/run-menu-style-c1-cohort.sh
+python3 build/qa/logs/prepare-menu-style-c1-motion-evidence.py
+python3 build/qa/logs/audit-menu-style-c1-shared-phases.py
+python3 build/qa/logs/prepare-menu-style-c1-integrated-evidence.py
+python3 build/qa/logs/collect-menu-style-c1-evidence.py
+```
+
+Los manifiestos de los contactos se marcan revisados tras inspeccionar sus
+imágenes, antes del informe final. La auditoría
+`build/qa/logs/menu-style-prior-phases-audit.json` confirma las fusiones
+A1 → A2 → B1 → B2, con CI aprobada antes de cada merge y únicamente
+cambios de documentación después de sus respectivos códigos probados.
+Con C1 quedan acreditados los **19 criterios**. La release v0.3.0 se
+publica sobre main después de la fusión, mediante el workflow de paquetes
+Linux y Windows; sus notas se generan a partir del informe final.

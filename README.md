@@ -30,7 +30,7 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
 - **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
-- **An integrated HUD with the ROM font.** Recognized menus, battle controls and compatible labels share dark panels and original glyphs. The game still supplies all menu text and selections. Integrated is the default in source builds; Esc can persistently restore the classic presentation. Special graphics and unsupported regions retain their original LCD pixels.
+- **An integrated HUD with the ROM font.** Recognized menus, battle controls and compatible labels share dark panels and original glyphs. The game still supplies all menu text and selections. Integrated is the default; Esc can persistently restore the classic presentation. Special graphics and unsupported regions retain their original LCD pixels.
 - **Original interfaces over a 3D world.** Dialogues and recognized windows retain the scene behind them; full-screen menus frame the original LCD over a dimmed, blurred background. `F2` crossfades into original 2D presentation. Fly, Teleport and Dig follow the engine's white fade and relocate the camera at the destination; bike and surf remain continuous.
 - **Pokédex and storage.** Browse the original list and data on a 3D device, see encounter areas over Kanto, use Bill’s twelve boxes, and visit the item PC, Oak’s evaluation and Hall of Fame gallery with original portraits and menus.
 - **Bounded rendering work.** Exploration meshes are cached for the current map and its immediate neighbors, with at most five resident maps.
@@ -57,7 +57,7 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 
 ### Prebuilt packages
 
-Download [v0.2.0 for Linux or Windows x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.2.0), extract the complete ZIP, and follow its `RUN.md`. Supply your matching ROM as `roms/pokeyellow.gbc` beside the executable. Packages contain no ROM, game assets or save.
+Download [v0.3.0 for Linux or Windows x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.3.0), extract the complete ZIP, and follow its `RUN.md`. Supply your matching ROM as `roms/pokeyellow.gbc` beside the executable. Packages contain no ROM, game assets or save.
 
 - **Linux:** built on Ubuntu 24.04; uses system SDL2, libcurl and OpenGL/GLES libraries listed in `DEPENDENCIES.txt`. Open a terminal in the package directory and run `./pokeyellow3d`.
 - **Windows 10/11 x64:** includes SDL2, CURL, ANGLE and MSVC runtime DLLs. Double-click `Start.cmd`, which selects the package directory before launching. Keep the DLLs beside the executable; no compiler or vcpkg installation is required.
@@ -174,6 +174,8 @@ In `Esc` settings, **Hora del mundo** selects disabled lighting, your local cloc
 
 In `Esc`, **Estilo de menus** selects **Integrado** or **Clasico**. The choice is saved with the lighting preferences, separately from cartridge saves. Integrated retains the ROM typeface; Esc settings use the application font.
 
+Integrated panel backgrounds fade and move over about 150 ms using the Game Boy cycle clock. Text keeps its full ink and fixed position from the first frame. Esc and focus loss freeze the animation, shared windows keep their phase, and loading an open menu shows it immediately.
+
 ## Development status
 
 | Area | Current scope |
@@ -288,7 +290,7 @@ Built on [GB-Recomp/pokeyellow](https://github.com/GB-Recomp/pokeyellow) and the
 
 ## Contributing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all eighteen ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds Linux (GCC and Clang) on every push to `main` and every pull request, plus a Linux build with the 3D layer disabled. The enabled Windows (MSVC) job uses pinned SDL2/CURL/ANGLE dependencies and requires all nineteen ROM-independent tests to pass, including the synthetic renderer on a real Windows graphics context. Native validation is recorded in `PLAN_API_CI.md`. The macOS job remains disabled pending a compatible GLES2 backend. Match that locally before opening a pull request:
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON -DCMAKE_BUILD_TYPE=MinSizeRel

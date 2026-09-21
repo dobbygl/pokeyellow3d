@@ -913,4 +913,9 @@ solapamiento original y el retrato del jugador previamente decodificado,
 si corresponde al luchador actual. Una carga fría sin retratos completos,
 equipo y mochila conservan el LCD enmarcado. El respaldo de animaciones
 permanece intacto; no se dibuja simultáneamente el menú integrado.
-Validación de B1 en curso; sus criterios siguen abiertos en el plan.
+B1 está validada: CTest 36/36, sin ROM 17/17, veinte baterías clásicas
+con 2.159 capturas y 1.831 estados idénticos a v0.2.0. Los 18 recorridos
+integrados comprueban 659.726 glifos en 25.613 frames, y la cadena adicional
+de combate verifica captura, cambios, rival y efectos. Evidencia y contactos
+revisados en `build/qa/logs/menu-style-b1-*`. El HUD conserva su tipografía
+previa hasta B2; los menús de esta fase ya usan la fuente original.

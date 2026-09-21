@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: A1 y A2 fusionadas; B1 en desarrollo; B2 y C1 pendientes.
+Fecha: 2026-09-21. Estado: A1, A2 y B1 validadas; B2 y C1 pendientes.
 
 ## Análisis del estado actual
 
@@ -163,10 +163,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Un encuentro salvaje en Ruta 1 y el combate contra el rival de Ruta 22 se juegan hasta el final con el menú integrado: luchar, elegir movimiento, mochila, equipo y huir.
-- [ ] Los glifos del menú, la lista de movimientos y los mensajes coinciden bit a bit con `wTileMap` en cada frame presentado.
-- [ ] Ningún frame muestra un panel vacío ni texto duplicado entre el panel y el respaldo de animación.
-- [ ] `ui_battles_qa.sh` y `battles_qa.sh` pasan con el estilo integrado y con el clásico.
+- [x] Un encuentro salvaje en Ruta 1 y el combate contra el rival de Ruta 22 se juegan hasta el final con el menú integrado: luchar, elegir movimiento, mochila, equipo y huir.
+- [x] Los glifos del menú, la lista de movimientos y los mensajes coinciden bit a bit con `wTileMap` en cada frame presentado.
+- [x] Ningún frame muestra un panel vacío ni texto duplicado entre el panel y el respaldo de animación.
+- [x] `ui_battles_qa.sh` y `battles_qa.sh` pasan con el estilo integrado y con el clásico.
 
 ### Fase B2: coherencia de todo el HUD
 
@@ -567,3 +567,62 @@ conserva exactamente sus pulsaciones previas. El ensayo ampliado pasa en
 `build/qa/menu-style-b1/cursor-probe/trainer.log`; CTest independiente sin
 ROM pasa 17/17 y el formato 18.1.8 pasa. Se inicia la validación completa
 antes de acreditar los criterios y fusionar B1.
+
+
+### Cierre de B1 — 2026-09-21
+
+Implementación probada: `06dc979867b27003bc61c1cf4e653c6a54b2977d`, PR #19.
+CI `35641407322` aprobada: Linux GCC, Clang, 2D, Windows MSVC y formato.
+Este cierre solo modifica documentación; la fusión espera también la CI
+aprobada del último commit. B2 empieza después de fusionar B1.
+
+Evidencia consolidada: `build/qa/logs/menu-style-b1-evidence.json`.
+Las veinte baterías clásicas pasan: **2.159 capturas de juego y 1.831
+estados completos idénticos** a v0.2.0, sin archivos ausentes o adicionales.
+Las 38 vistas exteriores coinciden también con el archivo original.
+Los diez ajustes de Esc se registran aparte; sus estados sí se comparan.
+Runtime limpio en `00cc26d`. CTest completo **36/36**, build independiente
+sin ROM **17/17**, sin saltos; llvmpipe verificado y formato **18.1.8**.
+
+`ui_style_qa.sh` pasa sus 18 recorridos: **25.613 frames, 659.726 glifos,
+42.222.464 bits y 7.648 comprobaciones del cursor**. El observador también
+comprueba que no haya paneles vacíos y que el menú integrado no se dibuje
+junto al respaldo LCD completo. Los contactos de FIGHT y movimientos del
+salvaje y del rival, en ambas cámaras, están revisados:
+`menu-style-b1-battle-review.{png,json}` bajo `build/qa/logs/`.
+
+La batería integrada adicional `battles_qa.sh` pasa en
+`build/qa/battles-vXavgn`: captura real, cambios de Pokémon, rival,
+sustitución del oponente, efectos y animación original con cero diferencias
+en los 23.040 píxeles LCD. La selección recorre los cuatro movimientos;
+24 frames de repintado pendiente conservan la flecha del motor y se
+comprueban contra `wLastMenuItem`, además de comparar sus glifos.
+El rival abre mochila y equipo, rechaza huir mediante el motor original
+y termina el combate. Su contacto adicional está revisado en
+`menu-style-b1-trainer-review.{png,json}`. Las pulsaciones adicionales solo
+se aplican al recorrido integrado; el clásico mantiene su secuencia previa.
+
+Comandos reproducibles (fixtures privados, mismo renderizador Intel que
+las referencias originales):
+
+```sh
+bash build/qa/logs/run-menu-style-b1-regressions.sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
+  build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/battles-LojUdN/logs/route22-trainer.state \
+  build/qa/ui-crossfade-5bOG41/world.state \
+  build/qa/ui-crossfade-5bOG41/battle.state
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 \
+  QA_CAPTURE_STATES=1 tests/battles_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/interiors-fJDbZk/logs/town-route1.state \
+  build/qa/firstperson-9cB3FJ/route.state
+python3 build/qa/logs/prepare-menu-style-b1-integrated-evidence.py
+python3 build/qa/logs/collect-menu-style-b1-evidence.py
+```
+
+Los cuatro criterios de B1 quedan acreditados: **13 de 19**. B2, C1 y la
+release v0.3.0 siguen pendientes. El binario `build/pokeyellow3d` está
+compilado; el HUD de combate conserva aún su tipografía previa hasta B2.
+La compresión Btrfs transparente de la evidencia conserva cada SHA-256.

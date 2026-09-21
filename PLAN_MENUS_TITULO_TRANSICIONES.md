@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, C1 y C2 completadas y verificadas; C3 parcialmente implementada; B1 y B2 pendientes.
+Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, C1, C2 y C3 completadas y verificadas; B1 y B2 pendientes.
 
 ## Análisis del estado actual
 
@@ -253,9 +253,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] F2 en cualquier estado produce un fundido cruzado y no un corte.
-- [ ] Volar de Ciudad Verde a Paleta encadena fundido, carga y aparición sin frame 2D.
-- [ ] Ninguna transición deja la máscara de controles relativos activa.
+- [x] F2 en cualquier estado produce un fundido cruzado y no un corte.
+- [x] Volar de Ciudad Verde a Paleta encadena fundido, carga y aparición sin frame 2D.
+- [x] Ninguna transición deja la máscara de controles relativos activa.
 
 ## Limitaciones asumidas
 
@@ -717,3 +717,45 @@ revisada en `build/qa/logs/ui-c3-venusaur-regression-review.png`. Se repite la
 regresión completa sobre esta corrección con
 `bash build/qa/logs/run-ui-c3-final-regressions.sh`; la ejecución anterior se
 conserva con salida 40 como evidencia del fallo y no cuenta como aceptación.
+
+
+### C3 cerrada: regresión completa — 2026-09-21
+
+- PR [#8](https://github.com/dobbygl/pokeyellow3d/pull/8); implementación probada
+  `c49d90f`. CTest **26/26**, directorio independiente sin ROM **10/10**,
+  `clang-format` 18.1.8 y **las 16 baterías `tests/*_qa.sh` aprobadas**.
+  Ejecución reproducible: `bash build/qa/logs/run-ui-c3-final-regressions.sh`;
+  log y salida final en `build/qa/logs/ui-c3-final-regressions.{log,exit}`.
+- Las **38/38 referencias exteriores coinciden byte a byte**, sin excepciones.
+  Comparación en `build/qa/logs/ui-c3-final-exterior-comparison.txt` y resultados
+  estructurados en `build/qa/logs/ui-c3-final-acceptance.json`.
+- CI de la implementación aprobada: GCC, Clang, 2D y formato, ejecución
+  [35565819035](https://github.com/dobbygl/pokeyellow3d/actions/runs/35565819035).
+  Windows/macOS siguen con el estado previsto por el plan de API; no forman
+  parte de los jobs habilitados en este punto.
+- Revisión visual adicional de monturas, destinos de carga y arenas válidas en
+  `build/qa/logs/ui-c3-special-cases-review.png`. Las pruebas del motor original
+  y las comparaciones de imagen anteriores siguen vigentes. Los casos de link,
+  tutorial y Safari del compositor usan flags controlados y no se presentan
+  como recorridos reales de esos modos.
+- Se cierran las tres casillas C3. B1 y B2 siguen pendientes y se realizarán
+  después de fusionar este punto, según el orden del objetivo integrado.
+
+Directorios de evidencia de la regresión final:
+
+- `battles`: `build/qa/battles-10OS8j/`.
+- `dex_area`: `build/qa/dex-area-xVK452/`.
+- `dex_list`: `build/qa/dex-list-GmsrtM/`.
+- `dex_portraits`: `build/qa/dex-portraits-pnsWux/`.
+- `firstperson`: `build/qa/firstperson-Dd34nh/`.
+- `interiors`: `build/qa/interiors-sYI5Gh/`.
+- `pc_details`: `build/qa/pc-details-ggjyUv/`.
+- `pc_focus`: `build/qa/pc-focus-wTwS8Q/`.
+- `pc_storage`: `build/qa/pc-storage-zFhNw5/`.
+- `tile_animation`: `build/qa/tile-animation-PFEYsJ/`.
+- `ui_battles`: `build/qa/ui-battles-3Opx6i/`.
+- `ui_crossfade`: `build/qa/ui-crossfade-B7xqfb/`.
+- `ui_menus`: `build/qa/ui-menus-FzHv3Q/`.
+- `ui_special_transitions`: `build/qa/ui-special-transitions-Y8HxpK/`.
+- `ui_transitions`: `build/qa/ui-transitions-JULyLe/`.
+- `world`: `build/qa/kanto-jAHfVo/`.

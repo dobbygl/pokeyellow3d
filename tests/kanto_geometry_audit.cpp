@@ -36,9 +36,9 @@ int main(int argc, char **argv) {
                     !pallet::cleared(rom.data(), scene, x, z))
                     ++flat_solids[{top, bottom}];
             }
-        for (auto entry : flat_solids)
-            std::printf("original-flat-solid,%d,%02x,%02x,%d\n", scene.id, entry.first.first,
-                        entry.first.second, entry.second);
+        for (auto solid : flat_solids)
+            std::printf("original-flat-solid,%d,%02x,%02x,%d\n", scene.id, solid.first.first,
+                        solid.first.second, solid.second);
         for (size_t i = 0; i < classified.size(); i++)
             if (classified[i])
                 std::printf("terrain,%d,%zu,%d\n", scene.id, i, classified[i]);

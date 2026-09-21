@@ -37,10 +37,10 @@ int main(int argc, char **argv) {
     auto name = [&](int address, int x, int y, const std::string &text) {
         for (size_t i = 0; i < text.size(); i++) {
             int c = text[i] - 'A' + 0x80;
-            set(address + i, c);
-            set(battle::TileMap + y * 20 + x + i, c);
+            set(address + int(i), c);
+            set(battle::TileMap + y * 20 + x + int(i), c);
         }
-        set(address + text.size(), 0x50);
+        set(address + int(text.size()), 0x50);
     };
     io[0x40] = 0x81;
     io[0x47] = 0xe4;
@@ -108,8 +108,8 @@ int main(int argc, char **argv) {
     auto point = [&](int x, int y, int value, int base = 0) {
         int id = base + (x / 8) * 7 + y / 8, at = 0x1000 + id * 16 + (y % 8) * 2,
             mask = 1 << (7 - x % 8);
-        vram[at] = (vram[at] & ~mask) | ((value & 1) ? mask : 0);
-        vram[at + 1] = (vram[at + 1] & ~mask) | ((value & 2) ? mask : 0);
+        vram[at] = uint8_t((vram[at] & ~mask) | ((value & 1) ? mask : 0));
+        vram[at + 1] = uint8_t((vram[at + 1] & ~mask) | ((value & 2) ? mask : 0));
     };
     for (int i = 8; i <= 16; i++) {
         point(i, 8, 3);

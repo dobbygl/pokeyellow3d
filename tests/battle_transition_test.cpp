@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
         for (size_t call : calls) {
             int ret = int(call % 0x4000) + 0x4003;
             wram[pos++] = ret & 255;
-            wram[pos++] = ret >> 8;
+            wram[pos++] = uint8_t(ret >> 8);
         }
     };
     check(battle_transition::sample(nullptr).phase == Phase::None, "null context");

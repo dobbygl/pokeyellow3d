@@ -22,7 +22,7 @@ int main() {
     for (auto anchor : {std::pair<size_t, int>{0x75e41, 0x5e65}, {0x75e6b, 0x3852}}) {
         rom[anchor.first] = 0xcd;
         rom[anchor.first + 1] = anchor.second & 255;
-        rom[anchor.first + 2] = anchor.second >> 8;
+        rom[anchor.first + 2] = uint8_t(anchor.second >> 8);
     }
     auto put = [&](int address, int value) { ram[address - 0xc000] = uint8_t(value); };
     auto word = [&](int address, int value) {

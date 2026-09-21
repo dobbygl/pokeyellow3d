@@ -670,3 +670,27 @@ rótulos y retiene el último LCD completo al salir. El observador comprueba
 los píxeles de esa ventana contra el LCD observado y los bits de los
 rótulos que siguen visibles. Los dos ensayos fallidos se conservan como
 diagnóstico en `menu-style-b2-area-probe*.log`; no son evidencia de cierre.
+
+
+La revisión final encontró un límite heredado incorrecto en el rótulo de
+entrenador: D049–D055 contiene 12 glifos y terminador, mientras el HUD leía
+10. La tabla `TrainerNames` (ROM 235902, verificada contra el C generado)
+incluye BUG CATCHER, JR.TRAINER, BIRD KEEPER y COOLTRAINER con 11–12 glifos.
+El integrado usa ahora el campo completo. El observador comprueba también
+las posiciones esperadas; verificar solo los quads presentes no detectaba
+los sufijos omitidos.
+
+El nuevo modo privado `trainer-labels-styled` recorre las 47 etiquetas de
+clase originales sobre un savestate real de introducción, variando solo el
+campo de nombre del fixture antes de cada guarda de memoria. No afirma
+haber jugado 47 encuentros distintos. El código anterior falla con salida
+62 por la R final de BUG CATCHER; la corrección pasa ambas cámaras, conserva
+los símbolos de género y rechaza un glifo extra-fuente en el duodécimo lugar.
+Contacto y comandos en `build/qa/logs/menu-style-b2-trainer-label*` y
+`build/qa/menu-style-b2/trainer-labels/commands.json`.
+
+La cohorte anterior se detuvo al descubrir el caso y quedó archivada bajo
+`build/qa/logs/menu-style-b2-before-trainer-label-fix/`. Se repiten las veinte
+baterías clásicas y los dieciocho recorridos integrados sobre el candidato
+corregido antes de acreditar B2. El README incorpora siete capturas del
+estilo integrado; cada PNG conserva los píxeles de su fuente a 800×720.

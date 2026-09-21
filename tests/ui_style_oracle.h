@@ -18,6 +18,7 @@ inline std::array<size_t, 4> battle_frames{};
 inline size_t pending_move_cursors = 0;
 inline size_t font_audit_frames = 0, default_glyph_frames = 0;
 inline size_t atlas_glyphs = 0, atlas_bits = 0, atlas_occluded_bits = 0;
+inline size_t trainer_captions = 0, long_trainer_captions = 0;
 inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
     std::fprintf(stderr, "[UI-STYLE] FAIL %s tile=%02x x=%d y=%d frame=%zu\n", message, tile, x, y,
                  frames);
@@ -36,6 +37,8 @@ inline void report() {
                      atlas_bits, atlas_occluded_bits);
         std::fprintf(stderr, "[UI-BATTLE] message=%zu fight=%zu moves=%zu\n", battle_frames[1],
                      battle_frames[2], battle_frames[3]);
+        std::fprintf(stderr, "[UI-TRAINER] captions=%zu long_names=%zu\n", trainer_captions,
+                     long_trainer_captions);
     }
 }
 inline bool default_font_glyphs(const ImDrawData *data) {
@@ -75,6 +78,14 @@ inline void observe_atlas(GBContext *ctx, int w, int h) {
     if (!data || !texture || pallet3d_blend().active ||
         (arena.active && (arena.full_overlay || arena.overlay_alpha > 0)))
         return;
+    // wTrainerName occupies D049..D055: twelve glyphs plus its terminator.
+    // Count expected cells independently; checking only submitted quads would
+    // miss a truncated suffix even if every remaining glyph had correct bits.
+    std::array<bool, 13> trainer_cells{};
+    size_t trainer_length = 0;
+    if (arena.active && arena.trainer_class)
+        while (trainer_length < trainer_cells.size() && ctx->wram[0x1049 + trainer_length] != 0x50)
+            ++trainer_length;
     // AREA UNKNOWN is a native LCD window drawn over the map labels. Only
     // recognize that exact submitted quad; verify its pixels instead of the
     // hidden glyph bits. All visible portions of each label remain checked.
@@ -133,6 +144,15 @@ inline void observe_atlas(GBContext *ctx, int w, int h) {
                     fail("invalid ROM atlas glyph quad");
                 if ((a.col >> IM_COL32_A_SHIFT) != 255)
                     fail("ROM glyph is not fully visible");
+                if (trainer_length && a.pos.y == 24 && a.pos.x >= 24 &&
+                    a.pos.x < 24 + float(trainer_cells.size() * 16)) {
+                    size_t cell = size_t(std::lround((a.pos.x - 24) / 16));
+                    if (cell >= trainer_length || trainer_cells[cell] ||
+                        a.pos.x != 24 + float(cell * 16) || b.pos.x - a.pos.x != 16 ||
+                        b.pos.y - a.pos.y != 16 || tile != ctx->wram[0x1049 + cell])
+                        fail("trainer caption differs from its original name buffer", tile);
+                    trainer_cells[cell] = true;
+                }
                 for (int y = 0; y < 8; ++y)
                     for (int x = 0; x < 8; ++x) {
                         float sx = a.pos.x + (x + .5f) * (b.pos.x - a.pos.x) / 8;
@@ -171,6 +191,14 @@ inline void observe_atlas(GBContext *ctx, int w, int h) {
                 ++atlas_glyphs;
             }
         }
+    }
+    if (trainer_length) {
+        for (size_t cell = 0; cell < trainer_length; ++cell)
+            if (trainer_cells[cell] != (ctx->wram[0x1049 + cell] >= 0x80))
+                fail("trainer caption omits an original name glyph", ctx->wram[0x1049 + cell],
+                     int(cell));
+        ++trainer_captions;
+        long_trainer_captions += trainer_length > 10;
     }
 }
 inline void observe(GBContext *ctx, int w, int h, bool menu_open) {

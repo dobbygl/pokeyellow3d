@@ -322,7 +322,9 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     full_overlay = !opening && !intro && !effect && !moves &&
                    (animation || !battle::rectangle(ctx, battle::Enemy, true) ||
                     !battle::rectangle(ctx, battle::Player, true));
-    bool unsupported_name = styled && (intro ? !hud_text::supported(ctx->wram + 0x1049, 10)
+    // D049..D055 holds twelve trainer glyphs plus a terminator. Pokemon
+    // nicknames have the shorter ten-glyph limit used by their status panels.
+    bool unsupported_name = styled && (intro ? !hud_text::supported(ctx->wram + 0x1049, 13)
                                              : (battle::name_matches(ctx, 0xcfd9, 1, 0) &&
                                                 !hud_text::supported(ctx->wram + 0xfd9, 10)) ||
                                                    (battle::name_matches(ctx, 0xd008, 10, 7) &&
@@ -480,7 +482,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     }
     if (intro && !unsupported_name) {
         if (styled)
-            hud_text::draw(ctx->rom, ctx->rom_size, ctx->wram + 0x1049, 10, {24, 24},
+            hud_text::draw(ctx->rom, ctx->rom_size, ctx->wram + 0x1049, 13, {24, 24},
                            ui_theme::HudGlyphScale, ui_theme::Ink);
         else {
             auto name = battle::text(ctx, 0xd049);

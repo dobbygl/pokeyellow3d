@@ -59,6 +59,7 @@ static void capture_surface(const char *path) {
 #include "boot_integration.h"
 #include "world_animation_integration.h"
 #include "daylight_integration.h"
+#include "hud_text_integration.h"
 
 int main(int argc, char **argv) {
     SDL_SetMainReady();
@@ -384,6 +385,12 @@ int main(int argc, char **argv) {
     }
     if (argc > 3 && std::strcmp(argv[3], "battle-probe") == 0) {
         int result = battle_probe(ctx);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "trainer-labels") || !std::strcmp(argv[3], "trainer-labels-fp"))) {
+        int result = hud_text_qa::trainer_labels(ctx, rom.data(), std::strstr(argv[3], "-fp"));
         gb_platform_shutdown();
         return result;
     }

@@ -99,6 +99,13 @@ int main(int argc, char **argv) {
         pallet3d_menu_style(ui_preferences::Style::Integrated);
         ui_style_qa::enabled = true;
     }
+    // Suites without a -styled suffix still honor the explicit QA style after
+    // platform initialization has loaded presentation preferences.
+    if (!styled)
+        if (const char *style = std::getenv("QA_MENU_STYLE"))
+            pallet3d_menu_style(!std::strcmp(style, "integrated")
+                                    ? ui_preferences::Style::Integrated
+                                    : ui_preferences::Style::Classic);
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
     if (argc > 5 && (!std::strcmp(argv[2], "--title-audit") || !std::strcmp(argv[2], "boot"))) {

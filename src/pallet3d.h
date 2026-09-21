@@ -150,6 +150,8 @@ struct PalletTileAnimationInfo {
     size_t uploads = 0;
 };
 PalletTileAnimationInfo pallet3d_tile_animation();
+// Shared ROM atlas handle for independent draw-command/pixel QA.
+unsigned pallet3d_font_texture();
 
 struct PalletWorldAnimationInfo {
     bool enabled;

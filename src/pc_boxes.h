@@ -10,6 +10,7 @@ std::vector<Vertex> geometry;
 size_t rebuilds = 0, uploads = 0;
 int width = 0, height = 0;
 bool presented = false;
+ui_preferences::Style rendered_style = ui_preferences::Style::Classic;
 std::array<std::array<float, 4>, 26> slots{}; // screen-space portrait bounds
 void reset() {
     data = {};
@@ -61,6 +62,8 @@ void block(std::vector<Vertex> &v, float x, float y, float w, float h, Color col
 }
 void text(std::vector<Vertex> &v, const uint8_t *chars, int length, float x, float y, float size,
           Color color = ui_theme::ShelfInk) {
+    if (menu_style == ui_preferences::Style::Integrated)
+        color = ui_theme::InkColor;
     x = std::round(x);
     y = std::round(y);
     for (int i = 0; i < length && chars[i] != 0x50; i++)
@@ -83,6 +86,7 @@ void label(std::vector<Vertex> &v, const char *value, float x, float y, float si
 }
 void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next) {
     data = next;
+    rendered_style = menu_style;
     width = w;
     height = h;
     geometry.clear();
@@ -97,7 +101,9 @@ void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next)
     // This keeps portraits visible while the original lists are being used.
     float pad = std::max(6.f, h * .011f), font = 8.f * std::max(1, h / 720);
     float card_h = (top - 3 * pad - font) / 2, portrait_h = std::max(8.f, card_h - 2 * font - 3);
-    block(geometry, pad, pad, w - 2 * pad, top - 2 * pad, ui_theme::BoxHeader);
+    Color header = menu_style == ui_preferences::Style::Integrated ? ui_theme::PanelColor
+                                                                   : ui_theme::BoxHeader;
+    block(geometry, pad, pad, w - 2 * pad, top - 2 * pad, header);
     char heading[32];
     std::snprintf(heading, sizeof(heading), "BOX %02d   %02d", data.active + 1,
                   data.boxes[data.active].count);
@@ -143,7 +149,9 @@ void build(const GBContext *ctx, int w, int h, const pc_storage::Snapshot &next)
               current_box ? ui_theme::BoxActiveLed : ui_theme::BoxInactiveLed);
     }
     float bottom = h - top + pad;
-    block(geometry, pad, bottom, w - 2 * pad, top - 2 * pad, ui_theme::PartyShelf);
+    block(geometry, pad, bottom, w - 2 * pad, top - 2 * pad,
+          menu_style == ui_preferences::Style::Integrated ? ui_theme::PanelColor
+                                                          : ui_theme::PartyShelf);
     std::snprintf(heading, sizeof(heading), "PARTY %02d", data.party.count);
     label(geometry, heading, pad * 2, bottom + pad, font);
     float party_cell = (w - 4 * pad) / 6.f,
@@ -162,7 +170,8 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
         for (int i = 0; i < group->count; i++)
             if (!portraits.get(ctx->rom, ctx->rom_size, group->mons[i].species, true).valid)
                 return false;
-    if (!data.valid || data.fingerprint != next.fingerprint || w != width || h != height)
+    if (!data.valid || data.fingerprint != next.fingerprint || w != width || h != height ||
+        rendered_style != menu_style)
         build(ctx, w, h, next);
     selected = pc_box_state::selection(ctx, gb_get_framebuffer(ctx), data);
     firstperson::Camera camera;

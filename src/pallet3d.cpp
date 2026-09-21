@@ -11,6 +11,8 @@
 #include "rom_font.h"
 #include "lcd_overlay.h"
 #include "menu_text_gl.h"
+#include "hud_text_gl.h"
+#include "rom_text_region.h"
 #include "battle_menu_layout.h"
 #include "fade_state.h"
 #include "menu_state.h"
@@ -1143,9 +1145,63 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
 #include "pc3d.h"
 #include "title3d.h"
 
-void hud(const GBContext *ctx) {
+void hud(GBContext *ctx) {
     ImGuiIO &io = ImGui::GetIO();
     ImDrawList *dl = ImGui::GetForegroundDrawList();
+    if (menu_style == ui_preferences::Style::Integrated) {
+        const char *subtitle =
+            first_person ? "Amarillo  /  Primera persona" : "Amarillo  /  Prototipo 3D";
+        const char *controls[] = {
+            first_person ? "F2  2D / 3D     F3  Vista ortografica"
+                         : "F2  2D / 3D     F3  Primera persona     Q / E  Girar     Rueda  Zoom",
+            first_person ? "W  Avanzar   A / D  Girar   S  Media vuelta   Z  Hablar   Enter  Menu"
+                         : "Flechas / WASD  Mover     Z  Hablar     Enter  Menu     Esc  Ajustes"};
+        const auto &title = presented_scene(ctx)->title;
+        if (hud_text::encode(title).empty() || !rom_font::get(ctx->rom, ctx->rom_size).valid) {
+            lcd_overlay::framed(gb_get_framebuffer(ctx), io.DisplaySize.x, io.DisplaySize.y);
+            return;
+        }
+        float pad = ui_theme::Padding;
+        int title_scale = std::max(
+            1, std::min(ui_theme::HudTitleScale,
+                        int((io.DisplaySize.x - 4 * pad) / std::max(size_t(8), title.size() * 8))));
+        float box_width =
+            std::max(float(title.size() * 8 * title_scale), float(std::strlen(subtitle) * 8)) +
+            2 * pad;
+        dl->AddRectFilled({pad, pad}, {pad + box_width, pad + 76 + 2 * pad}, ui_theme::Panel,
+                          ui_theme::Radius);
+        hud_text::label(ctx->rom, ctx->rom_size, "KANTO  /  01", {2 * pad, 2 * pad},
+                        ui_theme::HudDetailScale, ui_theme::DimInk);
+        hud_text::label(ctx->rom, ctx->rom_size, title, {2 * pad, 2 * pad + 22}, title_scale,
+                        ui_theme::Ink);
+        hud_text::label(ctx->rom, ctx->rom_size, subtitle, {2 * pad, 2 * pad + 60},
+                        ui_theme::HudDetailScale, ui_theme::DimInk);
+        // Wrap the existing help at spaces when the viewport is narrow; do not
+        // truncate or replace a label to fit the different font metrics.
+        std::vector<std::string> lines;
+        size_t columns = size_t(std::max(1.f, (io.DisplaySize.x - 4 * pad) / 8));
+        for (const char *value : controls) {
+            std::string line = value;
+            while (line.size() > columns) {
+                size_t split = line.rfind(' ', columns);
+                if (split == std::string::npos || !split)
+                    split = columns;
+                lines.push_back(line.substr(0, split));
+                line.erase(0, split + (line[split] == ' ' ? 1 : 0));
+            }
+            lines.push_back(line);
+        }
+        float top = io.DisplaySize.y - pad - 2 * pad - float(lines.size()) * 16;
+        size_t longest = 0;
+        for (const auto &line : lines)
+            longest = std::max(longest, line.size());
+        dl->AddRectFilled({pad, top}, {3 * pad + float(longest * 8), io.DisplaySize.y - pad},
+                          ui_theme::Panel, ui_theme::Radius);
+        for (size_t i = 0; i < lines.size(); ++i)
+            hud_text::label(ctx->rom, ctx->rom_size, lines[i], {2 * pad, top + pad + float(i * 16)},
+                            ui_theme::HudDetailScale, i ? ui_theme::DimInk : ui_theme::Ink);
+        return;
+    }
     float s = std::max(1.f, io.DisplaySize.x / 1000.f);
     const ImU32 dim = IM_COL32(159, 186, 177, 255), bright = IM_COL32(241, 237, 215, 255);
     dl->AddRectFilledMultiColor({0, 0}, {io.DisplaySize.x, 113 * s}, IM_COL32(13, 25, 28, 235),
@@ -1454,6 +1510,10 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
                           1, true);
     }
     ++active_frames;
+}
+
+unsigned pallet3d_font_texture() {
+    return menu_text::texture;
 }
 
 bool pallet3d_event(const SDL_Event *event, bool menu_open) {

@@ -917,5 +917,27 @@ B1 está validada: CTest 36/36, sin ROM 17/17, veinte baterías clásicas
 con 2.159 capturas y 1.831 estados idénticos a v0.2.0. Los 18 recorridos
 integrados comprueban 659.726 glifos en 25.613 frames, y la cadena adicional
 de combate verifica captura, cambios, rival y efectos. Evidencia y contactos
-revisados en `build/qa/logs/menu-style-b1-*`. El HUD conserva su tipografía
-previa hasta B2; los menús de esta fase ya usan la fuente original.
+revisados en `build/qa/logs/menu-style-b1-*`.
+
+
+B2 extiende la fuente original al HUD del mundo y a nombres, niveles, HP y
+estado del combate. Los nombres conservan directamente los índices del
+juego, incluidos acentos y símbolos. Los paneles comparten tinta
+RGB 248/244/219, fondo 17/29/33, relleno 14 y radio 6. A 800x720, el título
+del mapa usa glifos de 24 píxeles, los nombres de combate 16 y los detalles
+8; los controles ajustan sus líneas al ancho disponible. Las etiquetas
+compactas del mapa de áreas usan relleno 3 y radio 3.
+
+Los rótulos del PC y del Salón de la Fama comparten la tinta del tema; sus
+mallas se actualizan al cambiar de estilo. Las regiones de texto compatibles
+de Pokédex y título usan el atlas común solo cuando VRAM y el LCD mostrado
+coinciden con sus glifos. Los logotipos, símbolos especiales, pantallas
+completas y regiones incompatibles conservan los gráficos originales.
+La tipografía ImGui queda reservada a los ajustes Esc en estilo integrado.
+
+El observador de QA detecta glifos ImGui en los comandos de dibujo y compara
+los píxeles visibles del atlas 2D con los bits de la ROM. En el mapa de áreas,
+la ventana original AREA UNKNOWN puede cubrir etiquetas: esa parte se
+compara con el último LCD completo observado; el resto de cada glifo sigue
+comprobándose. La validación completa de B2 se registra en
+`PLAN_ESTILO_MENUS.md` antes de acreditar sus tres criterios.

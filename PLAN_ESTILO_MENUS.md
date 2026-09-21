@@ -626,3 +626,47 @@ Los cuatro criterios de B1 quedan acreditados: **13 de 19**. B2, C1 y la
 release v0.3.0 siguen pendientes. El binario `build/pokeyellow3d` está
 compilado; el HUD de combate conserva aún su tipografía previa hasta B2.
 La compresión Btrfs transparente de la evidencia conserva cada SHA-256.
+
+
+### B2 — coherencia del HUD, 2026-09-21
+
+B1 se fusionó en PR #19, merge `ca998d5`, después de la CI final
+`35645056563` aprobada. B2 parte de ese merge en `menu-style-b2`.
+Sus tres criterios permanecen abiertos mientras se completa la evidencia.
+
+El prototipo sustituye las ocho llamadas de texto ImGui del HUD de juego
+por quads del atlas compartido: mapa, controles, nombres, niveles, HP y
+estado de combate. Los nombres se leen como índices originales, sin pasar
+por la conversión ASCII que pierde acentos o símbolos. El mundo utiliza
+paneles del tema, escala entera y ajuste de línea para los controles.
+Clásico conserva su camino de dibujo anterior.
+
+PC y Salón de la Fama reutilizan su atlas original con la tinta común y
+regeneran las mallas al cambiar de estilo. En Pokédex y el rótulo del título,
+una región solo adopta el atlas si todos sus tiles pertenecen a la fuente,
+VRAM coincide con la ROM y el LCD ya muestra esos mismos bits. Un gráfico
+especial, fuente reemplazada o texto aún pendiente de pintar mantiene sus
+píxeles originales para toda la región; los logotipos conservan su arte.
+
+La nueva prueba pura comprueba el charmap, todos los títulos de mapa,
+nombres con símbolos y la espera del LCD. El observador por frame inspecciona
+los comandos de dibujo para rechazar glifos ImGui durante el juego integrado
+y compara los píxeles de cada quad del atlas 2D con los bits de la ROM.
+El control negativo inyecta texto ImGui solo en el helper y falla con código
+62 como corresponde. Primeras pruebas: CTest 37/37, 100 frames del mundo y
+el recorrido de menús de combate aprobados. El contacto preliminar se guarda
+en `build/qa/logs/menu-style-b2-initial-review.png`; aún no acredita el cierre.
+
+Pendientes: revisión de PC/Pokédex/título, contacto de ocho vistas, cobertura
+integrada completa, veinte baterías clásicas y comparación con v0.2.0,
+build independiente sin ROM, formato y CI de la PR antes de fusionar.
+
+
+Pokédex (lista y datos), almacenamiento y título pasan sus recorridos
+integrados preliminares; el contacto PC/Pokédex está revisado. El build
+independiente sin ROM pasa 18/18. El mapa de áreas también comparte el atlas.
+Su prueba detectó un solapamiento legítimo: AREA UNKNOWN tapa algunos
+rótulos y retiene el último LCD completo al salir. El observador comprueba
+los píxeles de esa ventana contra el LCD observado y los bits de los
+rótulos que siguen visibles. Los dos ensayos fallidos se conservan como
+diagnóstico en `menu-style-b2-area-probe*.log`; no son evidencia de cierre.

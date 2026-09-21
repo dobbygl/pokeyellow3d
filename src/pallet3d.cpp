@@ -1151,7 +1151,7 @@ void hud(GBContext *ctx) {
     if (menu_style == ui_preferences::Style::Integrated) {
         const char *subtitle =
             first_person ? "Amarillo  /  Primera persona" : "Amarillo  /  Prototipo 3D";
-        const char *controls[] = {
+        const char *control_labels[] = {
             first_person ? "F2  2D / 3D     F3  Vista ortografica"
                          : "F2  2D / 3D     F3  Primera persona     Q / E  Girar     Rueda  Zoom",
             first_person ? "W  Avanzar   A / D  Girar   S  Media vuelta   Z  Hablar   Enter  Menu"
@@ -1180,7 +1180,7 @@ void hud(GBContext *ctx) {
         // truncate or replace a label to fit the different font metrics.
         std::vector<std::string> lines;
         size_t columns = size_t(std::max(1.f, (io.DisplaySize.x - 4 * pad) / 8));
-        for (const char *value : controls) {
+        for (const char *value : control_labels) {
             std::string line = value;
             while (line.size() > columns) {
                 size_t split = line.rfind(' ', columns);

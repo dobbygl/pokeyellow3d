@@ -75,9 +75,9 @@ inline void original_lettering(const GBContext *ctx, const uint32_t *lcd, int w,
                 size_t at = (size_t(glyph >= 0 ? glyph / 16 * 8 + y % 8 : 0) * rom_font::Width +
                              (glyph >= 0 ? glyph % 16 * 8 + x % 8 : 0)) *
                             4;
-                data[p * 4] = uint8_t(ui_theme::Ink >> IM_COL32_R_SHIFT);
-                data[p * 4 + 1] = uint8_t(ui_theme::Ink >> IM_COL32_G_SHIFT);
-                data[p * 4 + 2] = uint8_t(ui_theme::Ink >> IM_COL32_B_SHIFT);
+                data[p * 4] = uint8_t((ui_theme::Ink >> IM_COL32_R_SHIFT) & 0xff);
+                data[p * 4 + 1] = uint8_t((ui_theme::Ink >> IM_COL32_G_SHIFT) & 0xff);
+                data[p * 4 + 2] = uint8_t((ui_theme::Ink >> IM_COL32_B_SHIFT) & 0xff);
                 data[p * 4 + 3] = glyph >= 0 ? font.rgba[at + 3] : 0;
             }
         }

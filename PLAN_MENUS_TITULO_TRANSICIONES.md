@@ -1,6 +1,6 @@
 # Plan: menús, pantalla de título y transiciones
 
-Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, C1, C2 y C3 completadas y verificadas; B1 y B2 pendientes.
+Fecha: 2026-09-20. Estado: goal activo; retomado tras el checkpoint publicado. A1, A2, A3, B1, C1, C2 y C3 completadas y verificadas; B2 pendiente.
 
 ## Análisis del estado actual
 
@@ -176,10 +176,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Arrancar sin partida y con partida llega al título en 3D con el logo y el texto originales.
-- [ ] Pulsar Start, entrar en Continuar y aparecer en el mapa guardado encadena título, menú y mundo sin frames en blanco.
-- [ ] Nueva partida y la pantalla de nombre se ven sobre el fondo atenuado y el nombre se escribe con normalidad.
-- [ ] Dejar el título en reposo hasta que el juego vuelve a la intro no rompe la detección.
+- [x] Arrancar sin partida y con partida llega al título en 3D con el logo y el texto originales.
+- [x] Pulsar Start, entrar en Continuar y aparecer en el mapa guardado encadena título, menú y mundo sin frames en blanco.
+- [x] Nueva partida y la pantalla de nombre se ven sobre el fondo atenuado y el nombre se escribe con normalidad.
+- [x] Dejar el título en reposo hasta que el juego vuelve a la intro no rompe la detección.
 
 ### Fase B2: intro y copyright
 
@@ -812,3 +812,55 @@ La última orden ejecuta las 17 baterías registradas, CTest con/sin ROM,
 clang-format 18.1.8 y la comparación de las 38 referencias. Su resultado se
 registrará antes de cerrar B1. B2, incluida la grabación revisada del arranque
 completo y el modo público `boot`, sigue siendo el siguiente punto.
+
+### B1 cerrada: título, menú y nombres — 2026-09-21
+
+- PR [#9](https://github.com/dobbygl/pokeyellow3d/pull/9), implementación
+  `68784c2`; CI GCC, Clang, 2D y formato aprobada en
+  [35570658701](https://github.com/dobbygl/pokeyellow3d/actions/runs/35570658701).
+- CTest **28/28**, directorio independiente sin ROM **11/11**, formato
+  18.1.8 y **las 17 baterías `tests/*_qa.sh` aprobadas**. Las **38 referencias
+  exteriores coinciden byte a byte**, sin excepciones. Comando reproducible:
+  `bash build/qa/logs/run-title-b1-acceptance-regressions.sh`. Registro y salida
+  en `build/qa/logs/title-b1-acceptance-regressions.{log,exit}`; informe
+  estructurado en `build/qa/logs/title-b1-acceptance.json`.
+- El recorrido desde ROM sin batería escribe los nombres y llega al mundo
+  (7.200 frames). Con batería copiada, Continuar muestra su resumen y llega
+  a Paleta (2.800 frames); los hashes de los datos de entrada se conservan.
+  El reposo vuelve a copyright/intro y entra de nuevo en el título (7.200
+  frames). Todas las fases reconocidas se presentan en 3D, con memoria y
+  framebuffer intactos y máscara relativa neutral en cada frame.
+- El retrato leído de VRAM/OAM coincide en sus **4.759 píxeles opacos** con
+  el LCD original. Las capturas de menú y nombre mantienen el texto del
+  motor sobre el fondo atenuado; no se sustituyen las rutinas de entrada.
+- Revisión del recorrido completo de cámara corregido:
+  `build/qa/logs/title-b1-acceptance-review.png`. Se redujo el avance
+  en profundidad para conservar el retrato dentro del encuadre, sin taparlo
+  con el laboratorio ni con el copyright. También se igualó la salida a 2D
+  tras un fallo de inicialización gráfica con la ruta del mundo.
+- Las dos ejecuciones anteriores se interrumpieron deliberadamente con
+  salida 143 para incorporar esos ajustes; no se usan como aceptación.
+  Esta regresión se ejecutó de nuevo íntegra sobre la implementación final.
+
+Directorios privados de evidencia:
+
+- `battles`: `build/qa/battles-pTjVl1/`.
+- `dex_area`: `build/qa/dex-area-6YwOfb/`.
+- `dex_list`: `build/qa/dex-list-oJr4L3/`.
+- `dex_portraits`: `build/qa/dex-portraits-v0A42F/`.
+- `firstperson`: `build/qa/firstperson-dUFgcm/`.
+- `interiors`: `build/qa/interiors-jBW6UV/`.
+- `pc_details`: `build/qa/pc-details-YHUXcg/`.
+- `pc_focus`: `build/qa/pc-focus-6Xyqw9/`.
+- `pc_storage`: `build/qa/pc-storage-yIXzVN/`.
+- `tile_animation`: `build/qa/tile-animation-gymxGN/`.
+- `title`: `build/qa/title-0UjQMz/`.
+- `ui_battles`: `build/qa/ui-battles-3xShbQ/`.
+- `ui_crossfade`: `build/qa/ui-crossfade-GK16yq/`.
+- `ui_menus`: `build/qa/ui-menus-yQXN19/`.
+- `ui_special_transitions`: `build/qa/ui-special-transitions-rHtFyI/`.
+- `ui_transitions`: `build/qa/ui-transitions-Qiyv2e/`.
+- `world`: `build/qa/kanto-ZkWw3j/`.
+
+Se cierran las cuatro casillas B1. B2 sigue pendiente y empieza después de
+fusionar esta PR; no se declara todavía cerrado el plan de menús.

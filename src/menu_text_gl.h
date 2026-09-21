@@ -33,15 +33,19 @@ inline bool upload(const rom_font::Atlas &font) {
     texture_generation = rom_font::decodes;
     return texture != 0;
 }
-inline void regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *rom, size_t rom_size,
-                    const uint32_t *framebuffer, const menu_layout::Layout &layout, float width,
-                    float height) {
+struct Drawn {
+    int panels = 0, glyphs = 0, fallback_cells = 0;
+};
+inline Drawn regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *rom, size_t rom_size,
+                     const uint32_t *framebuffer, const menu_layout::Layout &layout, float width,
+                     float height, Placement placement = Placement::World) {
+    Drawn drawn;
     const auto &font = rom_font::get(rom, rom_size);
     auto plan = prepare(tiles, vram, font, layout, width, height, ui_theme::Padding,
-                        ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale);
+                        ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale, placement);
     if (!plan.count || !upload(font)) {
         lcd_overlay::regions(framebuffer, layout, width, height);
-        return;
+        return drawn;
     }
     auto *dl = ImGui::GetForegroundDrawList();
     static std::array<bool, 256> reported{};
@@ -59,6 +63,7 @@ inline void regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *ro
         }
         if (!p.visible)
             continue;
+        ++drawn.panels;
         for (int pad = 3; pad >= 1; --pad)
             dl->AddRectFilled({p.left - pad, p.top - pad + 2}, {p.right + pad, p.bottom + pad + 2},
                               ui_theme::Shadow, ui_theme::Radius);
@@ -78,10 +83,12 @@ inline void regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *ro
             ImVec2 from{p.origin_x + x * cell, p.origin_y + y * cell};
             ImVec2 to{from.x + cell, from.y + cell};
             if (p.fallback) {
+                ++drawn.fallback_cells;
                 dl->AddImage((ImTextureID)(intptr_t)lcd_overlay::texture, from, to,
                              {x / 20.f, y / 18.f}, {(x + 1) / 20.f, (y + 1) / 18.f},
                              ui_theme::White);
             } else if (tile >= 0x80) {
+                ++drawn.glyphs;
                 int glyph = tile - 0x80;
                 dl->AddImage((ImTextureID)(intptr_t)texture, from, to,
                              {float(glyph % 16) / 16, float(glyph / 16) / 8},
@@ -89,5 +96,6 @@ inline void regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *ro
                              ui_theme::Ink);
             }
         }
+    return drawn;
 }
 } // namespace menu_text

@@ -11,6 +11,7 @@
 #include "rom_font.h"
 #include "lcd_overlay.h"
 #include "menu_text_gl.h"
+#include "battle_menu_layout.h"
 #include "fade_state.h"
 #include "menu_state.h"
 #include "battle_transition_state.h"
@@ -1169,6 +1170,8 @@ void hud(const GBContext *ctx) {
 } // namespace
 
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
+    battle3d::integrated_menu = false;
+    battle3d::menu_panels = 0;
     dex3d::presented = false;
     dex_area3d::presented = false;
     dex_area3d::synchronize(ctx);
@@ -1881,7 +1884,10 @@ PalletBattleInfo pallet3d_battle() {
         battle3d::portraits[0].hp,
         battle3d::portraits[1].hp,
         battle3d::portraits[0].damage,
-        battle3d::portraits[1].damage};
+        battle3d::portraits[1].damage,
+        battle3d::integrated_menu,
+        int(battle3d::menu_kind),
+        battle3d::menu_panels};
 }
 
 PalletAreaInfo pallet3d_area() {

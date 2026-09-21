@@ -22,7 +22,9 @@ trap 'echo "QA interrupted; inspect $qa_dir/logs" >&2' ERR
 echo "QA output: $qa_dir"
 sha256sum roms/pokeyellow.gbc town.state route.state > logs/inputs.sha256
 export SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy
-./pallet_render_smoke roms/pokeyellow.gbc route.state battle-menus >logs/menus.log 2>&1
-./pallet_render_smoke roms/pokeyellow.gbc town.state battle3d >logs/battle3d.log 2>&1
+suffix=
+if [[ ${QA_MENU_STYLE:-classic} == integrated ]]; then suffix=-styled; fi
+./pallet_render_smoke roms/pokeyellow.gbc route.state "battle-menus$suffix" >logs/menus.log 2>&1
+./pallet_render_smoke roms/pokeyellow.gbc town.state "battle3d$suffix" >logs/battle3d.log 2>&1
 sha256sum --check logs/inputs.sha256
 printf 'PASS: B1/B2 battle integration; evidence in %s\n' "$qa_dir" | tee logs/result.txt

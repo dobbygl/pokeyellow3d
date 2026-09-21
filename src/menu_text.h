@@ -12,6 +12,7 @@
 // graphics, not FontGraphics, and deliberately falls back to the LCD.
 namespace menu_text {
 constexpr uint8_t Cursor = 0xed;
+enum class Placement { World, Battle };
 struct Panel {
     bool fallback = false, visible = false;
     int rejected_tile = -1;
@@ -41,7 +42,7 @@ inline bool is_bottom(menu_layout::Rect r) {
 }
 inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::Atlas &font,
                     const menu_layout::Layout &layout, float width, float height, float padding,
-                    int menu_scale, int bottom_scale) {
+                    int menu_scale, int bottom_scale, Placement placement = Placement::World) {
     Plan plan;
     if (!tiles || layout.kind != menu_layout::Kind::Partial || layout.count > 8)
         return plan;
@@ -60,7 +61,7 @@ inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::A
         if (r.x < 0 || r.y < 0 || r.w <= 0 || r.h <= 0 || r.x + r.w > 20 || r.y + r.h > 18)
             return Plan{};
         auto &p = plan.panels[i];
-        bool bottom = is_bottom(r);
+        bool bottom = placement == Placement::Battle || is_bottom(r);
         p.scale = bottom ? lower : upper;
         int cell = p.scale * 8;
         p.origin_x = bottom ? std::floor((width - 20 * cell) / 2)
@@ -75,6 +76,7 @@ inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::A
     for (size_t i = 0; i < layout.count; ++i) {
         auto &p = plan.panels[i];
         int min_x = 20, min_y = 18, max_x = -1, max_y = -1;
+        bool ink = false;
         for (int y = 0; y < 18; ++y)
             for (int x = 0; x < 20; ++x) {
                 if (plan.owner[y * 20 + x] != int(i))
@@ -84,6 +86,9 @@ inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::A
                     p.fallback = true;
                     p.rejected_tile = tile;
                 }
+                if (tile >= 0x80 && font.valid)
+                    for (int row = 0; row < 8; ++row)
+                        ink |= font.rows[(tile - 0x80) * 8 + row] != 0;
                 if (tile >= 0x79 && tile <= 0x7e)
                     continue;
                 min_x = std::min(min_x, x);
@@ -92,6 +97,8 @@ inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::A
                 max_y = std::max(max_y, y);
             }
         p.visible = max_x >= min_x;
+        if (placement == Placement::Battle && !ink && !p.fallback)
+            p.visible = false;
         if (p.visible) {
             p.left = p.origin_x + min_x * 8 * p.scale - padding;
             p.top = p.origin_y + min_y * 8 * p.scale - padding;

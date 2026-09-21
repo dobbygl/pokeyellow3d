@@ -1,5 +1,6 @@
 #pragma once
 #include "menu_layout.h"
+#include "battle_menu_layout.h"
 #include "menu_text.h"
 #include "ui_theme.h"
 #include "rom_font.h"
@@ -11,6 +12,8 @@
 namespace ui_style_qa {
 inline bool enabled = false;
 inline size_t frames = 0, glyphs = 0, bits = 0, fallback_tiles = 0, cursors = 0;
+inline std::array<size_t, 4> battle_frames{};
+inline size_t pending_move_cursors = 0;
 inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
     std::fprintf(stderr, "[UI-STYLE] FAIL %s tile=%02x x=%d y=%d frame=%zu\n", message, tile, x, y,
                  frames);
@@ -22,16 +25,28 @@ inline void report() {
                      "[UI-STYLE] frames=%zu glyphs=%zu bits=%zu classic_fallback_tiles=%zu\n",
                      frames, glyphs, bits, fallback_tiles);
         std::fprintf(stderr, "[UI-CURSOR] frames=%zu\n", cursors);
+        std::fprintf(stderr, "[UI-MOVE-CURSOR] pending_repaint=%zu\n", pending_move_cursors);
+        std::fprintf(stderr, "[UI-BATTLE] message=%zu fight=%zu moves=%zu\n", battle_frames[1],
+                     battle_frames[2], battle_frames[3]);
     }
 }
 inline void observe(GBContext *ctx, int w, int h, bool menu_open) {
     if (!enabled || !ctx || !ctx->wram || menu_open)
         return;
     auto info = pallet3d_menu();
-    auto layout = menu_layout::classify(ctx->wram + 0x3a0);
-    if (!info.active || info.full || layout.kind != menu_layout::Kind::Partial ||
+    auto arena = pallet3d_battle();
+    bool in_battle = arena.active && arena.integrated_menu;
+    auto battle_layout = battle_menu::classify(ctx->wram + 0x3a0);
+    auto layout = in_battle ? battle_layout.regions : menu_layout::classify(ctx->wram + 0x3a0);
+    if ((!in_battle && (!info.active || info.full)) || layout.kind != menu_layout::Kind::Partial ||
         pallet3d_pc().active || pallet3d_blend().active)
         return;
+    if (in_battle) {
+        if (arena.full_overlay || arena.overlay_alpha != 0 ||
+            arena.menu_kind != int(battle_layout.kind) || !arena.menu_kind)
+            fail("integrated battle menu overlaps full LCD fallback");
+        ++battle_frames[size_t(arena.menu_kind)];
+    }
     ++frames;
     const auto *native = gb_get_framebuffer(ctx);
     int scale = std::max(1, int(std::floor(std::min(w / 160.f, h / 144.f))));
@@ -47,9 +62,34 @@ inline void observe(GBContext *ctx, int w, int h, bool menu_open) {
     }
     const auto &font = rom_font::get(ctx->rom, ctx->rom_size);
     const bool integrated = pallet3d_menu_style() == ui_preferences::Style::Integrated;
-    auto plan = menu_text::prepare(ctx->wram + 0x3a0, ctx->vram, font, layout, float(w), float(h),
-                                   ui_theme::Padding, ui_theme::StartGlyphScale,
-                                   ui_theme::BottomGlyphScale);
+    auto plan =
+        menu_text::prepare(ctx->wram + 0x3a0, ctx->vram, font, layout, float(w), float(h),
+                           ui_theme::Padding, ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale,
+                           in_battle ? menu_text::Placement::Battle : menu_text::Placement::World);
+    if (in_battle) {
+        int expected_panels = 0;
+        for (size_t i = 0; i < layout.count; ++i) {
+            bool ink = false, fallback = false;
+            for (int cell = 0; cell < 360; ++cell) {
+                if (plan.owner[cell] != int(i))
+                    continue;
+                uint8_t tile = ctx->wram[0x3a0 + cell];
+                fallback |= tile < 0x79;
+                if (tile < 0x80)
+                    continue;
+                for (int row = 0; row < 8; ++row) {
+                    uint8_t pattern = ctx->rom[rom_font::Offset + (tile - 128) * 8 + row];
+                    ink |= pattern != 0;
+                    for (int plane = 0; plane < 2; ++plane)
+                        fallback |=
+                            ctx->vram[0x800 + (tile - 128) * 16 + row * 2 + plane] != pattern;
+                }
+            }
+            expected_panels += ink && !fallback;
+        }
+        if (arena.menu_panels != expected_panels)
+            fail("battle draws an empty panel or omits a populated one");
+    }
     for (int ty = 0; ty < 18; ++ty)
         for (int tx = 0; tx < 20; ++tx) {
             uint8_t tile = ctx->wram[0x3a0 + ty * 20 + tx];
@@ -61,9 +101,31 @@ inline void observe(GBContext *ctx, int w, int h, bool menu_open) {
             int cursor_address = ctx->wram[0xc30] | (ctx->wram[0xc31] << 8);
             if (tile == 0xed && cursor_address == 0xc3a0 + ty * 20 + tx) {
                 int step = ctx->hram[0x7a] & 2 ? 1 : 2;
-                if (tx != ctx->wram[0xc25] || ty != ctx->wram[0xc24] + step * ctx->wram[0xc26])
+                int item = ctx->wram[0xc26];
+                // SelectMenuItem clears the spacing flag after HandleMenuInput,
+                // then updates the selection/PP window before repainting the
+                // arrow. PlaceMenuCursor records the displayed item in CC2A.
+                // During this interval compare against that original cursor,
+                // not the next logical selection. Its pixels are still checked.
+                bool pending = in_battle && battle_layout.kind == battle_menu::Kind::Moves &&
+                               !(ctx->hram[0x7a] & 2);
+                if (pending) {
+                    step = 1;
+                    item = ctx->wram[0xc2a];
+                }
+                if (tx != ctx->wram[0xc25] || ty != ctx->wram[0xc24] + step * item) {
+                    std::fprintf(
+                        stderr,
+                        "[UI-CURSOR] top=%u,%u item=%u flags=%02x battle=%d kind=%d cycles=%llu\n",
+                        ctx->wram[0xc25], ctx->wram[0xc24], ctx->wram[0xc26], ctx->hram[0x7a],
+                        in_battle, int(battle_layout.kind), (unsigned long long)ctx->cycles);
+                    gb_context_save_state_file(ctx, "logs/cursor-disagreement.state");
                     fail("active cursor disagrees with original menu selection", tile, tx, ty);
-                ++cursors;
+                }
+                if (pending)
+                    ++pending_move_cursors;
+                else
+                    ++cursors;
             }
             bool original_font = true;
             for (int y = 0; y < 8; ++y)

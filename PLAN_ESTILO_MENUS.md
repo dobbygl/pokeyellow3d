@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: A1 fusionada; A2 validada, pendiente de fusión; B1, B2 y C1 pendientes.
+Fecha: 2026-09-21. Estado: A1 y A2 fusionadas; B1 en desarrollo; B2 y C1 pendientes.
 
 ## Análisis del estado actual
 
@@ -520,3 +520,50 @@ La compresión Btrfs transparente de capturas cerradas conserva su SHA-256;
 no elimina evidencia. Los cinco criterios de A2 quedan acreditados: nueve
 de los diecinueve están verificados. B1 empieza solo después de fusionar
 esta fase; B1, B2 y C1 conservan sus diez criterios abiertos.
+
+
+### B1 — menús de combate, 2026-09-21
+
+A2 se fusionó en PR #18, merge `7ad5d46`, con la CI final `35638109080`
+aprobada. B1 parte de ese merge en `menu-style-b1`. Sus cuatro criterios
+permanecen abiertos mientras se implementa y valida esta fase.
+
+Los fixtures originales muestran tres disposiciones: mensaje inferior;
+mensaje más FIGHT/PKMN/ITEM/RUN; y mensaje, lista de movimientos y cuadro
+de PP/tipo. Este último ocupa `(0,8,11,5)`, por encima de las seis filas
+inferiores, y cubre el borde superior de la lista `(4,12,16,6)`. Se reconoce
+la geometría completa y se conserva el orden de superposición, sin
+reconstruir ninguna cadena. Los tiles se exportaron bajo
+`build/qa/menu-style-b1/inspect/`.
+
+La presentación integrada comparte el atlas de A2, alinea estas regiones
+abajo a escala entera y omite los paneles que no contienen tinta. La lista
+de movimientos conserva el retrato previamente decodificado del jugador,
+porque el cuadro PP/tipo cubre parte de su sprite en el LCD. Sin un retrato
+completo residente se mantiene el respaldo original. Mochila, equipo y
+respaldo de animación mantienen su composición anterior. Clásico conserva
+su camino de renderizado.
+
+Se añade observación por frame de glifos de combate, paneles vacíos y
+exclusión mutua con el LCD completo. El test del rival verifica que el
+retrato retenido durante PP/tipo sigue siendo el del luchador actual.
+Primeras comprobaciones: compilación y CTest 36/36; fixtures de geometría
+original aprobados; recorrido salvaje integrado aprobado en ambas cámaras.
+Contacto inicial revisado en
+`build/qa/logs/menu-style-b1-first-battle-review.{png,json}`. La batería del
+rival y la cadena integrada de captura, cambios y efectos están en curso.
+No se acredita todavía ningún criterio de B1.
+
+La prueba de efectos encontró un desfase legítimo del cursor: el motor
+actualiza `wCurrentMenuItem` y limpia el flag de espaciado antes de repintar
+la flecha de movimientos. El observador usa `wLastMenuItem` durante ese
+intervalo, como `PlaceMenuCursor`, sin omitir la comparación de píxeles.
+Los cinco efectos pasan; 24 frames registran ese repintado pendiente.
+Evidencia: `build/qa/menu-style-b1/cursor-probe/effects-2.log`.
+
+El recorrido integrado del rival abre movimientos, mochila y equipo,
+intenta huir (el motor lo rechaza) y termina el combate. La prueba clásica
+conserva exactamente sus pulsaciones previas. El ensayo ampliado pasa en
+`build/qa/menu-style-b1/cursor-probe/trainer.log`; CTest independiente sin
+ROM pasa 17/17 y el formato 18.1.8 pasa. Se inicia la validación completa
+antes de acreditar los criterios y fusionar B1.

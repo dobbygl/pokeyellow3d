@@ -867,3 +867,20 @@ La comparación byte a byte se hace con
 `tests/compare_classic_captures.py BASE CANDIDATE --report REPORTE.json`;
 `--settings-ui-changed` registra aparte las dos capturas del panel Esc
 que contienen el control nuevo, sin excluir capturas del juego.
+
+
+La base A1 está validada: veinte baterías clásicas, 2.159 capturas de juego
+idénticas a v0.2.0 y 1.831 estados completos pareados sin diferencias; las
+38 vistas exteriores siguen idénticas al archivo original. La comparación
+exacta usa el mismo renderizador Intel que ese archivo. CTest pasa 34/34
+con ROM y 15/15 en el build independiente sin ROM, donde también se prueba
+el renderizado por software.
+
+`ui_style_qa.sh` hereda el renderizador elegido por el entorno, como las
+otras baterías; `LIBGL_ALWAYS_SOFTWARE=1` permite ejecutarlo con llvmpipe.
+La ejecución integrada de A1 comprobó 478.265 glifos en 15.817 frames
+observados, además del cursor y la persistencia entre procesos. La prueba
+de iluminación conserva explícitamente el estilo seleccionado al crear y
+recargar sus preferencias. La evidencia y los comandos completos están en
+el registro de `PLAN_ESTILO_MENUS.md` y en
+`build/qa/logs/menu-style-a1-evidence.json`.

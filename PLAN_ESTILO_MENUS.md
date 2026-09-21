@@ -1,6 +1,6 @@
 # Plan: estilo integrado de menús y HUD
 
-Fecha: 2026-09-21. Estado: A1 validada; A2, B1, B2 y C1 pendientes.
+Fecha: 2026-09-21. Estado: A1 fusionada; A2 en validación; B1, B2 y C1 pendientes.
 
 ## Análisis del estado actual
 
@@ -253,7 +253,7 @@ Criterios de aceptación:
 
 ## Referencias técnicas
 
-- [Fuente del juego](https://github.com/pret/pokeyellow/blob/master/gfx/font/font.png) y [mapa de caracteres](https://github.com/pret/pokeyellow/blob/master/charmap.asm).
+- [Fuente del juego](https://github.com/pret/pokeyellow/blob/master/gfx/font/font.png) y [mapa de caracteres](https://github.com/pret/pokeyellow/blob/e89ead154b9968aa50eed9328ff2b38b6c194382/constants/charmap.asm).
 - [Dibujo de cuadros de texto](https://github.com/pret/pokeyellow/blob/master/home/text.asm) y [menús de lista](https://github.com/pret/pokeyellow/blob/master/engine/menus/menu.asm).
 - [Menú de combate](https://github.com/pret/pokeyellow/blob/master/engine/battle/core.asm).
 - `src/menu_layout.h`: rectángulos y bordes por disposición.
@@ -412,3 +412,48 @@ El comparador separa diez vistas de ajustes de Esc que contienen el control
 nuevo, pero compara sus estados del motor; no excluye ningún menú del juego.
 Los cuatro criterios de A1 quedan acreditados. Los quince criterios de
 A2, B1, B2 y C1 permanecen abiertos; A2 empieza tras la fusión de esta PR.
+
+
+### A2 — regiones integradas, 2026-09-21
+
+A1 se fusionó en PR #17, merge `ad1b2c3`, después de la CI final
+`35633075199` aprobada. A2 parte de ese merge en `menu-style-a2`.
+Las cinco casillas de A2 permanecen abiertas hasta terminar su validación.
+
+Se verificó `constants/charmap.asm` de pret/pokeyellow, commit
+`e89ead154b9968aa50eed9328ff2b38b6c194382`, antes de implementar los glifos:
+cursor lleno ED, vacío EC, flecha inferior EE, é BA, 'd BB, 's BD,
+PK/MN E1/E2, dinero F0 y dígitos F6–FF. El símbolo de nivel 6E y el
+colon pequeño 6D pertenecen a gráficos adicionales: obligan a conservar
+los píxeles LCD de su región. La copia consultada y su SHA-256 quedan
+bajo `build/qa/menu-style-a2/`; no se incorpora ROM al repositorio.
+
+`menu_text.h` prepara la propiedad de cada celda desde el orden original
+de ventanas. `menu_text_gl.h` sube un atlas GPU común con filtrado nearest,
+dibuja paneles del tema y emite cada glifo visible una sola vez. A 800x720
+Start y los cuadros superiores usan escala 3, el diálogo inferior escala 4,
+y el relleno es 14 píxeles. Los tamaños se reducen por múltiplos enteros
+cuando la ventana es menor. El motor conserva todos los controles.
+
+Las regiones con tiles fuera del atlas o con gráficos VRAM sustituidos
+usan sus píxeles LCD originales, a escala entera en la disposición
+integrada; las celdas cubiertas por ventanas posteriores siguen ocultas.
+Por ejemplo, la tarjeta de guardado conserva su aspecto clásico por el
+colon 6D, mientras Start, diálogo y confirmación se integran. Las pantallas
+completas y disposiciones desconocidas siguen enmarcadas sin reinterpretar.
+El estilo clásico no entra en el nuevo renderizador.
+
+Primer ensayo: 35/35 pruebas CTest y las ocho variantes de
+`ui_menus_qa.sh` integradas aprobadas, con lectura por frame del resultado
+OpenGL y comparación de sus glifos con la ROM. Evidencia inicial:
+`build/qa/ui-menus-MD83vI`, log
+`build/qa/logs/menu-style-a2-menu-probe.log`. Se revisaron capturas de
+Start, guardado y tienda; los solapamientos conservan la propiedad original.
+La comprobación posterior añade correspondencia del cursor activo con
+`wCurrentMenuItem`, `wTopMenuItemX/Y` y `hUILayoutFlags`, verificados contra
+`pokeyellow_internal.h` y `PlaceMenuCursor`; recorre también las opciones
+de tienda, curación y sí/no mediante pulsaciones reales.
+
+Validación completa pendiente: veinte baterías clásicas frente a la
+referencia inmutable de v0.2.0, `ui_style_qa.sh` integrado, CTest con y sin
+ROM, formato y CI de la PR. No se inicia B1 antes de fusionar A2.

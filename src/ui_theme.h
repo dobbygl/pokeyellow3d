@@ -32,6 +32,7 @@ constexpr ImU32 Shadow = IM_COL32(0, 0, 0, 35);
 constexpr ImU32 Frame = IM_COL32(12, 18, 18, 240);
 constexpr ImU32 FrameEdge = IM_COL32(163, 181, 167, 220);
 constexpr ImU32 White = IM_COL32(255, 255, 255, 255);
+constexpr Color TexturedWhite{1, 1, 1, 1};
 constexpr ImU32 Accent = HpAmber;
 constexpr float Radius = 6, Padding = 14, BarRadius = 3;
 constexpr int StartGlyphScale = 3, BottomGlyphScale = 4;

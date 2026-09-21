@@ -80,8 +80,7 @@ inline void draw(const uint32_t *framebuffer, Rect r, float w, float h, float al
     ImGui::GetForegroundDrawList()->AddImage(
         (ImTextureID)(intptr_t)texture, {left + r.x * 8 * scale, top + r.y * 8 * scale},
         {left + (r.x + r.w) * 8 * scale, top + (r.y + r.h) * 8 * scale}, {r.x / 20.f, r.y / 18.f},
-        {(r.x + r.w) / 20.f, (r.y + r.h) / 18.f},
-        IM_COL32(255, 255, 255, int(std::clamp(alpha, 0.f, 1.f) * 255)));
+        {(r.x + r.w) / 20.f, (r.y + r.h) / 18.f}, ui_theme::opacity(ui_theme::White, alpha));
 }
 inline int framed_scale(float w, float h) {
     // Leave enough of small interiors visible to establish the retained scene.

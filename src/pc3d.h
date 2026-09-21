@@ -118,7 +118,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
                      {center.x + .48f, center.y - .432f, center.z},
                      {center.x - .48f, center.y - .432f, center.z}};
     quad(v, corners[0], corners[1], corners[2], corners[3],
-         monitor_image ? Color{1, 1, 1, t} : ui_theme::with_alpha(ui_theme::PcScreen, t),
+         ui_theme::with_alpha(monitor_image ? ui_theme::TexturedWhite : ui_theme::PcScreen, t),
          // Cancel the atlas helper's quarter-texel inset: every LCD pixel has
          // equal width here, including the first and last rows/columns.
          monitor_image ? UV{-.25f, -.25f, 160.5f, 144.5f} : Solid);

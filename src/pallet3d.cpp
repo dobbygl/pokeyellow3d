@@ -46,7 +46,7 @@ struct UV {
     float x, y, w, h;
 };
 constexpr UV Solid{511, 511, 0, 0};
-constexpr Color White{1, 1, 1, 1};
+constexpr Color White = ui_theme::TexturedWhite;
 GLuint program = 0, buffer = 0, atlas = 0;
 GLint fade_loc = -1, matrix_loc = -1, eye_loc = -1, fog_loc = -1, sky_loc = -1, xray_loc = -1;
 GLint dusk_loc = -1;

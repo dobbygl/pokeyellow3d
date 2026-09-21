@@ -25,6 +25,7 @@ def main():
     extra = sorted(candidate.keys() - baseline.keys())
     differences, settings, compared = [], [], []
     machine_differences = []
+    machine_missing = []
     machine_count = 0
     for name in sorted(baseline.keys() & candidate.keys()):
         a, b = baseline[name], candidate[name]
@@ -36,6 +37,8 @@ def main():
             if record['baseline'] != record['candidate']:
                 differences.append(name)
         ma, mb = Path(str(a) + '.machine'), Path(str(b) + '.machine')
+        if ma.exists() != mb.exists():
+            machine_missing.append(name)
         if ma.exists() and mb.exists():
             machine_count += 1
             if digest(ma) != digest(mb):
@@ -43,14 +46,14 @@ def main():
     report = dict(baseline=str(args.baseline), candidate=str(args.candidate),
                   compared=len(compared), differences=differences, missing=missing, extra=extra,
                   runtime_settings=settings, hashes=compared, machine_pairs=machine_count,
-                  machine_differences=machine_differences)
+                  machine_differences=machine_differences, machine_missing=machine_missing)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + '\n')
     print(f"Compared {len(compared)} game captures: {len(differences)} differences, "
           f"{len(missing)} missing, {len(extra)} extra; "
           f"{len(settings)} runtime settings views recorded separately; "
           f"{machine_count} engine states, {len(machine_differences)} differences")
-    if not compared or missing or extra or differences or machine_differences:
+    if not compared or missing or extra or differences or machine_differences or machine_missing:
         raise SystemExit(1)
 
 

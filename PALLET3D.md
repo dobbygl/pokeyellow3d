@@ -875,7 +875,10 @@ visuales se encuentran en `src/ui_theme.h`.
 | Acciones de equipo | Sin movimientos de campo: (11, 11, 9, 7). Con ellos: borde izquierdo verificado, alto variable y una fila extra sobre la primera opción |
 | Resumen: estadísticas | Retrato (1, 0, 7, 7), caja de estadísticas (0, 8, 10, 10), líneas originales derechas; HP con los tokens del HUD |
 | Resumen: movimientos | Retrato (1, 0, 7, 7), movimientos/PP (0, 8, 20, 10), barra de experiencia en la fila vacía 2; conserva ambos textos de experiencia |
-| Mochila y pantalla desconocida | LCD completo enmarcado |
+| Mochila del mundo (A3 en validación) | Start conservado, lista (4, 2, 16, 11), Use/Toss (13, 10, 7, 5), cantidad (15, 9, 5, 3), diálogo y confirmación |
+| Tienda completa (A3 en validación) | Buy, dinero y stock en cuadrícula completa; cantidad, confirmaciones y mensaje de objeto no vendible conservan el orden de ventanas |
+| Lista Pokédex (A3 en validación) | Lista (0, 0, 14, 18), lateral (15, 8, 5, 9), contadores (16, 1, 4, 2) y (16, 4, 4, 2), sobre el dispositivo |
+| Mochila en combate y pantalla desconocida | LCD completo enmarcado; el perfil de mochila en combate está pendiente en A3 |
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
 no se repite texto al separar el diálogo inferior de los cuadros superiores.
@@ -904,8 +907,8 @@ cantidades ni listas. Los gráficos LV (`6E`) y caja ocupada (`78`) se contrasta
 con ambos planos de VRAM y sus gráficos originales en ROM antes de presentarlos.
 Un borde desconocido, selección inválida o glifo reemplazado conserva **todo**
 el LCD enmarcado. Las páginas de impresión, Hall of Fame y otras disposiciones
-que no figuran en esta tabla mantienen su presentación previa. Mochila, lista de
-Pokédex, opciones, tarjeta y nombres se abordan en A3–A4 de
+que no figuran en esta tabla mantienen su presentación previa. A3 está en
+validación; opciones, tarjeta y nombres siguen pendientes en A4 de
 `PLAN_PANTALLAS_COMPLETAS.md`.
 
 La batería específica es `tests/ui_full_pc_qa.sh ROM PC_WORLD`, con
@@ -1063,3 +1066,30 @@ La copia privada de seis miembros incluye HP cero y mínimo, todos los estados
 alterados, nivel 100 y movimientos de campo. El mismo recorrido clásico sirve
 para la comparación exacta con v0.3.0. La evidencia y el estado de aceptación
 de esta fase se registran en `PLAN_PANTALLAS_COMPLETAS.md`.
+
+### Mochila, tienda y lista Pokédex (A3 en desarrollo)
+
+La mochila del mundo y la tienda comparten la cuadrícula y la lectura de cursor
+/scroll de A1. Conservan las partes visibles de Start y de las ventanas anteriores,
+incluidos cantidades, mensajes de Use/Toss, compra, venta y objetos no vendibles.
+`item_menu_state.h` exige las llamadas originales activas y rechaza los gráficos
+de otros perfiles. La mochila de combate aún conserva el LCD y está pendiente.
+
+La lista Pokédex presenta cuatro regiones sobre las pantallas y el cuerpo del
+dispositivo existente. Usa `menu_text` con posiciones proyectadas y escala entera;
+los nombres y contadores siguen siendo tiles originales. El marcador de captura
+`72` se compara con los dos planos de VRAM y ROM `3AA28`. Los separadores `70/71`
+también se validan. Una región, fuente, gráfico o selección no reconocidos mantiene
+el LCD completo; nunca combina media lista integrada con media lista nativa.
+El retrato sigue esperando a que el número y el cursor correspondientes sean
+visibles en el LCD. DATA y AREA conservan sus composiciones previas.
+
+Pruebas específicas: `tests/ui_full_items_qa.sh ROM WORLD_AFTER_PARCEL` y
+`tests/ui_full_dex_qa.sh ROM WORLD_WITH_POKEDEX`, con
+`QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1`. La Pokédex recorre listas de 5 y
+151 entradas, ambos extremos, saltos de página, registros capturados/vistos/no
+vistos, DATA y CRY en ambas cámaras. Comprueba cada glifo y marcador contra ROM,
+VRAM y la superficie final, además de cobertura, cursor, memoria, pausa/carga
+y cinco alteraciones de prueba. Ambos recorridos se incorporan a `ui_style_qa.sh`.
+La fase no está cerrada: faltan el perfil de mochila en combate y la validación
+clásica acumulada contra v0.3.0 antes de la PR de A3.

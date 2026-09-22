@@ -2,6 +2,7 @@
 #include "full_menu_layout.h"
 #include "menu_text_gl.h"
 #include "pc_state.h"
+#include "item_menu_state.h"
 #include "pokemon_menu_gl.h"
 
 namespace full_menu {
@@ -20,11 +21,8 @@ inline Context context(pc_state::Mode mode) {
         return Context::None;
     }
 }
-inline void draw(GBContext *ctx, pc_state::Mode mode, int width, int height,
-                 bool verified_background = true) {
-    if (verified_background && pokemon_menu::draw(ctx, width, height))
-        return;
-    auto domain = context(mode);
+inline void draw_context(GBContext *ctx, Context domain, int width, int height,
+                         bool verified_background = true) {
     auto layout = classify(ctx->wram + 0x3a0, domain);
     shown = {true, true, int(domain), int(layout.kind), int(layout.text.count)};
     auto selection = list_snapshot(ctx->wram);
@@ -35,7 +33,9 @@ inline void draw(GBContext *ctx, pc_state::Mode mode, int width, int height,
     shown.cursor_y = selection.cursor_y;
     menu_text::prime();
     if (!verified_background || layout.kind == Kind::Unknown ||
-        selection.current > ctx->wram[0xc28]) {
+        selection.current > ctx->wram[0xc28] ||
+        ((domain == Context::Bag || domain == Context::Mart) &&
+         !item_menu::text_only(ctx->wram + 0x3a0, layout.text))) {
         lcd_overlay::framed(gb_get_framebuffer(ctx), float(width), float(height));
         return;
     }
@@ -43,5 +43,18 @@ inline void draw(GBContext *ctx, pc_state::Mode mode, int width, int height,
                                     gb_get_framebuffer(ctx), layout.text, float(width),
                                     float(height), menu_text::Placement::Full);
     shown.fallback = drawn.panels == 0;
+}
+inline void draw(GBContext *ctx, pc_state::Mode mode, int width, int height,
+                 bool verified_background = true) {
+    if (verified_background && pokemon_menu::draw(ctx, width, height))
+        return;
+    draw_context(ctx, context(mode), width, height, verified_background);
+}
+inline bool draw_items(GBContext *ctx, int width, int height) {
+    auto domain = item_menu::context(ctx);
+    if (domain == Context::None)
+        return false;
+    draw_context(ctx, domain, width, height);
+    return true;
 }
 } // namespace full_menu

@@ -12,7 +12,7 @@
 namespace ui_full_menu_qa {
 inline size_t frames = 0, glyphs = 0, bits = 0, graphics = 0, fallbacks = 0, cursors = 0;
 inline size_t pending_cursors = 0;
-inline std::array<size_t, 6> kinds{};
+inline std::array<size_t, 9> kinds{};
 inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
     std::fprintf(stderr, "[UI-FULL] FAIL frame=%zu %s tile=%02x at=%d,%d\n", frames, message, tile,
                  x, y);
@@ -21,9 +21,9 @@ inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
 inline void report() {
     std::fprintf(stderr,
                  "[UI-FULL] frames=%zu glyphs=%zu bits=%zu graphics=%zu fallback=%zu "
-                 "cursor=%zu pending_cursor=%zu kinds=%zu,%zu,%zu,%zu,%zu,%zu\n",
+                 "cursor=%zu pending_cursor=%zu kinds=%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu\n",
                  frames, glyphs, bits, graphics, fallbacks, cursors, pending_cursors, kinds[0],
-                 kinds[1], kinds[2], kinds[3], kinds[4], kinds[5]);
+                 kinds[1], kinds[2], kinds[3], kinds[4], kinds[5], kinds[6], kinds[7], kinds[8]);
 }
 inline void observe(GBContext *ctx, int width, int height) {
     auto shown = pallet3d_full_menu();

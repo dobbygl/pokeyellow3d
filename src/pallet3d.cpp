@@ -1233,6 +1233,7 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
     battle3d::integrated_menu = false;
     battle3d::menu_panels = 0;
     dex3d::presented = false;
+    dex3d::menu_shown = {};
     dex_area3d::presented = false;
     dex_area3d::synchronize(ctx);
     pc3d::presented = false;
@@ -1318,7 +1319,9 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
     menu_overlay = can_compose_menu(ctx);
     menu_blurred = false;
     menu_regions = menu_overlay ? menu_layout::classify(ctx->wram + 0x3a0) : menu_layout::Layout{};
-    menu_full = menu_overlay && menu_regions.kind == menu_layout::Kind::Full;
+    menu_full = menu_overlay && (menu_regions.kind == menu_layout::Kind::Full ||
+                                 (menu_style == ui_preferences::Style::Integrated &&
+                                  item_menu::context(ctx) != full_menu::Context::None));
     dialogue_overlay = menu_overlay && pallet::bottom_dialogue(ctx);
     warp_overlay = !battle_composed && can_compose_warp(ctx);
     if (!fade::field_arrival(ctx))
@@ -1488,7 +1491,8 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
             if (!menu_blurred)
                 draw_world_frame(width, height, {.42f, 0});
             if (!menu_open && !(menu_style == ui_preferences::Style::Integrated &&
-                                pokemon_menu::draw(ctx, width, height)))
+                                (pokemon_menu::draw(ctx, width, height) ||
+                                 full_menu::draw_items(ctx, width, height))))
                 lcd_overlay::framed(gb_get_framebuffer(ctx), float(width), float(height));
         } else if (!menu_open) {
             if (menu_style == ui_preferences::Style::Integrated)
@@ -1930,6 +1934,9 @@ PalletDexInfo pallet3d_dex() {
             dex3d::cache.resident(),
             dex3d::cache.decodes,
             dex3d::selection.row};
+}
+PalletDexMenuInfo pallet3d_dex_menu() {
+    return dex3d::menu_shown;
 }
 
 bool pallet3d_dialogue_overlay() {

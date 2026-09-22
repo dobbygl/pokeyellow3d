@@ -8,8 +8,18 @@
 // still validate each visible glyph/graphic before replacing the original LCD.
 namespace full_menu {
 using menu_layout::Rect;
-enum class Context { None, PcCenter, PcItems, PcBill, PcOak };
-enum class Kind { Unknown, PcMain, PcList, PcAction, PcBoxes, PcDialogue };
+enum class Context { None, PcCenter, PcItems, PcBill, PcOak, Bag, Mart };
+enum class Kind {
+    Unknown,
+    PcMain,
+    PcList,
+    PcAction,
+    PcBoxes,
+    PcDialogue,
+    BagList,
+    BagAction,
+    Mart
+};
 struct Layout {
     Kind kind = Kind::Unknown;
     menu_layout::Layout text;
@@ -50,6 +60,33 @@ inline Layout classify(const uint8_t *tiles, Context context) {
         return true;
     };
     constexpr auto bottom = menu_layout::Bottom, yes_no = menu_layout::YesNo;
+    if (context == Context::Bag) {
+        constexpr Rect action{13, 10, 7, 5};
+        for (int height : {14, 16}) {
+            Rect start{10, 0, 10, height};
+            if (matches(Kind::BagAction, {start, List, action, Quantity, bottom, yes_no}) ||
+                matches(Kind::BagAction, {start, List, action, Quantity, bottom}) ||
+                matches(Kind::BagAction, {start, List, action, Quantity}) ||
+                matches(Kind::BagAction, {start, List, action, bottom, yes_no}) ||
+                matches(Kind::BagAction, {start, List, action, bottom}) ||
+                matches(Kind::BagAction, {start, List, action}) ||
+                matches(Kind::BagList, {start, List}))
+                return result;
+        }
+        return {};
+    }
+    if (context == Context::Mart) {
+        // An unsellable key item overlays the list with a message without
+        // first opening a quantity window (original mart .unsellableItem).
+        if (matches(Kind::Mart, {menu_layout::Buy, menu_layout::Money, List, bottom}))
+            return result;
+        // Original buy/sell lists use the same layered windows as the partial
+        // mart. Present all surviving regions on the shared complete-screen grid.
+        auto original = menu_layout::classify(tiles);
+        if (original.kind == menu_layout::Kind::Partial)
+            return {Kind::Mart, original};
+        return {};
+    }
     if (context == Context::PcBill) {
         if (matches(Kind::PcBoxes, {BillMain, bottom, BoxNumber, BoxList}) ||
             matches(Kind::PcAction, {bottom, BillMain, BillBox, List, Action}) ||

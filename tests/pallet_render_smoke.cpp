@@ -55,6 +55,8 @@ static void capture_surface(const char *path) {
 #include "dex_integration.h"
 #include "pc_integration.h"
 #include "pokemon_menu_integration.h"
+#include "item_menu_integration.h"
+#include "dex_menu_integration.h"
 #include "pc_details_integration.h"
 #include "pc_hall_integration.h"
 #include "tile_animation_integration.h"
@@ -130,6 +132,21 @@ int main(int argc, char **argv) {
     }
     if (!gb_context_load_state_file(ctx, argv[2]))
         return 5;
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "items-battle") || !std::strcmp(argv[3], "items-battle-fp"))) {
+        int result = item_qa::battle_bag(ctx, std::strstr(argv[3], "-fp") != nullptr);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
+        (!std::strncmp(argv[3], "items-bag", 9) || !std::strncmp(argv[3], "items-shop", 10))) {
+        int count = std::strstr(argv[3], "-empty") ? 0 : std::strstr(argv[3], "-long") ? 20 : 2;
+        bool fp = std::strstr(argv[3], "-fp") != nullptr;
+        int result = !std::strncmp(argv[3], "items-bag", 9) ? item_qa::bag(ctx, fp, count)
+                                                            : item_qa::shop(ctx, fp, count);
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 3 &&
         (!std::strcmp(argv[3], "pokemon-battle") || !std::strcmp(argv[3], "pokemon-battle-fp"))) {
         int result = pokemon_qa::battle(ctx, std::strstr(argv[3], "-fp") != nullptr);
@@ -280,6 +297,12 @@ int main(int argc, char **argv) {
     if (argc > 3 &&
         (!std::strcmp(argv[3], "menu-motion") || !std::strcmp(argv[3], "menu-motion-fp"))) {
         int result = menu_motion_qa::run(ctx, !std::strcmp(argv[3], "menu-motion-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && !std::strncmp(argv[3], "full-dex", 8)) {
+        int result = dex_menu_qa::journey(ctx, std::strstr(argv[3], "-fp") != nullptr,
+                                          std::strstr(argv[3], "-short") != nullptr);
         gb_platform_shutdown();
         return result;
     }

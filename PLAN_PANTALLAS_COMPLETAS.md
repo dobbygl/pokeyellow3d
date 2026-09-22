@@ -646,3 +646,64 @@ llamadas originales de lista, acciones, cantidad y mensajes de mochila y
 compras/ventas. Faltan ampliar fixtures de venta, acciones, listas largas y
 vacías, implementar la presentación y ejecutar la validación completa.
 Todavía no se acredita ningún criterio de A3.
+
+### A3 — presentación inicial e integración Pokédex, 2026-09-22
+
+La rama incorpora la mochila del mundo y la tienda sobre la cuadrícula completa
+de A1. `item_menu_state.h` verifica las llamadas vivas originales de lista,
+acciones, cantidad y mensajes. Se conservan los solapamientos de Start, Use/Toss,
+dinero, compra/venta y confirmaciones. El mensaje de objeto no vendible conserva
+la lista detrás del diálogo sin inventar una ventana de cantidad.
+
+La lista Pokédex usa cuatro regiones de `menu_text`, colocadas a escala entera
+sobre el dispositivo existente. `dex_menu_state.h` valida toda la disposición,
+los glifos y los gráficos `70/71/72` antes de emitir texto. Se conserva el retrato
+coloreado/silueta/vacío y su sincronización original con número y cursor visibles.
+Cualquier región inválida conserva el LCD completo enmarcado. DATA y AREA
+mantienen su composición previa.
+
+Evidencia inicial, sin acreditar todavía criterios de A3:
+
+- Inventario ampliado a 109 parejas tilemap/estado, con hashes y comparación
+  contra WRAM en `fullscreen-a3-source-inventory.json`. Incluye acciones,
+  cantidades, venta vacía, objeto no vendible, mochila de combate y Pokédex.
+- CTest 42/42, build independiente sin ROM 23/23 con llvmpipe y formato
+  clang-format 18.1.8 en los 16 C++ cambiados. Logs
+  `fullscreen-a3-{ctest,no-rom,format}-initial.log`.
+- Los doce recorridos iniciales de mochila/tienda pasan en
+  `build/qa/ui-full-items-ZRCOSJ`. Dos recorridos adicionales de tienda vacía
+  y larga verifican venta sin objetos y objeto clave no vendible en
+  `build/qa/ui-full-items-extra-styled-l1jsvj3m`; faltan incorporarlos a la
+  ejecución acumulada final en ambas cámaras.
+- Cuatro recorridos Pokédex pasan con listas de 5 y 151 entradas, extremos,
+  salto de siete filas, DATA/CRY, pausa/carga y cinco negativos por recorrido.
+  Oráculo: 21.990 frames, 2.519.358 glifos, 161.428.864 bits, 2.968 gráficos y
+  21.280 cursores; 1.882 frames de respaldo conservan el LCD completo.
+  Evidencia en `build/qa/ui-full-dex-pKXQwK/logs/dex.json` y
+  `fullscreen-a3-dex-totals-initial.json`. El agregador inicial esperaba nueve
+  capturas también en la variante corta; se corrigió a ocho cortas/nueve largas
+  y se ejecutó de nuevo sobre los cuatro recorridos ya finalizados con éxito.
+- Contacto Pokédex inicial revisado:
+  `fullscreen-a3-dex-contact-initial.png` y su registro `-review.json`.
+  Los cuatro recorridos están añadidos a `tests/ui_style_qa.sh`.
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 \
+  tests/ui_full_items_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-KfpanN/pallet.state
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 \
+  tests/ui_full_dex_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-KfpanN/pallet.state
+cmake --build build --target pokeyellow3d pallet_render_smoke --parallel 4
+ctest --test-dir build --output-on-failure
+cmake --build build/qa/no-rom --parallel 4
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+python3 build/qa/logs/inventory-fullscreen-a3.py
+```
+
+La mochila de combate sigue pendiente: sus capturas originales conservan texto,
+fragmentos de retratos y HUD fuera de la lista. Se ha añadido el recorrido privado,
+pero su presentación integrada requiere un perfil gráfico propio; actualmente
+se conserva el LCD. También quedan las comparaciones clásicas completas con
+v0.3.0, la batería integrada acumulada, los contactos y capturas finales, y la PR
+con CI verde. A3 continúa con 0/6 criterios acreditados; A4 no ha comenzado.

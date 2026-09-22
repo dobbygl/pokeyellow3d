@@ -1,7 +1,7 @@
 # Plan: pantallas completas con el estilo integrado
 
-Fecha: 2026-09-22. Estado: A1–A3 fusionadas; A4 en desarrollo.
-18/24 criterios acreditados. Base: release v0.3.0.
+Fecha: 2026-09-22. Estado: A1–A3 fusionadas; A4 en validación final.
+22/24 criterios acreditados. Base: release v0.3.0.
 
 ## Análisis del estado actual
 
@@ -193,10 +193,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Opciones y tarjeta muestran todos sus datos y gráficos originales con el tema; los ajustes siguen siendo decisiones del motor y las variantes no reconocidas conservan el LCD enmarcado.
-- [ ] Las pantallas de nombres usan la cuadrícula del tema con el cursor original, conservando caracteres, orden, edición, borrado y aceptación en las variantes de jugador, rival y Pokémon.
-- [ ] Los recorridos de A4 añadidos a `ui_style_qa.sh` pasan glifo a glifo, cursor y memoria intacta por frame en ambas cámaras, con respaldo ante detección o fuente inválida.
-- [ ] Las animaciones de las nuevas pantallas usan ciclos del motor, se congelan con Esc o sin foco, no retrasan texto ni entradas y respetan cargas y regiones compartidas; hay evidencia reproducible.
+- [x] Opciones y tarjeta muestran todos sus datos y gráficos originales con el tema; los ajustes siguen siendo decisiones del motor y las variantes no reconocidas conservan el LCD enmarcado.
+- [x] Las pantallas de nombres usan la cuadrícula del tema con el cursor original, conservando caracteres, orden, edición, borrado y aceptación en las variantes de jugador, rival y Pokémon.
+- [x] Los recorridos de A4 añadidos a `ui_style_qa.sh` pasan glifo a glifo, cursor y memoria intacta por frame en ambas cámaras, con respaldo ante detección o fuente inválida.
+- [x] Las animaciones de las nuevas pantallas usan ciclos del motor, se congelan con Esc o sin foco, no retrasan texto ni entradas y respetan cargas y regiones compartidas; hay evidencia reproducible.
 - [ ] CTest completo, pruebas independientes sin ROM, formato, todas las baterías clásicas e integradas pasan; todas las referencias clásicas y las 38 exteriores siguen idénticas a v0.3.0.
 - [ ] Ejecutable compilado, PALLET3D con tabla completa y casos clásicos, README con capturas nuevas y contactos revisados están entregados; A4 pasa CI y su fusión deja las cuatro fases y todos los criterios en main.
 
@@ -1037,3 +1037,46 @@ Tras recompilar, tanto `pokeyellow3d` como el helper conservan exactamente
 sus SHA-256; `fullscreen-a4-msvc-rename-proof.json` registra la equivalencia.
 Las regresiones en curso mantienen por tanto el mismo código ejecutable.
 La cabecera del plan se corrige a los 18 criterios ya acreditados en sus casillas.
+
+
+### A4 — batería integrada final y cuatro criterios acreditados, 2026-09-22
+
+La ejecución acumulativa `build/qa/ui-style-3oiw8R` pasa sus 82 recorridos:
+8 de menús del mundo, 4 de combate, 6 de transiciones, 12 de PC, 8 de equipo
+/resumen, 14 de mochila/tienda, 4 de Pokédex y los 26 de A4. También pasan
+los dos recorridos de pausa/carga de paneles. El informe verificable es
+`fullscreen-a4-integrated-verified.json`; todos los helpers conservan el
+SHA-256 del ejecutable congelado, incluidas las entradas preparadas desde
+el arranque original.
+
+Los contactos finales de opciones, tarjeta y nombres se han revisado en
+`fullscreen-a4-final-*-contact-review.json`. Las capturas del README se
+contrastan píxel a píxel con estos recorridos mediante
+`fullscreen-a4-final-readme-images.json`. La tarjeta cubre el máximo real
+255:59 del contador original, contrastado con `home/play_time.asm`.
+
+CI [35692229028](https://github.com/dobbygl/pokeyellow3d/actions/runs/35692229028)
+pasa GCC, Clang, Linux 2D, MSVC y formato sobre `4774f20`. Windows ejecuta
+27/27 pruebas sin ROM, incluida la prueba de renderer con ANGLE. Las pruebas
+locales pasan 46/46 y el build independiente sin ROM 27/27. La auditoría de
+las PR #22–#25 verifica el plan previo a la implementación y la fusión
+ordenada de A1–A3; permanece registrada en `fullscreen-pr-chain-final-audit.json`.
+
+Se acreditan los cuatro primeros criterios de A4: presentación de opciones
+/tarjeta, cuadrícula de nombres, recorridos integrados por frame y animación
+con pausa/carga. El contador es 22/24 en esta rama. Los dos criterios restantes
+no se acreditan aún: la comparación clásica de las 27 baterías sigue en curso
+y la PR #26 continúa en borrador, pendiente de entrega y fusión.
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
+  build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state \
+  build/qa/firstperson-9cB3FJ/route.state \
+  build/qa/battles-LojUdN/logs/route22-trainer.state \
+  build/qa/ui-crossfade-5bOG41/world.state \
+  build/qa/ui-crossfade-5bOG41/battle.state \
+  build/qa/pc-storage-fJ2Oob/capture/logs/capture-complete.state \
+  build/qa/battles-eovzS8/logs/capture-throw.state
+python3 build/qa/logs/collect-fullscreen-a4-classic.py
+```

@@ -1163,5 +1163,8 @@ Con el teclado añadido pasan dieciséis recorridos más, 46/46 CTest y 27/27
 pruebas sin ROM. La batería de nombres comprueba 21.172 frames, 1.460.496
 glifos y 20.960 cursores; el contacto incluye jugador, rival, inspector de
 motes y captura, con ambos alfabetos y nombres de longitud máxima.
-A4 sigue abierta: faltan las regresiones finales clásicas,
-la validación acumulativa, CI, fusión y release v0.4.0.
+La batería acumulativa final pasa 82 recorridos, además de pausa/carga en
+ambas cámaras. Los tres contactos finales de A4 están revisados y CI pasa
+GCC, Clang, Linux 2D, MSVC y formato; Windows verifica también 27/27 pruebas
+sin ROM con ANGLE. A4 sigue abierta hasta terminar la comparación clásica
+completa, la fusión y la release v0.4.0.

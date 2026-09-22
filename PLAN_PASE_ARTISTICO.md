@@ -435,3 +435,17 @@ es el registro versionado de alcance, decisiones y evidencia.
 - La nueva fixture del benchmark queda registrada en CTest con etiqueta
   `rom` y salto explícito 77 cuando falta el material privado.
 - La PR #29 sigue en borrador; ninguna fase ni criterio queda cerrado.
+
+- Recuperadas las fixtures de Pokédex, PC y fuente mediante el motor original;
+  la base vuelve a pasar 46/46 pruebas. A1 pasa 49/49 y el build independiente
+  sin ROM 28/28, sin saltos (`art-a1-recovered-ctest.log` y
+  `art-a1-recovered-no-rom-ctest.log`).
+- La comparación A1 activado/desactivado de los catálogos conserva 1.736
+  imágenes en ambos estilos y cámaras. La revisión detectó encuadres de
+  diagnóstico pegados a paredes: el preview ahora busca suelo transitable
+  libre de sólidos visuales y cuatro casillas de visión, una vez por mapa.
+  La cámara del jugador no cambia. Se regeneran las referencias tras esta
+  mejora; el primer pase de contactos no se acredita como definitivo.
+- La batería de horas conserva el ajuste artístico al recargar preferencias.
+  El benchmark escribe líneas completas para impedir que los mensajes del
+  renderer corrompan su formato; las mediciones incompletas se descartaron.

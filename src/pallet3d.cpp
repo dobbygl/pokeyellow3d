@@ -904,22 +904,38 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
     const bool fp = preview_map >= 0 ? preview_fp : first_person;
     auto player_position = pallet::world_player(ctx);
     if (preview_map >= 0 && preview_fp) {
-        // A diagnostic eye at an actual walkable cell, without editing the
-        // player, map, collision grid or any other cartridge state.
-        float nearest = 1e30f;
-        for (int z = 0; z < current.height; ++z)
-            for (int x = 0; x < current.width; ++x) {
-                int tile = pallet::map_tile(ctx->rom, current, x * 2, z * 2 + 1);
-                if (!pallet::tileset(current).walkable[tile])
-                    continue;
-                float dx = x + .5f - current.width * .5f;
-                float dz = z + .5f - current.height * .75f;
-                float distance = dx * dx + dz * dz;
-                if (distance < nearest) {
-                    nearest = distance;
-                    player_position = {current.origin_x + x + .5f, current.origin_z + z + .5f};
+        // Pick a diagnostic eye once per preview. A collision-valid tile can
+        // still be covered by visual furniture, or face an adjacent wall.
+        // Prefer a clear northward view, then proximity to the map's center.
+        if (eye.ready) {
+            player_position = {eye.x, eye.z};
+        } else {
+            std::vector<bool> open(size_t(current.width) * current.height);
+            for (int z = 0; z < current.height; ++z)
+                for (int x = 0; x < current.width; ++x) {
+                    int tile = pallet::map_tile(ctx->rom, current, x * 2, z * 2 + 1);
+                    bool solid = current.interior
+                                     ? interior::classify(ctx->rom, current, x, z).height > 0
+                                     : pallet::cleared(ctx->rom, current, x, z);
+                    open[z * current.width + x] = pallet::tileset(current).walkable[tile] && !solid;
                 }
-            }
+            float best = -1e30f;
+            for (int z = 0; z < current.height; ++z)
+                for (int x = 0; x < current.width; ++x) {
+                    if (!open[z * current.width + x])
+                        continue;
+                    int clear = 0;
+                    while (clear < 4 && z > clear && open[(z - clear - 1) * current.width + x])
+                        ++clear;
+                    float dx = x + .5f - current.width * .5f;
+                    float dz = z + .5f - current.height * .75f;
+                    float score = clear * 100000.f - dx * dx - dz * dz;
+                    if (score > best) {
+                        best = score;
+                        player_position = {current.origin_x + x + .5f, current.origin_z + z + .5f};
+                    }
+                }
+        }
     }
     float jump = 0;
     if ((pallet::read(ctx, 0xd735) & 0x40) && pallet::read(ctx, 0xd713) > 0)

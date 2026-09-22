@@ -22,6 +22,8 @@ extern "C" {
 extern "C" uint8_t pokeyellow__rom_data[];
 
 int main(int argc, char **argv) {
+    // Keep each measurement intact when renderer diagnostics share the log.
+    std::setvbuf(stdout, nullptr, _IOLBF, 0);
     if (argc != 6) {
         std::fprintf(stderr, "Usage: art_benchmark ROM STATE catalog|interior-catalog|ortho|fp "
                              "off|on HOUR(-1 disables)\n");

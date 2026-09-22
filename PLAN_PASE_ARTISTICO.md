@@ -406,3 +406,14 @@ es el registro versionado de alcance, decisiones y evidencia.
 - Corregida la descripción de geometría existente: ya hay troncos/copas de
   cajas, hierba elevada y bordes de cornisa; C1 mejora esa geometría.
 - Sin criterios marcados: faltan todavía las ocho fases y su evidencia.
+
+### A1 en curso — ajuste y referencias
+
+- El usuario autoriza cambios para mejorar la presentación visual. La nueva
+  opción de Esc se registra como diferencia esperada del panel de ajustes;
+  la comparación byte a byte de las imágenes del juego con el pase
+  desactivado sigue siendo estricta en ambos estilos y cámaras.
+- Plan incorporado por PR #28 con cinco checks verdes antes de comenzar A1.
+  Implementación en una worktree aislada mientras `7955aaa` genera las
+  referencias privadas; no se recompila su binario con código de A1.
+- Ningún criterio de A1 acreditado todavía.

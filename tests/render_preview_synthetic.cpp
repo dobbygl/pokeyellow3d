@@ -36,16 +36,20 @@ void check(bool condition, const char *message) {
 
 // The emulated machine is presentation input only; nothing may write back.
 struct Snapshot {
-    std::vector<uint8_t> wram, vram, eram;
+    std::vector<uint8_t> wram, vram, eram, oam, hram, io, rom;
     std::vector<uint32_t> framebuffer;
     explicit Snapshot(const synthetic::Context &m)
         : wram(m.wram.begin(), m.wram.end()), vram(m.vram.begin(), m.vram.end()),
-          eram(m.eram.begin(), m.eram.end()),
+          eram(m.eram.begin(), m.eram.end()), oam(m.oam.begin(), m.oam.end()),
+          hram(m.hram.begin(), m.hram.end()), io(m.io.begin(), m.io.end()), rom(m.image),
           framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {}
     bool unchanged(const synthetic::Context &m) const {
         return !std::memcmp(wram.data(), m.wram.data(), wram.size()) &&
                !std::memcmp(vram.data(), m.vram.data(), vram.size()) &&
                !std::memcmp(eram.data(), m.eram.data(), eram.size()) &&
+               !std::memcmp(oam.data(), m.oam.data(), oam.size()) &&
+               !std::memcmp(hram.data(), m.hram.data(), hram.size()) &&
+               !std::memcmp(io.data(), m.io.data(), io.size()) && rom == m.image &&
                !std::memcmp(framebuffer.data(), m.framebuffer.data(), framebuffer.size() * 4);
     }
 };
@@ -152,6 +156,17 @@ int main() {
 
         preview(plan.home, "outdoor");
         const auto disabled = rgba;
+        // A1 changes policy/settings, not meshes. Exercise cache invalidation
+        // on the actual GPU, in both directions, rather than checking a flag.
+        for (bool artistic : {false, true, false}) {
+            check(pallet3d_artistic(artistic), "toggle artistic presentation");
+            Snapshot unchanged{machine};
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            check(rgba == disabled, "A1 reference geometry survives an art toggle byte for byte");
+            check(unchanged.unchanged(machine), "art toggle wrote to the emulated machine");
+            check(glGetError() == GL_NO_ERROR, "art toggle raised an OpenGL error");
+        }
         auto lit = [&](double hour) {
             check(pallet3d_daylight({daynight::Mode::Fixed, hour}), "set fixed presentation hour");
             Snapshot before{machine};

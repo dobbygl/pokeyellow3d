@@ -2,7 +2,7 @@
 #include "world_scene.h"
 
 namespace interior {
-enum class Kind { Floor, Warp, Wall, Furniture, Counter, Water };
+enum class Kind { Floor, Warp, Wall, Furniture, Counter, Water, Count };
 struct Cell {
     Kind kind = Kind::Floor;
     float height = 0;

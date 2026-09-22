@@ -79,7 +79,8 @@ enum class Terrain {
     Sign,
     Pillar,
     Wall,
-    Portal
+    Portal,
+    Count
 };
 inline Terrain terrain(const uint8_t *rom, const Scene &s, int x, int z,
                        const std::vector<uint8_t> *live = nullptr) {

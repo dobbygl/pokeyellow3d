@@ -15,6 +15,9 @@ bool pallet3d_register();
 bool pallet3d_menu_style(ui_preferences::Style style, bool persist = false);
 ui_preferences::Style pallet3d_menu_style();
 bool pallet3d_window_focused();
+// Independent presentation preference; changing it invalidates cached art meshes.
+bool pallet3d_artistic(bool enabled, bool persist = false);
+bool pallet3d_artistic();
 
 // Presentation only: these functions never write to the emulated machine.
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open);
@@ -42,6 +45,8 @@ Pallet3DStats pallet3d_stats();
 // Diagnostic preview uses the same geometry pipeline without changing game RAM.
 // Pass -1 to return to the live game. No actors are invented for preview maps.
 void pallet3d_preview(int map_id);
+void pallet3d_preview(int map_id, bool first_person);
+bool pallet3d_preview_firstperson();
 
 bool pallet3d_firstperson();
 void pallet3d_poll_controls(GBContext *ctx, bool menu_open);

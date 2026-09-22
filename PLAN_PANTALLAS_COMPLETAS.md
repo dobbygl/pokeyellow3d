@@ -933,3 +933,51 @@ python3 build/qa/logs/inventory-fullscreen-a4.py
 
 No se ha modificado todavía el renderer de A4 ni se acredita ninguno de sus
 seis criterios.
+
+### A4 — opciones y tarjeta integradas; preparación del teclado, 2026-09-22
+
+Se implementan los perfiles de opciones y tarjeta sobre las escenas existentes.
+Opciones conserva la selección de CD3D y la flecha pintada; funciona desde
+Start y desde el menú inicial. La tarjeta comprueba su llamada activa, el
+recorte original de Red, sus bordes, el colon, el fondo, los números y las
+caras/medallas. Las comprobaciones de PNG/ROM/VRAM están registradas en
+`fullscreen-a4-options-source-proof.json` y
+`fullscreen-a4-trainer-graphics-proof.json`. Se añaden pruebas sintéticas,
+incluidas las 256 combinaciones de medallas y sustituciones de gráficos.
+
+Evidencia inicial de la rama, todavía sin acreditar criterios de cierre:
+
+- Opciones: `build/qa/ui-full-options-4MSE6g`, cuatro recorridos, 136 capturas,
+  7.140 frames, 507.820 glifos, 32.500.480 bits y 7.076 cursores verificados.
+  Todos los ajustes pasan en ambas direcciones; también Cancel/Start/B,
+  salto de filas vacías, wrap, pausa por foco/Esc, carga y controles negativos.
+- Tarjeta: `build/qa/ui-full-trainer-5EBTIv`, seis recorridos, doce capturas,
+  1.304 frames, 44.608 glifos y 111.764 gráficos verificados. Se ejercitan
+  medallas ausentes/mixtas/completas, nombres de siete caracteres y extremos
+  de dinero/tiempo, pausa/carga y sustituciones de gráficos con respaldo LCD.
+- CTest completo: 45/45; build independiente `build/qa/no-rom`, sin directorio
+  de ROM y con llvmpipe: 26/26. clang-format 18.1.8 verifica los 15 C++ de A4.
+- Contactos revisados: `fullscreen-a4-options-contact-review.json` y
+  `fullscreen-a4-trainer-contact-review.json`. El README incluye dos capturas
+  reales nuevas; PALLET3D añade las disposiciones y delimita lo pendiente.
+- `prepare-names` llega mediante los diálogos e inputs originales a los
+  teclados vacíos de jugador y rival. Conserva las fuentes privadas en
+  `build/qa/ui-naming-prepare-q2omkiwe`. Las llamadas 66FF/6747 a 6307, el
+  gráfico ED y los subrayados se contrastan también con ROM/VRAM. El renderer
+  del teclado todavía no se ha implementado.
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_CAPTURE_STATES=1 \
+  tests/ui_full_options_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_CAPTURE_STATES=1 \
+  tests/ui_full_trainer_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state
+cmake --build build/qa/no-rom --parallel 4
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+```
+
+No se cierra A4: quedan jugador/rival/Pokémon con cuadrícula integrada,
+las regresiones clásicas exactas y toda la batería acumulativa sobre fuentes
+congeladas, además de CI, fusión y paquetes v0.4.0. Los criterios permanecen
+18/24 en la rama y 0/6 para A4.

@@ -8,7 +8,18 @@
 // still validate each visible glyph/graphic before replacing the original LCD.
 namespace full_menu {
 using menu_layout::Rect;
-enum class Context { None, PcCenter, PcItems, PcBill, PcOak, Bag, Mart, BattleBag };
+enum class Context {
+    None,
+    PcCenter,
+    PcItems,
+    PcBill,
+    PcOak,
+    Bag,
+    Mart,
+    BattleBag,
+    Options,
+    TrainerCard
+};
 enum class Kind {
     Unknown,
     PcMain,
@@ -19,7 +30,10 @@ enum class Kind {
     BagList,
     BagAction,
     Mart,
-    BattleBag
+    BattleBag,
+    Options,
+    TrainerCard,
+    Count
 };
 struct Layout {
     Kind kind = Kind::Unknown;
@@ -61,6 +75,33 @@ inline Layout classify(const uint8_t *tiles, Context context) {
         return true;
     };
     constexpr auto bottom = menu_layout::Bottom, yes_no = menu_layout::YesNo;
+    if (context == Context::TrainerCard) {
+        // TrainerInfo_DrawTextBox uses a distinct right/bottom edge. The middle
+        // label and side background also belong to this complete source page.
+        for (auto r : {Rect{0, 0, 20, 8}, Rect{1, 10, 18, 8}})
+            for (int y = r.y; y < r.y + r.h; ++y)
+                for (int x = r.x; x < r.x + r.w; ++x) {
+                    int edge = menu_layout::border(r, x, y);
+                    if (edge == 0x7a && y == r.y + r.h - 1)
+                        edge = 0x77;
+                    if (edge == 0x7c && x == r.x + r.w - 1)
+                        edge = 0x78;
+                    if (edge && tiles[y * 20 + x] != edge)
+                        return {};
+                }
+        result.kind = Kind::TrainerCard;
+        result.text.kind = menu_layout::Kind::Partial;
+        result.text.count = 3;
+        result.text.regions[0] = {0, 0, 20, 8};
+        result.text.regions[1] = {0, 8, 20, 2};
+        result.text.regions[2] = {0, 10, 20, 8};
+        return result;
+    }
+    if (context == Context::Options) {
+        if (matches(Kind::Options, {{0, 0, 20, 18}}))
+            return result;
+        return {};
+    }
     if (context == Context::BattleBag) {
         // The original battle keeps HUD and portrait fragments outside these
         // windows. Their stricter graphic profile is validated before drawing.

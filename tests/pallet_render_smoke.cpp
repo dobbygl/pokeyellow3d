@@ -56,6 +56,9 @@ static void capture_surface(const char *path) {
 #include "pc_integration.h"
 #include "pokemon_menu_integration.h"
 #include "item_menu_integration.h"
+#include "options_menu_integration.h"
+#include "trainer_card_integration.h"
+#include "naming_menu_integration.h"
 #include "dex_menu_integration.h"
 #include "pc_details_integration.h"
 #include "pc_hall_integration.h"
@@ -132,6 +135,23 @@ int main(int argc, char **argv) {
     }
     if (!gb_context_load_state_file(ctx, argv[2]))
         return 5;
+    if (argc > 3 && !std::strcmp(argv[3], "prepare-names")) {
+        int result = naming_qa::prepare(ctx);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && !std::strncmp(argv[3], "trainer-card", 12)) {
+        int badges = std::strstr(argv[3], "-all") ? 255 : std::strstr(argv[3], "-mixed") ? 0x5a : 0;
+        int result = trainer_card_qa::journey(ctx, std::strstr(argv[3], "-fp") != nullptr, badges);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && !std::strncmp(argv[3], "options-", 8)) {
+        int result = options_qa::journey(ctx, std::strstr(argv[3], "-fp") != nullptr,
+                                         std::strstr(argv[3], "title") != nullptr);
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 3 &&
         (!std::strcmp(argv[3], "items-battle") || !std::strcmp(argv[3], "items-battle-fp"))) {
         int result = item_qa::battle_bag(ctx, std::strstr(argv[3], "-fp") != nullptr);

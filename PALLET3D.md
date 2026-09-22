@@ -885,6 +885,9 @@ visuales se encuentran en `src/ui_theme.h`.
 | Tienda completa | Buy, dinero y stock en cuadrícula completa; cantidad, confirmaciones y mensaje de objeto no vendible conservan el orden de ventanas |
 | Lista Pokédex | Lista (0, 0, 14, 18), lateral (15, 8, 5, 9), contadores (16, 1, 4, 2) y (16, 4, 4, 2), sobre el dispositivo |
 | Mochila en combate | Cuadrícula completa, inferior y lista; texto y fragmentos de HUD/retratos originales fuera de las ventanas, verificados contra ROM y VRAM |
+| Opciones (A4 en desarrollo) | (0, 0, 20, 18), desde Start y desde el menú inicial; cursor propio CD3D y flecha original en filas 2/4/6/8/10/16 |
+| Tarjeta de entrenador (A4 en desarrollo) | Superior (0, 0, 20, 8), etiqueta central (0, 8, 20, 2), inferior (0, 10, 20, 8); conserva retrato, caras/medallas, números y colon propios |
+| Nombres (A4 pendiente) | LCD completo enmarcado; jugador, rival y Pokémon pendientes de cuadrícula integrada |
 | Pantalla desconocida | LCD completo enmarcado |
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
@@ -1109,3 +1112,32 @@ revisados. Las 24 baterías clásicas conservan 2.497 capturas y 2.159 estados
 exactos frente a v0.3.0, incluidas las 38 vistas exteriores originales.
 CTest pasa 43/43 y el build independiente sin ROM 24/24. La evidencia y el
 estado de CI/fusión están registrados en `PLAN_PANTALLAS_COMPLETAS.md`.
+
+### Opciones y tarjeta de entrenador (A4 en desarrollo)
+
+Opciones lee `wOptionsCursorLocation` (CD3D, alias `wWhichTrade` en el C
+generado), porque `wCurrentMenuItem` puede conservar la selección de Start.
+La flecha de `wTileMap` sigue siendo la autoridad visual durante un repintado.
+El perfil reconoce la llamada original compartida por Start y el menú inicial.
+Sus cinco ajustes, sus ciclos y Cancel siguen ejecutándose en el motor.
+
+La tarjeta valida el recorte del retrato de Red contra la ROM descomprimida,
+los bordes propios y cada gráfico visible. Los tiles D6–DF contienen el colon,
+fondo y números de medalla; no son caracteres de la fuente. Las caras y
+medallas se cotejan además con los bits de `wObtainedBadges`. Un gráfico,
+fuente, borde o disposición desconocidos conserva el LCD completo enmarcado.
+
+`tests/ui_full_options_qa.sh ROM WORLD_WITH_POKEDEX [INITIAL_MENU_STATE]`
+recorre todos los valores en ambas direcciones, el salto de filas vacías,
+wrap y salidas por Cancel, Start y B, desde ambos menús y en ambas cámaras.
+Sin el tercer argumento obtiene el estado inicial mediante el arranque original.
+`tests/ui_full_trainer_qa.sh ROM WORLD_WITH_POKEDEX` recorre medallas ausentes,
+mixtas y completas, nombre de siete caracteres y extremos de dinero/tiempo.
+Ambas baterías están incluidas en `ui_style_qa.sh`; con estilo integrado
+comprueban fuente/gráficos/píxeles por frame, memoria intacta, pausa y carga.
+
+La validación inicial suma cuatro recorridos de opciones y seis de tarjeta,
+45/45 CTest y 26/26 pruebas en el build independiente sin ROM. Los contactos
+están revisados en `build/qa/logs/fullscreen-a4-*-contact-review.json`.
+A4 sigue abierta: faltan el teclado y las regresiones finales clásicas,
+la validación acumulativa, CI, fusión y release v0.4.0.

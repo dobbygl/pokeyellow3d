@@ -1,7 +1,7 @@
 # Plan: pantallas completas con el estilo integrado
 
-Fecha: 2026-09-22. Estado: A1 fusionada; A2 validada, pendiente de fusión; A3–A4 pendientes.
-11/24 criterios acreditados. Base: release v0.3.0.
+Fecha: 2026-09-22. Estado: A1–A2 fusionadas; A3 en desarrollo; A4 pendiente.
+12/24 criterios acreditados. Base: release v0.3.0.
 
 ## Análisis del estado actual
 
@@ -153,7 +153,7 @@ Criterios de aceptación:
 - [x] Cada carácter y cursor coincide por frame con su tile original; los índices especiales están contrastados con charmap y rutinas pret antes de su uso.
 - [x] Los recorridos de A2 añadidos a `ui_style_qa.sh` verifican glifos, cursor, memoria intacta, cambios de página y respaldo LCD ante datos o gráficos no reconocidos.
 - [x] CTest completo, pruebas independientes sin ROM, formato y todas las baterías clásicas pasan; no cambia ninguna captura clásica respecto a v0.3.0, incluidas las 38 exteriores.
-- [ ] Contactos de equipo y resumen están revisados y registrados; A2 se fusiona con CI verde antes de iniciar A3.
+- [x] Contactos de equipo y resumen están revisados y registrados; A2 se fusiona con CI verde antes de iniciar A3.
 
 ### Fase A3: mochila, tienda completa y lista de Pokédex
 
@@ -601,3 +601,17 @@ env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
 
 Quedan acreditados cinco de los seis criterios de A2. El último se marcará
 tras verificar la fusión de la PR #24 con CI verde, antes de comenzar A3.
+
+
+### A2 fusionada; inicio de A3 — 2026-09-22
+
+PR #24 fusionada a las 02:47:33 UTC, merge
+`c802b33ad9203644a9f69d724bf3657012c53ba4`, después del run final
+`35680587598`: cinco comprobaciones obligatorias verdes sobre
+`fd9b228d46061f5960be086cedc5dd29215a6cf0`. Evidencias de CI y fusión en
+`build/qa/logs/fullscreen-a2-ci-final.json` y `fullscreen-a2-merge.json`.
+A2 queda acreditada 6/6 y el plan alcanza 12/24.
+
+`fullscreen-a3` parte de esa fusión. Se inicia el inventario de mochila,
+tienda completa y lista de Pokédex, manteniendo el motor y las referencias
+clásicas fijadas a v0.3.0. Todavía no hay criterios acreditados de A3.

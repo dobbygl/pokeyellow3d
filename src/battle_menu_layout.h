@@ -12,6 +12,10 @@ struct Layout {
     menu_layout::Layout regions;
 };
 constexpr menu_layout::Rect Fight{8, 12, 12, 6}, Moves{4, 12, 16, 6}, MoveInfo{0, 8, 11, 5};
+// Region order of Kind::Moves in classify(): Bottom, Moves, MoveInfo. The
+// original TYPE/PP window shares its bottom edge row with the move list's top
+// edge, so its integrated panel must be lifted clear of the four move rows.
+constexpr size_t MovesList = 1, MovesInfo = 2;
 inline bool matches(const uint8_t *tiles, menu_layout::Layout &out,
                     std::initializer_list<menu_layout::Rect> boxes) {
     std::array<uint8_t, 360> windows{};

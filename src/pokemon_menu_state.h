@@ -49,6 +49,24 @@ inline bool party_return(const GBContext *ctx) {
 inline bool stats_loading(const GBContext *ctx) {
     return battle::live_return(ctx, 0x115e1, 0x3de0) || battle::live_return(ctx, 0x115e7, 0x1144);
 }
+// Battle messages printed over the party list that is still displayed, after
+// HandlePartyMenuInput has returned. Bank 0F CALLs to PrintText (3C36), each
+// checked in the canonical ROM with its live return address:
+// - AlreadyOutText from EnemySendOutFirstMon after "Will ... change POKéMON?"
+//   (3CA71, returns 4A74) and from PartyMenuOrRockOrRun.switchMon (3D29E, 52A1).
+// - HasMonFainted's NoWillText (3CB14, 4B17), only while HasMonFainted was
+//   called after a party choice: ChooseNextMon for the forced switch (3C84B,
+//   484E), EnemySendOutFirstMon (3CA79, 4A7C) or PartyMenuOrRockOrRun (3D2A4,
+//   52A7). Its StartBattle caller (3C1C7) has no party list and is excluded.
+inline bool party_text(const GBContext *ctx) {
+    if (!battle::normal(ctx))
+        return false;
+    if (battle::live_return(ctx, 0x3ca71, 0x3c36) || battle::live_return(ctx, 0x3d29e, 0x3c36))
+        return true;
+    return battle::live_return(ctx, 0x3cb14, 0x3c36) &&
+           (battle::live_return(ctx, 0x3c84b, 0x4afc) ||
+            battle::live_return(ctx, 0x3ca79, 0x4afc) || battle::live_return(ctx, 0x3d2a4, 0x4afc));
+}
 inline Kind context(const GBContext *ctx) {
     if (!ready(ctx))
         return Kind::None;
@@ -62,7 +80,10 @@ inline Kind context(const GBContext *ctx) {
     if (battle::live_return(ctx, 0x11c95, 0x3aab) ||
         (battle::normal(ctx) && battle::live_return(ctx, 0x3d236, 0x3aab)))
         return Kind::Actions;
-    return party_return(ctx) ? Kind::Party : Kind::None;
+    // The forced switch (ChooseNextMon, 3C841) and the list after "Will ...
+    // change POKéMON?" (EnemySendOutFirstMon, 3CA5B) both reach the shared
+    // HandlePartyMenuInput loop through DisplayPartyMenu, as the voluntary one.
+    return party_return(ctx) || party_text(ctx) ? Kind::Party : Kind::None;
 }
 struct Graphic {
     size_t address = 0;
@@ -293,19 +314,32 @@ inline Snapshot prepare(const GBContext *ctx, mon_pic::Cache &portraits) {
     } else {
         out.count = battle::read(ctx, 0xd162);
         bool actions = out.kind == Kind::Actions;
-        out.selected = battle::read(ctx, actions ? 0xcc2b : 0xcc26);
+        // After HandlePartyMenuInput returns, the chosen row is wWhichPokemon
+        // (CF91). EnemySendOutFirstMon.next9 resets wCurrentMenuItem to 1
+        // before printing AlreadyOutText, so CC26 no longer names that row.
+        bool message = !actions && party_text(ctx);
+        out.selected = battle::read(ctx, actions ? 0xcc2b : message ? 0xcf91 : 0xcc26);
         if (!out.count || out.count > 6 || out.selected >= out.count ||
             !icons_valid(ctx, out.count))
             return out;
-        // HandleMenuInput updates selection before repainting its arrow. Keep
-        // the side portrait on the visibly selected row during that frame.
-        for (int row = 0; row < out.count; ++row)
-            if (tiles[(row * 2 + 1) * 20] == (actions ? 0xec : 0xed)) {
-                if (row != out.selected && (actions || row != battle::read(ctx, 0xcc2a)))
+        if (message) {
+            // PlaceUnfilledArrowMenuCursor (HandlePartyMenuInput, 1259) left the
+            // unfilled arrow on the chosen row and no active arrow elsewhere.
+            for (int row = 0; row < out.count; ++row) {
+                uint8_t arrow = tiles[(row * 2 + 1) * 20];
+                if (arrow == 0xed || (arrow == 0xec) != (row == out.selected))
                     return out;
-                out.selected = row;
-                break;
             }
+        } else
+            // HandleMenuInput updates selection before repainting its arrow. Keep
+            // the side portrait on the visibly selected row during that frame.
+            for (int row = 0; row < out.count; ++row)
+                if (tiles[(row * 2 + 1) * 20] == (actions ? 0xec : 0xed)) {
+                    if (row != out.selected && (actions || row != battle::read(ctx, 0xcc2a)))
+                        return out;
+                    out.selected = row;
+                    break;
+                }
         menu_layout::Rect action{0, 0, 0, 0};
         if (actions) {
             // DisplayFieldMoveMonMenu adds a blank row above the first field

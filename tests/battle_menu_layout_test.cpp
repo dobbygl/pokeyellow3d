@@ -54,6 +54,56 @@ int main(int argc, char **argv) {
             "only the two populated move panels appear");
     require(p.owner[12 * 20 + 4] == 2 && p.panels[2].top == 422 && p.panels[2].bottom == 546,
             "PP/type owns the covered top border of the move list");
+    // Four move rows (13-16) below TYPE/PP (rows 9-11): the shared bottom grid
+    // leaves only 4px between both panels. separate() lifts TYPE/PP alone.
+    for (int row = 13; row <= 16; ++row)
+        tiles[row * 20 + 6] = uint8_t(0x86 + row);
+    tiles[10 * 20 + 2] = 0x84;
+    tiles[11 * 20 + 7] = 0xf8;
+    p = plan(tiles, layout);
+    require(p.panels[1].top == 550 && p.panels[2].bottom == 546 &&
+                p.panels[2].right > p.panels[1].left,
+            "unseparated TYPE/PP nearly touches the first of four move rows");
+    auto lifted = p;
+    menu_text::separate(lifted, battle_menu::MovesInfo, battle_menu::MovesList, 14);
+    require(lifted.panels[2].bottom + 14 <= lifted.panels[1].top &&
+                lifted.panels[2].bottom == 536 && lifted.panels[2].top == 412 &&
+                lifted.panels[2].origin_y == p.panels[2].origin_y - 10 &&
+                lifted.panels[2].origin_x == p.panels[2].origin_x &&
+                lifted.panels[2].left == p.panels[2].left &&
+                lifted.panels[2].right == p.panels[2].right,
+            "TYPE/PP and its glyph grid rise by whole pixels to clear the move rows");
+    require(lifted.panels[1].origin_y == p.panels[1].origin_y &&
+                lifted.panels[1].top == p.panels[1].top &&
+                lifted.panels[0].origin_y == p.panels[0].origin_y && lifted.owner == p.owner &&
+                lifted.panels[2].scale == p.panels[2].scale,
+            "move list, message and source ownership are unchanged");
+    auto again = lifted;
+    menu_text::separate(again, battle_menu::MovesInfo, battle_menu::MovesList, 14);
+    require(again.panels[2].origin_y == lifted.panels[2].origin_y, "separation is idempotent");
+    // Controls: nothing moves without a horizontal overlap, a visible pair or
+    // valid indices, and the lower panel is never the one displaced.
+    auto apart = p;
+    apart.panels[2].right = apart.panels[1].left;
+    menu_text::separate(apart, battle_menu::MovesInfo, battle_menu::MovesList, 14);
+    require(apart.panels[2].origin_y == p.panels[2].origin_y, "side-by-side panels stay put");
+    auto hidden = p;
+    hidden.panels[1].visible = false;
+    menu_text::separate(hidden, battle_menu::MovesInfo, battle_menu::MovesList, 14);
+    require(hidden.panels[2].origin_y == p.panels[2].origin_y, "an invisible lower panel");
+    auto invalid = p;
+    menu_text::separate(invalid, 5, battle_menu::MovesList, 14);
+    menu_text::separate(invalid, battle_menu::MovesInfo, battle_menu::MovesInfo, 14);
+    require(invalid.panels[2].origin_y == p.panels[2].origin_y &&
+                invalid.panels[1].origin_y == p.panels[1].origin_y,
+            "out-of-range or identical indices change nothing");
+    auto message = p;
+    menu_text::separate(message, 0, battle_menu::MovesList, 14);
+    require(message.panels[0].origin_y == p.panels[0].origin_y, "the empty message never moves");
+    for (int row = 13; row <= 16; ++row)
+        tiles[row * 20 + 6] = 0x7f;
+    tiles[10 * 20 + 2] = 0x7f;
+    tiles[11 * 20 + 7] = 0x7f;
     tiles[13 * 20 + 5] = 0x6e;
     p = plan(tiles, layout);
     require(p.panels[1].fallback && !p.panels[2].fallback,

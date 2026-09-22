@@ -119,4 +119,21 @@ inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::A
     }
     return plan;
 }
+// Moves an upper panel, its glyphs and fallback cells included, up by whole
+// pixels until it clears a lower panel it overlaps horizontally by `gap`.
+// Ownership and validation are untouched; only the placement changes.
+inline void separate(Plan &plan, size_t upper, size_t lower, float gap) {
+    if (upper >= plan.count || lower >= plan.count || upper == lower)
+        return;
+    auto &u = plan.panels[upper];
+    const auto &l = plan.panels[lower];
+    if (!u.visible || !l.visible || u.right <= l.left || l.right <= u.left)
+        return;
+    float shift = std::ceil(u.bottom + gap - l.top);
+    if (shift <= 0)
+        return;
+    u.origin_y -= shift;
+    u.top -= shift;
+    u.bottom -= shift;
+}
 } // namespace menu_text

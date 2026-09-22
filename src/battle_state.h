@@ -57,6 +57,27 @@ inline bool rectangle(const GBContext *ctx, Rect r, bool displayed = false) {
         }
     return true;
 }
+// True while the LCD layer that presents the battle shows exactly these
+// wTileMap cells. Effect animations shake the window (WX/WY) or scroll the BG
+// by less than a tile; the same tiles remain visible, only displaced. A BG map
+// that has not yet received wTileMap (auto BG transfer pending), another
+// selected map, a disabled BG or an off LCD all show something else.
+inline bool displayed(const GBContext *ctx, int x0, int y0, int w, int h) {
+    if (!ctx || !ctx->wram || !ctx->vram || !ctx->io || x0 < 0 || y0 < 0 || w <= 0 || h <= 0 ||
+        x0 + w > 20 || y0 + h > 18)
+        return false;
+    uint8_t lcdc = ctx->io[0x40];
+    if ((lcdc & 0x81) != 0x81)
+        return false;
+    bool window = (lcdc & 0x20) && ctx->io[0x4a] < 8 && ctx->io[0x4b] < 15;
+    int map = (lcdc & (window ? 0x40 : 8)) ? 0x1c00 : 0x1800;
+    int ox = window ? 0 : ctx->io[0x43] / 8, oy = window ? 0 : ctx->io[0x42] / 8;
+    for (int y = y0; y < y0 + h; y++)
+        for (int x = x0; x < x0 + w; x++)
+            if (ctx->vram[map + ((y + oy) & 31) * 32 + ((x + ox) & 31)] != tile(ctx, x, y))
+                return false;
+    return true;
+}
 inline bool name_matches(const GBContext *ctx, int address, int x, int y) {
     // A HUD name must be present, not the trainer-introduction picture or a
     // full-screen party/item list reusing the same species bytes.

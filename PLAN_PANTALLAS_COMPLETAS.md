@@ -1,6 +1,6 @@
 # Plan: pantallas completas con el estilo integrado
 
-Fecha: 2026-09-22. Estado: A1–A2 fusionadas; A3 en desarrollo; A4 pendiente.
+Fecha: 2026-09-22. Estado: A1–A2 fusionadas; A3 en validación clásica final; A4 pendiente.
 12/24 criterios acreditados. Base: release v0.3.0.
 
 ## Análisis del estado actual
@@ -170,10 +170,10 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Mochila y tienda completa usan la lista integrada con sus cantidades, dinero, opciones y confirmaciones originales, sin omitir contenido ni modificar operaciones.
-- [ ] La Pokédex presenta la lista integrada sobre su dispositivo, con números, nombres, registros, contadores y retrato coherentes con la selección original.
-- [ ] Scroll, cursor, extremos y cambios de lista mantienen el orden y la selección del motor por frame; toda disposición o gráfico desconocido conserva el LCD enmarcado.
-- [ ] Los recorridos de A3 añadidos a `ui_style_qa.sh` pasan glifo a glifo, cursor, memoria intacta y transiciones en ambas cámaras.
+- [x] Mochila y tienda completa usan la lista integrada con sus cantidades, dinero, opciones y confirmaciones originales, sin omitir contenido ni modificar operaciones.
+- [x] La Pokédex presenta la lista integrada sobre su dispositivo, con números, nombres, registros, contadores y retrato coherentes con la selección original.
+- [x] Scroll, cursor, extremos y cambios de lista mantienen el orden y la selección del motor por frame; toda disposición o gráfico desconocido conserva el LCD enmarcado.
+- [x] Los recorridos de A3 añadidos a `ui_style_qa.sh` pasan glifo a glifo, cursor, memoria intacta y transiciones en ambas cámaras.
 - [ ] CTest completo, pruebas independientes sin ROM, formato y todas las baterías clásicas pasan con capturas idénticas a v0.3.0, incluidas las 38 exteriores.
 - [ ] Contactos de mochila, tienda y Pokédex están revisados y registrados; A3 se fusiona con CI verde antes de comenzar A4.
 
@@ -756,3 +756,83 @@ nuevos se ejecutan mediante `run-fullscreen-a3-v030.py`.
 
 No se acreditan aún criterios: quedan resultados finales, comparaciones,
 contactos/documentación de entrega y CI/fusión de la PR. A4 sigue pendiente.
+
+
+### A3 — pruebas independientes y preparación de entrega, 2026-09-22
+
+La PR en borrador [#25](https://github.com/dobbygl/pokeyellow3d/pull/25) contiene
+la implementación en `2d097ac`. Su ejecución CI `35684729736` pasa las cinco
+comprobaciones obligatorias: Linux GCC, Clang, 2D, Windows MSVC y formato.
+Los logs confirman 24/24 pruebas sin ROM en GCC, Clang y Windows/ANGLE; macOS
+sigue deshabilitado. Evidencia: `fullscreen-a3-ci-code.json` y `-code.log`.
+
+Los catorce recorridos integrados de mochila, tienda y combate pasan con el
+ejecutable final en `build/qa/ui-full-items-DcV64b`: 26.622 frames,
+1.436.870 glifos, 100.722.560 bits, 136.920 gráficos y 14.704 cursores.
+Los 736 frames de respaldo mantienen el LCD completo. Los contactos de objetos
+y combate están revisados y vinculados mediante SHA-256 a sus capturas y al
+helper: `fullscreen-a3-{items,battle}-contact-review.json`.
+
+Los dieciocho recorridos nuevos de referencia v0.3.0 también terminan con éxito
+y quedan registrados en `fullscreen-a3-v030-new-driver-proof.json`. La
+comprobación de las 151 espaldas se reproduce con un script independiente;
+coinciden los 473.536 píxeles y el informe inicial completo.
+
+```sh
+python3 build/qa/logs/verify-fullscreen-a3-backs.py
+python3 build/qa/logs/collect-fullscreen-a3-classic.py
+# Ejecutar después de completar ambas baterías y revisar el contacto Pokédex final:
+python3 build/qa/logs/collect-fullscreen-a3-evidence.py
+```
+
+Las 24 baterías clásicas y la ejecución integrada acumulada siguen en curso.
+El recolector final está preparado para exigir todas las comparaciones, los
+56 recorridos, las 38 vistas exteriores originales y las capturas de README
+vinculadas al helper definitivo. Se han preparado cuatro imágenes nuevas
+(mochila, tienda, mochila de combate y lista Pokédex); la imagen de Pokédex
+se contrastará de nuevo con la ejecución acumulada final. No se acredita
+todavía ningún criterio de A3 ni se comienza A4.
+
+Las 38 vistas exteriores de `build/qa/kanto-Sz6bQP/logs/catalog` coinciden
+byte a byte con las originales de `build/qa/kanto-hvoPvo/logs/catalog`;
+el manifiesto es `fullscreen-a3-original-exteriors.json`. La revisión del
+soporte de pruebas queda en `fullscreen-a3-oracle-source-review.json`:
+`QaWalk::tick` compara WRAM completa, VRAM completa, RAM de cartucho y framebuffer
+antes y después de cada frame presentado; las llamadas de render de pausa y
+negativos repiten la misma comprobación. Los oráculos contrastan glifos,
+gráficos y cursores originales con la imagen OpenGL. La ROM y los fixtures de
+entrada tienen además sus propias comprobaciones SHA-256 al cerrar cada batería.
+
+La ejecución integrada acumulada ya ha completado menús, combates, transiciones,
+los doce recorridos del PC y los ocho de equipo/resumen; continúa en objetos.
+Aún faltan los resultados acumulados definitivos y todas las comparaciones
+clásicas, por lo que A3 permanece sin criterios acreditados.
+
+
+### A3 — ejecución integrada final completada, 2026-09-22
+
+`tests/ui_style_qa.sh` termina con éxito en `build/qa/ui-style-Li1AC0`: ocho
+recorridos de menús, cuatro de combate, seis de transiciones, doce de PC, ocho
+de equipo/resumen, catorce de objetos y cuatro de Pokédex. Son 56 recorridos,
+más las comprobaciones de animación, pausa, foco y carga en ambas cámaras.
+El helper conserva el mismo hash que el ejecutable de pruebas de la PR.
+
+La ejecución acumulada de objetos (`build/qa/ui-full-items-QPhecW`) verifica
+26.624 frames, 1.436.782 glifos, 100.716.928 bits, 136.920 gráficos y 14.694
+cursores, con 736 frames de respaldo. La Pokédex final está en
+`build/qa/ui-full-dex-Qh12vJ`. Su contacto de seis vistas se ha revisado y
+coincide byte a byte con el contacto inicial; el manifiesto de README ahora
+apunta a la captura del helper definitivo. Los tres contactos revisados
+(objetos, combate y Pokédex) y las cuatro imágenes PNG publicables están
+comprobados con sus hashes y píxeles RGB originales.
+
+```sh
+python3 build/qa/logs/prepare-fullscreen-a3-final-dex-review.py
+# Revisar visualmente el contacto y registrar el resultado antes de continuar.
+python3 build/qa/logs/collect-fullscreen-a3-integrated.py
+```
+
+`fullscreen-a3-integrated-evidence.json` acredita los cuatro primeros criterios
+de A3. No acredita la aceptación clásica ni la fusión: los dos criterios
+restantes siguen abiertos hasta terminar todas las baterías, comparar sus
+capturas y verificar CI/fusión. A4 no ha comenzado.

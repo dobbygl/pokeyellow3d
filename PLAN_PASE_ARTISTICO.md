@@ -521,3 +521,13 @@ figuran en `inputs.json`, los informes de procedencia del benchmark y
   del usuario. La corrección permanece en la copia privada; esta incidencia
   no se cuenta como una prueba aprobada. Continúan las comprobaciones de A1;
   la fase y su fusión siguen pendientes.
+- Un recorrido diagnóstico completo confirma que A1 desactivado conserva
+  exactamente las 18 capturas y los 18 estados de `7955aaa`, incluidos los
+  nueve fotogramas rechazados, 3883–3891. El diagnóstico continúa para recoger
+  evidencia, pero termina con código 41: no sustituye a una prueba aprobada.
+  Informe: `build/qa/logs/art-a1-inherited-transition-comparison.json`.
+- Frente a la copia corregida, los nueve estados de las capturas comunes
+  permanecen idénticos y solo cambia `warp-01-map-012-bgp-00.ppm`;
+  `art-transition-fix-scope.json` delimita esa diferencia. Las 139 piezas de
+  evidencia del diagnóstico y de la corrección aislada tienen una copia
+  privada fuera de `build/qa`, verificada byte a byte al leer el archivo.

@@ -1179,5 +1179,6 @@ ambas cámaras. Los tres contactos finales de A4 están revisados y CI pasa
 GCC, Clang, Linux 2D, MSVC y formato; Windows verifica también 27/27 pruebas
 sin ROM con ANGLE. Las 27 baterías clásicas conservan 2.765 capturas y
 2.427 estados idénticos a v0.3.0, incluidas las 38 vistas exteriores originales.
-La evidencia final está en `fullscreen-a4-evidence.json`; quedan la fusión
-y la publicación verificada de v0.4.0.
+La evidencia final está en `fullscreen-a4-evidence.json`. La PR #26 está
+fusionada en main; `PLAN_PANTALLAS_COMPLETAS.md` registra los 24 criterios
+completos y el contrato de publicación de v0.4.0.

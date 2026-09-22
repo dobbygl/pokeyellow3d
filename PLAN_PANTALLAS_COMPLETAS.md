@@ -1,7 +1,7 @@
 # Plan: pantallas completas con el estilo integrado
 
-Fecha: 2026-09-22. Estado: A1–A3 fusionadas; A4 en validación final.
-22/24 criterios acreditados. Base: release v0.3.0.
+Fecha: 2026-09-22. Estado: A1–A3 fusionadas; A4 validada, pendiente de fusión.
+23/24 criterios acreditados. Base: release v0.3.0.
 
 ## Análisis del estado actual
 
@@ -197,7 +197,7 @@ Criterios de aceptación:
 - [x] Las pantallas de nombres usan la cuadrícula del tema con el cursor original, conservando caracteres, orden, edición, borrado y aceptación en las variantes de jugador, rival y Pokémon.
 - [x] Los recorridos de A4 añadidos a `ui_style_qa.sh` pasan glifo a glifo, cursor y memoria intacta por frame en ambas cámaras, con respaldo ante detección o fuente inválida.
 - [x] Las animaciones de las nuevas pantallas usan ciclos del motor, se congelan con Esc o sin foco, no retrasan texto ni entradas y respetan cargas y regiones compartidas; hay evidencia reproducible.
-- [ ] CTest completo, pruebas independientes sin ROM, formato, todas las baterías clásicas e integradas pasan; todas las referencias clásicas y las 38 exteriores siguen idénticas a v0.3.0.
+- [x] CTest completo, pruebas independientes sin ROM, formato, todas las baterías clásicas e integradas pasan; todas las referencias clásicas y las 38 exteriores siguen idénticas a v0.3.0.
 - [ ] Ejecutable compilado, PALLET3D con tabla completa y casos clásicos, README con capturas nuevas y contactos revisados están entregados; A4 pasa CI y su fusión deja las cuatro fases y todos los criterios en main.
 
 ## Limitaciones asumidas
@@ -1043,7 +1043,7 @@ La cabecera del plan se corrige a los 18 criterios ya acreditados en sus casilla
 
 La ejecución acumulativa `build/qa/ui-style-3oiw8R` pasa sus 82 recorridos:
 8 de menús del mundo, 4 de combate, 6 de transiciones, 12 de PC, 8 de equipo
-/resumen, 14 de mochila/tienda, 4 de Pokédex y los 26 de A4. También pasan
+y resumen, 14 de mochila/tienda, 4 de Pokédex y los 26 de A4. También pasan
 los dos recorridos de pausa/carga de paneles. El informe verificable es
 `fullscreen-a4-integrated-verified.json`; todos los helpers conservan el
 SHA-256 del ejecutable congelado, incluidas las entradas preparadas desde
@@ -1063,7 +1063,7 @@ las PR #22–#25 verifica el plan previo a la implementación y la fusión
 ordenada de A1–A3; permanece registrada en `fullscreen-pr-chain-final-audit.json`.
 
 Se acreditan los cuatro primeros criterios de A4: presentación de opciones
-/tarjeta, cuadrícula de nombres, recorridos integrados por frame y animación
+y tarjeta, cuadrícula de nombres, recorridos integrados por frame y animación
 con pausa/carga. El contador es 22/24 en esta rama. Los dos criterios restantes
 no se acreditan aún: la comparación clásica de las 27 baterías sigue en curso
 y la PR #26 continúa en borrador, pendiente de entrega y fusión.
@@ -1080,3 +1080,36 @@ env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
   build/qa/battles-eovzS8/logs/capture-throw.state
 python3 build/qa/logs/collect-fullscreen-a4-classic.py
 ```
+
+
+### A4 — regresión completa contra v0.3.0, 2026-09-22
+
+`fullscreen-a4-evidence.json` acredita la validación completa del código
+congelado en `4774f20`: 27 baterías clásicas, 2.765 capturas y 2.427 estados
+del motor idénticos a v0.3.0, sin diferencias ni archivos ausentes. Las 38
+vistas exteriores se cotejan además con las capturas originales del catálogo.
+Las siete baterías de pantallas completas usan sus referencias ejecutadas
+sobre la producción inalterada de v0.3.0, incluidos los preparadores de nombres.
+
+La batería acumulativa suma 82 recorridos y las dos pruebas de movimiento
+y pausa de paneles. Pasa 46/46 CTest, 27/27 sin ROM con llvmpipe y formato
+18.1.8 sobre los 20 C++ de A4. Los contactos finales están revisados y las
+capturas publicadas coinciden píxel a píxel con las de esta ejecución. El
+runtime permanece en `00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e`; no cambian el
+C generado ni la ROM. PALLET3D enumera todos los perfiles y las composiciones
+previas que conservan impresión, Salón de la Fama y DATA/AREA de la Pokédex.
+
+El ejecutable entregable `build/pokeyellow3d` tiene SHA-256
+`5d4191c3ad0572ee3093fa76a919e8c37ddee9135dcd35465a498b2f1288afd2`.
+El helper comprobado tiene SHA-256
+`fb64802bbeae258f4cd7db492791d68f6eaa3e71ffb7a45e52d6b23e0602c0ae`.
+
+```sh
+bash build/qa/logs/run-fullscreen-a4-regressions.sh
+python3 build/qa/logs/collect-fullscreen-a4-evidence.py
+```
+
+Se acredita el quinto criterio de A4: 23/24 en la rama. Solo queda acreditar
+la fusión de la PR #26 y reflejar la entrega completa en main. Después se
+publicará y verificará v0.4.0 para Linux y Windows; el goal sigue activo hasta
+comprobar los paquetes y checksums publicados.

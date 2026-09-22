@@ -885,10 +885,22 @@ visuales se encuentran en `src/ui_theme.h`.
 | Tienda completa | Buy, dinero y stock en cuadrícula completa; cantidad, confirmaciones y mensaje de objeto no vendible conservan el orden de ventanas |
 | Lista Pokédex | Lista (0, 0, 14, 18), lateral (15, 8, 5, 9), contadores (16, 1, 4, 2) y (16, 4, 4, 2), sobre el dispositivo |
 | Mochila en combate | Cuadrícula completa, inferior y lista; texto y fragmentos de HUD/retratos originales fuera de las ventanas, verificados contra ROM y VRAM |
-| Opciones (A4 en desarrollo) | (0, 0, 20, 18), desde Start y desde el menú inicial; cursor propio CD3D y flecha original en filas 2/4/6/8/10/16 |
-| Tarjeta de entrenador (A4 en desarrollo) | Superior (0, 0, 20, 8), etiqueta central (0, 8, 20, 2), inferior (0, 10, 20, 8); conserva retrato, caras/medallas, números y colon propios |
-| Nombres (A4 en desarrollo) | Cabecera (0, 0, 20, 4), teclado (0, 4, 20, 11), cambio de caja (0, 15, 20, 3); cuadrícula de 5 × 9 teclas, flecha, ED, subrayados e icono animado originales |
+| Opciones | (0, 0, 20, 18), desde Start y desde el menú inicial; cursor propio CD3D y flecha original en filas 2/4/6/8/10/16 |
+| Tarjeta de entrenador | Superior (0, 0, 20, 8), etiqueta central (0, 8, 20, 2), inferior (0, 10, 20, 8); conserva retrato, caras/medallas, números y colon propios |
+| Nombres | Cabecera (0, 0, 20, 4), teclado (0, 4, 20, 11), cambio de caja (0, 15, 20, 3); cuadrícula de 5 × 9 teclas, flecha, ED, subrayados e icono animado originales |
 | Pantalla desconocida | LCD completo enmarcado |
+
+Las siguientes pantallas conservan su composición previa, fuera de los
+perfiles completos de A1–A4:
+
+| Pantalla | Presentación conservada |
+| --- | --- |
+| Impresión del PC | Página original; no se convierte en una lista integrada nueva |
+| Salón de la Fama | Galería y retratos con sus ventanas de información originales |
+| Pokédex DATA y CRY | Datos y retrato sobre el dispositivo existente |
+| Pokédex AREA | Catálogo de Kanto, nidos y texto originales |
+| Geometría, fuente o gráfico no reconocidos | LCD completo enmarcado, sin recomponer parcialmente la pantalla |
+
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
 no se repite texto al separar el diálogo inferior de los cuadros superiores.
@@ -919,9 +931,8 @@ cantidades ni listas. Los gráficos LV (`6E`) y caja ocupada (`78`) se contrasta
 con ambos planos de VRAM y sus gráficos originales en ROM antes de presentarlos.
 Un borde desconocido, selección inválida o glifo reemplazado conserva **todo**
 el LCD enmarcado. Las páginas de impresión, Hall of Fame y otras disposiciones
-que no figuran en esta tabla mantienen su presentación previa. Opciones,
-tarjeta y nombres siguen pendientes en A4 de
-`PLAN_PANTALLAS_COMPLETAS.md`.
+que no figuran en los perfiles completos mantienen su presentación previa.
+Opciones, tarjeta y nombres se incluyen en los perfiles de A4 descritos arriba.
 
 La batería específica es `tests/ui_full_pc_qa.sh ROM PC_WORLD`, con
 `QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1` para el estilo integrado.
@@ -1115,7 +1126,7 @@ exactos frente a v0.3.0, incluidas las 38 vistas exteriores originales.
 CTest pasa 43/43 y el build independiente sin ROM 24/24. La evidencia y el
 estado de CI/fusión están registrados en `PLAN_PANTALLAS_COMPLETAS.md`.
 
-### Opciones, tarjeta de entrenador y nombres (A4 en desarrollo)
+### Opciones, tarjeta de entrenador y nombres
 
 Opciones lee `wOptionsCursorLocation` (CD3D, alias `wWhichTrade` en el C
 generado), porque `wCurrentMenuItem` puede conservar la selección de Start.
@@ -1166,5 +1177,7 @@ motes y captura, con ambos alfabetos y nombres de longitud máxima.
 La batería acumulativa final pasa 82 recorridos, además de pausa/carga en
 ambas cámaras. Los tres contactos finales de A4 están revisados y CI pasa
 GCC, Clang, Linux 2D, MSVC y formato; Windows verifica también 27/27 pruebas
-sin ROM con ANGLE. A4 sigue abierta hasta terminar la comparación clásica
-completa, la fusión y la release v0.4.0.
+sin ROM con ANGLE. Las 27 baterías clásicas conservan 2.765 capturas y
+2.427 estados idénticos a v0.3.0, incluidas las 38 vistas exteriores originales.
+La evidencia final está en `fullscreen-a4-evidence.json`; quedan la fusión
+y la publicación verificada de v0.4.0.

@@ -900,3 +900,36 @@ Se acredita el sexto criterio de A3 tras verificar la fusión. La rama
 `fullscreen-a4` parte de ese `main`. A4 empieza por inventariar las disposiciones
 originales de opciones, tarjeta de entrenador y nombres de jugador, rival y
 Pokémon. Ningún criterio de A4 está acreditado todavía.
+
+
+### A4 — inventario inicial de las pantallas originales, 2026-09-22
+
+Se han contrastado ocho pares de tilemap y savestate privados: opciones y
+tarjeta en ambas cámaras, y teclado vacío/escrito del inspector de motes en
+ambas cámaras. Proceden de `build/qa/ui-menus-uWkxEs`, ya comparado exactamente
+con v0.3.0. El informe es `fullscreen-a4-source-inventory.json`; el contacto
+de las tres pantallas originales está revisado en
+`fullscreen-a4-original-contact-review.json`. Esto acredita el inventario,
+no una presentación integrada nueva.
+
+Las rutinas originales de pret verificadas son `engine/menus/options.asm`,
+`naming_screen.asm`, `start_sub_menus.asm` y `draw_badges.asm`, del commit
+`e89ead154b9968aa50eed9328ff2b38b6c194382` ya fijado. Opciones usa su propia
+variable de cursor: en el fixture, `wCurrentMenuItem` todavía vale 5 mientras
+la flecha visible selecciona Text Speed. No se reutilizará la selección de
+las listas para interpretar ese cursor.
+
+La tarjeta carga gráficos propios de borde, fondo, números de medalla y
+separador de tiempo, además del retrato de Red y las caras/medallas. El teclado
+tiene cinco filas de nueve caracteres, cambio de mayúsculas/minúsculas, el
+gráfico ED y subrayados normal/elevado; conserva el icono animado al nombrar
+un Pokémon. Quedan por verificar todos esos gráficos contra ROM/VRAM y
+completar los estados de jugador, rival, minúsculas, límites, borrado y envío
+por Start/ED, además de variantes de medallas y valores de opciones.
+
+```sh
+python3 build/qa/logs/inventory-fullscreen-a4.py
+```
+
+No se ha modificado todavía el renderer de A4 ni se acredita ninguno de sus
+seis criterios.

@@ -131,7 +131,7 @@ Criterios de aceptación:
 - [x] Las disposiciones y gráficos no reconocidos vuelven al LCD completo enmarcado, con pruebas negativas y transiciones sin pérdida de contenido.
 - [x] Los recorridos PC añadidos a `ui_style_qa.sh` pasan el oráculo glifo a glifo, cursor, OpenGL y memoria intacta por frame en ambas cámaras.
 - [x] CTest completo, build independiente sin ROM con `ctest -LE rom`, formato y todas las baterías clásicas pasan; sus capturas y las 38 exteriores son idénticas a v0.3.0.
-- [ ] Contactos PC revisados y comandos reproducibles están registrados; la PR de A1 supera CI y se fusiona antes de comenzar A2.
+- [x] Contactos PC revisados y comandos reproducibles están registrados; la PR de A1 supera CI y se fusiona antes de comenzar A2.
 
 ### Fase A2: equipo y resumen de Pokémon
 
@@ -439,3 +439,16 @@ gh run view 35673667245 --repo dobbygl/pokeyellow3d \
 
 Quedan acreditados cinco de los seis criterios de A1. El último se marcará
 al constatar la fusión de la PR #23 con CI verde, antes de implementar A2.
+
+
+### A1 fusionada; inicio de A2 — 2026-09-22
+
+PR #23 fusionada a las 01:16:09 UTC, merge
+`33561771b3d07a994e0c4d0e2f197b1be930fbd2`, después del run final
+`35674984372`: cinco comprobaciones obligatorias verdes sobre
+`c28dfe5efbb14901daedf26c06cf8d03f6c2e9cd`. Evidencia de fusión en
+`build/qa/logs/fullscreen-a1-merge.json`. A1 queda acreditada 6/6.
+
+`fullscreen-a2` parte de ese merge; se inicia el inventario de equipo y resumen,
+sin modificar todavía su renderizado. La fuente original y las referencias
+clásicas continúan fijadas a los mismos commits de pret y v0.3.0.

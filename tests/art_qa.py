@@ -22,17 +22,17 @@ def sha(path):
 
 
 def main():
-    if len(sys.argv) != 7:
-        raise SystemExit('Expected candidate, ROM, Pallet state, five-map state, baseline, output root')
-    candidate, rom, pallet, route, baseline, output = map(Path, sys.argv[1:])
+    if len(sys.argv) != 8:
+        raise SystemExit('Expected smoke, benchmark, ROM, Pallet state, five-map state, baseline benchmark, output root')
+    candidate, benchmark, rom, pallet, route, baseline, output = map(Path, sys.argv[1:])
     output.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix='art-a1-', dir=output))
     print(f'QA output: {root}', flush=True)
-    for name, source in [('candidate', candidate), ('reference', baseline),
+    for name, source in [('candidate', candidate), ('benchmark', benchmark), ('reference', baseline),
                          ('cartridge.gbc', rom), ('pallet.state', pallet), ('route.state', route)]:
         shutil.copy2(source, root / name)
     provenance = {name: sha(root / name) for name in
-                  ('candidate', 'reference', 'cartridge.gbc', 'pallet.state', 'route.state')}
+                  ('candidate', 'benchmark', 'reference', 'cartridge.gbc', 'pallet.state', 'route.state')}
     (root / 'inputs.json').write_text(json.dumps(provenance, indent=2) + '\n')
     env = os.environ.copy()
     env.update(SDL_VIDEODRIVER='offscreen', SDL_AUDIODRIVER='dummy', QA_CAPTURE_STATES='1')
@@ -40,14 +40,14 @@ def main():
     env.pop('QA_FULL_NEGATIVES', None)
     results = []
 
-    def run(label, binary, fixture, mode, **settings):
+    def run(label, binary, fixture, mode, *arguments, **settings):
         directory = root / label
         directory.mkdir()
         (directory / "logs").mkdir()
         captures = directory / 'captures'
         captures.mkdir()
         with (directory / 'run.log').open('w') as log:
-            subprocess.run([str(root / binary), str(root / 'cartridge.gbc'), str(root / fixture), mode],
+            subprocess.run([str(root / binary), str(root / 'cartridge.gbc'), str(root / fixture), mode, *arguments],
                            cwd=directory, env={**env, **settings}, stdout=log,
                            stderr=subprocess.STDOUT, check=True)
         text = (directory / 'run.log').read_text()
@@ -86,33 +86,41 @@ def main():
     # Same scene, driver, process setup and synchronization. Alternate order to
     # expose warm-up/drift rather than comparing against an unrelated old number.
     performance = []
-    for mode in ('catalog', 'interior-catalog', 'ortho-benchmark', 'fp-benchmark'):
+    gpu_names = set()
+    for mode in ('catalog', 'interior-catalog', 'ortho', 'fp'):
         groups = {'reference': [], 'candidate': []}
         for repeat in range(3):
             order = ('reference', 'candidate') if repeat % 2 == 0 else ('candidate', 'reference')
             for binary in order:
                 fixture = 'pallet.state' if 'catalog' in mode else 'route.state'
-                _, text = run(f'perf-{mode}-{repeat}-{binary}', binary, fixture, mode,
-                              QA_MENU_STYLE='integrated', QA_ART_PASS='on' if binary == 'candidate' else 'off',
-                              CATALOG_BENCH_FRAMES='60')
-                if 'catalog' in mode:
-                    samples = [float(n) for n in re.findall(r'\[PERF\].*mean_ms=([0-9.]+)', text)]
-                    assert len(samples) == (179 if mode == 'interior-catalog' else 38)
-                else:
-                    samples = [float(n) for n in re.findall(r'\[FPBENCH\].*median=([0-9.]+)', text)]
-                    assert len(samples) == 1
+                _, text = run(f'perf-{mode}-{repeat}-{binary}',
+                              'benchmark' if binary == 'candidate' else 'reference', fixture, mode,
+                              'on' if binary == 'candidate' else 'off', '-1')
+                entries = re.findall(r'\[ART-PERF\] mode=(\S+) map=(-?\d+) sample=(\d+) frames=(\d+) mean_ms=([0-9.]+) vertices=(\d+)', text)
+                batches = 3 if 'catalog' in mode else 7
+                maps = 179 if mode == 'interior-catalog' else 38 if mode == 'catalog' else 1
+                assert len(entries) == maps * batches
+                assert len({entry[1] for entry in entries}) == maps
+                for map_id in {entry[1] for entry in entries}:
+                    assert {int(e[2]) for e in entries if e[1] == map_id} == set(range(batches))
+                assert all(e[0] == mode and int(e[3]) == (30 if 'catalog' in mode else 100)
+                           and int(e[5]) > 0 for e in entries)
+                samples = [float(e[4]) for e in entries]
+                gpu = re.findall(r'\[ART-GPU\] (.+)', text)
+                assert len(gpu) == 1
+                gpu_names.add(gpu[0])
                 assert all(n > 0 for n in samples)
                 groups[binary].append(samples)
         means = {key: statistics.mean(n for run in values for n in run) for key, values in groups.items()}
         ratio = means['candidate'] / means['reference']
         assert ratio <= 2.0, (mode, ratio)
         performance.append(dict(mode=mode, samples_ms=groups, mean_ms=means, ratio=ratio,
-                                statistic='mean of map presentation means' if 'catalog' in mode else
-                                          'mean of three process medians (seven 100-frame batches each)'))
+                                statistic='arithmetic mean of synchronized presentation batches; invariant checks excluded'))
+    assert len(gpu_names) == 1, gpu_names
     for name, expected in provenance.items():
         assert sha(root / name) == expected
     report = dict(status='PASS', phase='A1', inputs=provenance, catalogs=results, performance=performance,
-                  reviewed=False, note='Contacts must be reviewed separately before phase acceptance.')
+                  gpu=sorted(gpu_names), reviewed=False, note='Contacts must be reviewed separately before phase acceptance.')
     (root / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
     print(f'PASS: A1 art reference, both cameras/styles and paired performance; {root}')
 

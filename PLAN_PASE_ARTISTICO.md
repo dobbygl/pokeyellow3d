@@ -1,6 +1,6 @@
 # Plan: pase artístico e iluminación
 
-Fecha: 2026-09-22. Estado: propuesto; ninguna fase iniciada. Desarrolla el
+Fecha: 2026-09-22. Estado: A1 en curso; ninguna fase acreditada. Desarrolla el
 punto 3 de `PLAN_MEJORAS.md`.
 
 ## Análisis del estado actual
@@ -417,3 +417,21 @@ es el registro versionado de alcance, decisiones y evidencia.
   Implementación en una worktree aislada mientras `7955aaa` genera las
   referencias privadas; no se recompila su binario con código de A1.
 - Ningún criterio de A1 acreditado todavía.
+
+### A1 — recuperación de evidencia y medición reproducible
+
+- Se borró permanentemente `build/qa` durante las regresiones. El usuario
+  confirmó el borrado y pidió continuar. Diez archivos privados externos
+  conservan 1.238 capturas, sus fixtures y el helper de referencia; el
+  proceso interrumpido terminó con error y no acredita el gate completo.
+- `build/qa/logs/art-recovery.json` registra los hashes recuperados y las
+  rutas privadas. Hay que reconstruir las referencias perdidas de v0.3.0
+  y repetir las comparaciones; no se rebajan sus requisitos.
+- `tests/art_benchmark.cpp` mide la media de lotes sincronizados con
+  `glFinish`, excluyendo del tiempo los controles de memoria y GL por frame.
+  El mismo driver se enlaza con las bibliotecas congeladas de `7955aaa` y
+  con A1; alterna el orden de ejecución sobre el mismo dispositivo.
+  Incluye los catálogos completos y ambas cámaras con cinco mapas residentes.
+- La nueva fixture del benchmark queda registrada en CTest con etiqueta
+  `rom` y salto explícito 77 cuando falta el material privado.
+- La PR #29 sigue en borrador; ninguna fase ni criterio queda cerrado.

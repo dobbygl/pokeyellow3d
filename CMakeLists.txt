@@ -220,7 +220,22 @@ if(CMAKE_PROJECT_NAME STREQUAL "pokeyellow")
             target_link_options(pallet_render_smoke PRIVATE
                 "LINKER:--wrap=SDL_GetTicks" "LINKER:--wrap=SDL_Delay")
         endif()
+        add_executable(art_benchmark tests/art_benchmark.cpp)
+        target_include_directories(art_benchmark PRIVATE src)
+        target_link_libraries(art_benchmark PRIVATE pokeyellow_cart gbrt)
+        target_compile_definitions(art_benchmark PRIVATE SDL_MAIN_HANDLED)
+        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+            target_sources(art_benchmark PRIVATE tests/qa_sdl_clock.cpp)
+            target_compile_definitions(art_benchmark PRIVATE QA_DETERMINISTIC_SDL_CLOCK)
+            target_link_options(art_benchmark PRIVATE
+                "LINKER:--wrap=SDL_GetTicks" "LINKER:--wrap=SDL_Delay")
+        endif()
         include(cmake/SyntheticTests.cmake)
+        add_test(NAME art_benchmark_fixture COMMAND art_benchmark
+            "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc"
+            "${CMAKE_CURRENT_BINARY_DIR}/qa/art-fixtures/five-maps.state" ortho off -1)
+        set_tests_properties(art_benchmark_fixture PROPERTIES
+            LABELS rom SKIP_RETURN_CODE 77 ENVIRONMENT "${preview_environment}")
         if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc")
             add_test(NAME rom_font_cartridge COMMAND rom_font_test "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc")
             add_test(NAME rom_font_vram COMMAND rom_font_test "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc" "${CMAKE_CURRENT_BINARY_DIR}/qa/ui/font.vram")

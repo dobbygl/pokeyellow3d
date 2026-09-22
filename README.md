@@ -76,12 +76,12 @@ Options, the trainer card and naming keyboard preserve the original text, graphi
 
 ### Prebuilt packages
 
-Download [v0.3.0 for Linux or Windows x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.3.0), extract the complete ZIP, and follow its `RUN.md`. Supply your matching ROM as `roms/pokeyellow.gbc` beside the executable. Packages contain no ROM, game assets or save.
+Download [v0.4.0 for Linux or Windows x86_64](https://github.com/dobbygl/pokeyellow3d/releases/tag/v0.4.0), extract the complete ZIP, and follow its `RUN.md`. Supply your matching ROM as `roms/pokeyellow.gbc` beside the executable. Packages contain no ROM, game assets or save.
 
 - **Linux:** built on Ubuntu 24.04; uses system SDL2, libcurl and OpenGL/GLES libraries listed in `DEPENDENCIES.txt`. Open a terminal in the package directory and run `./pokeyellow3d`.
 - **Windows 10/11 x64:** includes SDL2, CURL, ANGLE and MSVC runtime DLLs. Double-click `Start.cmd`, which selects the package directory before launching. Keep the DLLs beside the executable; no compiler or vcpkg installation is required.
 
-The expanded full-screen menus shown here are available in source builds while v0.4.0 is in development. The v0.3.0 packages include the earlier integrated world and battle menus.
+Version v0.4.0 includes the integrated PC, party, summary, bag, mart, Pokédex list, options, trainer card and naming screens shown above. Classic presentation remains available in Esc.
 
 Each ZIP has a companion `.sha256` checksum. The launcher is included in `pokeyellow3d`; it starts the game once the matching user-supplied ROM is available.
 

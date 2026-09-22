@@ -1,7 +1,7 @@
 # Plan: pantallas completas con el estilo integrado
 
-Fecha: 2026-09-22. Estado: A1–A3 fusionadas; A4 validada, pendiente de fusión.
-23/24 criterios acreditados. Base: release v0.3.0.
+Fecha: 2026-09-22. Estado: A1–A4 fusionadas.
+24/24 criterios acreditados. Base de la entrega: release v0.4.0. Referencia clásica: v0.3.0.
 
 ## Análisis del estado actual
 
@@ -198,7 +198,7 @@ Criterios de aceptación:
 - [x] Los recorridos de A4 añadidos a `ui_style_qa.sh` pasan glifo a glifo, cursor y memoria intacta por frame en ambas cámaras, con respaldo ante detección o fuente inválida.
 - [x] Las animaciones de las nuevas pantallas usan ciclos del motor, se congelan con Esc o sin foco, no retrasan texto ni entradas y respetan cargas y regiones compartidas; hay evidencia reproducible.
 - [x] CTest completo, pruebas independientes sin ROM, formato, todas las baterías clásicas e integradas pasan; todas las referencias clásicas y las 38 exteriores siguen idénticas a v0.3.0.
-- [ ] Ejecutable compilado, PALLET3D con tabla completa y casos clásicos, README con capturas nuevas y contactos revisados están entregados; A4 pasa CI y su fusión deja las cuatro fases y todos los criterios en main.
+- [x] Ejecutable compilado, PALLET3D con tabla completa y casos clásicos, README con capturas nuevas y contactos revisados están entregados; A4 pasa CI y su fusión deja las cuatro fases y todos los criterios en main.
 
 ## Limitaciones asumidas
 
@@ -1113,3 +1113,26 @@ Se acredita el quinto criterio de A4: 23/24 en la rama. Solo queda acreditar
 la fusión de la PR #26 y reflejar la entrega completa en main. Después se
 publicará y verificará v0.4.0 para Linux y Windows; el goal sigue activo hasta
 comprobar los paquetes y checksums publicados.
+
+
+### Entrega de A4 y cierre de los 24 criterios, 2026-09-22
+
+La [PR #26](https://github.com/dobbygl/pokeyellow3d/pull/26) se fusiona el
+2026-09-22 a las 06:21:57 UTC. `main` contiene A4 en
+`153681da7780b00c63cf6790a4250a35958d8538`. Se verificaron los cinco checks
+requeridos en verde sobre `01121dc306edc59e469a6475ccbc074b4223a4b8` antes
+de fusionar. `fullscreen-a4-pr-final-checks.json` y
+`fullscreen-a4-pr-merged.json` conservan la comprobación externa.
+
+Se cotejan de nuevo los fuentes de `main` con los comprobados por las
+27 baterías clásicas y 82 recorridos integrados. El último criterio de
+entrega de A4 queda acreditado: las cuatro fases están fusionadas, el
+binario está compilado y la documentación y capturas forman parte de main.
+Esta actualización registra las 24 casillas cerradas y prepara la
+publicación v0.4.0 desde el mismo árbol de código validado.
+
+La publicación conserva el contrato de `.github/workflows/release.yml`:
+paquetes Linux y Windows x86_64, pruebas nativas sin ROM, comprobación del
+launcher extraído y checksums SHA-256. El cierre del goal exige verificar
+los archivos efectivamente publicados, no solamente crear el tag. Su
+informe privado se conserva en `build/qa/logs/fullscreen-v040-release-verified.json`.

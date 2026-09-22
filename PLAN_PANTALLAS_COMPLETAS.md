@@ -1,7 +1,7 @@
 # Plan: pantallas completas con el estilo integrado
 
 Fecha: 2026-09-22. Estado: A1–A3 fusionadas; A4 en desarrollo.
-12/24 criterios acreditados. Base: release v0.3.0.
+18/24 criterios acreditados. Base: release v0.3.0.
 
 ## Análisis del estado actual
 
@@ -1029,3 +1029,11 @@ el estado de un lanzamiento que captura al Pokémon mediante las reglas
 originales. No se inyecta el resultado. A4 no se cierra todavía: quedan las
 27 baterías clásicas frente a v0.3.0, la validación acumulativa sobre fuentes
 congeladas, CI, fusión y release. Ningún criterio nuevo se acredita aquí.
+
+La PR de A4 es [#26](https://github.com/dobbygl/pokeyellow3d/pull/26), inicialmente
+en borrador. El primer CI detecta C4456 en MSVC: los bucles locales `row`
+ocultan la variable del estado original. Esta se renombra a `logical_row`.
+Tras recompilar, tanto `pokeyellow3d` como el helper conservan exactamente
+sus SHA-256; `fullscreen-a4-msvc-rename-proof.json` registra la equivalencia.
+Las regresiones en curso mantienen por tanto el mismo código ejecutable.
+La cabecera del plan se corrige a los 18 criterios ya acreditados en sus casillas.

@@ -31,8 +31,8 @@ inline Snapshot prepare(const GBContext *ctx) {
         return out;
     out.type = battle::read(ctx, Type);
     int length = battle::read(ctx, Length), letter_case = battle::read(ctx, Case);
-    int row = battle::read(ctx, 0xcc26), column = battle::read(ctx, 0xcc25);
-    if (out.type > 2 || length > (out.type == 2 ? 10 : 7) || letter_case > 1 || row > 6 ||
+    int logical_row = battle::read(ctx, 0xcc26), column = battle::read(ctx, 0xcc25);
+    if (out.type > 2 || length > (out.type == 2 ? 10 : 7) || letter_case > 1 || logical_row > 6 ||
         column < 1 || column > 17 || !(column % 2) ||
         !pokemon_menu::icons_valid(ctx, out.type == 2 ? 1 : 0))
         return out;

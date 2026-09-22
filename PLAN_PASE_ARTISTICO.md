@@ -11,10 +11,11 @@ Punto de partida verificado en `src/pallet3d.cpp`, `src/world_scene.h`,
 
 | Elemento | Presentación actual | Mecanismo |
 | --- | --- | --- |
-| Suelo, caminos, hierba, arena | Plano con el tile original de 8 píxeles | `create_map` emite un quad por casilla con UV del atlas de 512×512 |
-| Árboles, rocas, vallas, carteles | Caja extruida con el tile en las caras | `box` y `quad` por familia de `pallet::Terrain` |
+| Suelo, caminos, arena | Plano con el tile original de 8 píxeles | `create_map` emite un quad por casilla con UV del atlas de 512×512 |
+| Árboles, rocas, vallas, carteles | Árboles con tronco y tres capas de cajas; rocas escalonadas y decoración por familia | `box` y `quad` por familia de `pallet::Terrain`; C1 mejora sus siluetas |
+| Hierba alta | Quads elevados con viento existente | Rama `Terrain::Grass` en `create_map` |
 | Casas y edificios | Prisma con tejado plano y laterales de tiles repetidos | `make_house` sobre las 140 regiones de `pallet::houses` |
-| Cornisas | Plano; el salto es un balanceo de cámara | Sin desnivel real |
+| Cornisas | Borde visual de cajas de hasta 0,32 unidades; suelo transitable plano | `Terrain::Ledge`; el salto añade balanceo de cámara |
 | Agua y flores | Animadas a la cadencia original desde 5A | `tile_animation.h` sube solo las celdas cambiadas del atlas |
 | Interiores | Paredes de dos unidades, mobiliario como cajas con altura por familia | `interior::classify`, `Kind::{Floor, Warp, Wall, Furniture, Counter, Water}` |
 | Casillas de interior sin regla | Planas con su tile original; 2.960 en 104 interiores | Columna `unclassified_flat_cells` de `build/qa/logs/interiors.csv` |
@@ -50,9 +51,9 @@ Hechos que condicionan el diseño:
   profundidad codificada en RGBA8 dentro de un framebuffer propio y leerla
   con un muestreo de 2×2. Es una técnica conocida y cabe en el presupuesto.
 - Un único programa dibuja mundo, interiores, combate y título. La
-  presentación ortográfica media es 1,42 ms y la primera persona con cinco
-  mapas residentes 3,64 ms sobre Intel UHD 620 a 800×720. El criterio del
-  punto 3 es no superar el doble.
+  documentación histórica mide 1,42 ms en ortográfica y 3,64 ms en primera
+  persona con cinco mapas sobre Intel UHD 620 a 800×720. Esos datos no
+  sustituyen la nueva medición de `7955aaa` en este equipo. El límite es 2,0×.
 - Las 38 capturas exteriores y las 179 de interiores son la puerta de
   regresión de todos los planes anteriores. Este plan cambia el aspecto por
   definición; necesita un ajuste que conserve la imagen actual y una
@@ -159,13 +160,15 @@ Trabajo:
   existente encaje; documentar cada regla con el tileset y el índice.
 - Repetir `interior_audit` y la batería de interiores; el CSV debe dar cero
   en `unclassified_flat_cells` para los 179 interiores.
-- Revisar contactos de los 25 tilesets de interior con el pase activado.
+- Revisar contactos de los 25 tilesets con el pase activado: el audit de
+  `7955aaa` confirma 21 usados en los 179 interiores y cuatro solo exteriores;
+  los contactos identifican esa distinción sin inventar interiores.
 
 Criterios de aceptación:
 
 - [ ] `build/qa/logs/interiors.csv` registra cero casillas sin clasificar en los 179 interiores y cero gráficos desconocidos.
 - [ ] Ningún mueble oculta permanentemente al jugador ni bloquea la lectura de un cuadro de texto en ambas cámaras.
-- [ ] Contactos de los 25 tilesets revisados y la batería de interiores en PASS en ambos modos.
+- [ ] Contactos de los 25 tilesets revisados (21 de interiores y cuatro exteriores), y la batería de los 179 interiores en PASS en ambos modos.
 
 ## Bloque B: iluminación
 
@@ -396,4 +399,10 @@ es el registro versionado de alcance, decisiones y evidencia.
   pendiente de confirmación y privacidad de las capturas.
 - `git ls-remote --tags origin 'refs/tags/v0.4.*'` solo devuelve v0.4.0;
   referencia efectiva fijada a `7955aaa0ddbba3d9e2fd78085902be167faccf23`.
+- `build/interior_audit build/roms/pokeyellow.gbc > build/qa/logs/art-baseline-interiors.csv`
+  confirma 179 interiores, 2.960 casillas pendientes en 104 mapas, cero
+  gráficos desconocidos y 21 tilesets interiores de 25 totales. Resumen en
+  `build/qa/logs/art-baseline-interior-summary.json`.
+- Corregida la descripción de geometría existente: ya hay troncos/copas de
+  cajas, hierba elevada y bordes de cornisa; C1 mejora esa geometría.
 - Sin criterios marcados: faltan todavía las ocho fases y su evidencia.

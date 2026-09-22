@@ -83,8 +83,10 @@ C generado, y cualquier alteración del movimiento por casillas.
 ## Decisiones de arquitectura
 
 1. Un ajuste persistente "Pase artístico" con dos valores: desactivado, que
-   produce la imagen de v0.4.1 byte a byte, y activado, que es el objeto de
-   este plan. Valor por defecto activado. La referencia clásica se conserva
+   produce la imagen de v0.4.1 byte a byte salvo las excepciones autorizadas
+   de Esc y del panel residual de transición descritas en Validación, y
+   activado, que es el objeto de este plan. Valor por defecto activado.
+   La referencia clásica se conserva
    para las pruebas; el modo activado obtiene su propia referencia archivada
    tras revisión.
 2. Un manifiesto de familias en `src/art_manifest.h`: para cada familia de
@@ -548,3 +550,30 @@ figuran en `inputs.json`, los informes de procedencia del benchmark y
 - Los binarios anteriores se conservan mientras terminan sus recorridos.
   La versión corregida requiere su propia validación; las pruebas anteriores
   no acreditan automáticamente el cambio. La fase sigue sin cerrar.
+- En `82c039e`, la corrección solo suprime el dibujo de la decoración de
+  cierre durante `warp_overlay`; la evolución de la animación continúa.
+  Se comprueban ocho recorridos de salida blanca: ambos estilos, ambas
+  cámaras y ambos estados del pase, sin relajar los oráculos de transición.
+- Frente a la producción original, el estilo clásico conserva todas las
+  imágenes y los estados en ambas cámaras. En integrado solo cambia la
+  captura `white/logs/warp-01-map-012-bgp-00.ppm` del inventario histórico;
+  el recorrido adicional `white-fp` verifica la misma corrección en primera
+  persona. Todos los estados siguen siendo idénticos. La imagen corregida
+  debe ser blanca en sus 800×720 píxeles; en la original, los píxeles del
+  panel están limitados al rectángulo inclusivo (95, 549)–(704, 710).
+  El diagnóstico original conserva su salida 41 y sus nueve fotogramas
+  rechazados, 3883–3891; nunca se registra como prueba aprobada.
+- El verificador de la excepción rechaza un byte distinto del motor, la
+  imagen en otra batería, el mismo nombre en otra ruta y un solo píxel no
+  blanco en el resultado. No hay tolerancia visual general ni excepción
+  para estados. Evidencia: `art-transition-exception-validator.json`,
+  `art-a1-fixed-white.json` y `art-original-white-fp.json`.
+- El script completo de transiciones, ampliado con `transitions-white-fp`,
+  pasa con 132 capturas y 132 estados por estilo; los archivos privados se
+  verifican byte a byte tras comprimirlos. Informe:
+  `build/qa/logs/art-final-transition-suites.json`. También pasan los 49
+  tests con ROM, los 28 sin ROM y los cinco trabajos requeridos de CI de
+  Linux/Windows para `82c039e` (ejecución `35791107179`).
+- Las regresiones completas, los recorridos acumulados y el gate artístico
+  del binario corregido siguen pendientes de cierre. Estos resultados
+  parciales no acreditan todavía la fase A1.

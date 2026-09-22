@@ -494,7 +494,7 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     if (framed_overlay && overlay_alpha > 0) {
         scene_filter::capture(w, h);
         scene_filter::draw(w, h);
-        if (styled && pokemon_menu::draw(ctx, w, h))
+        if (styled && (pokemon_menu::draw(ctx, w, h) || full_menu::draw_items(ctx, w, h)))
             return;
         lcd_overlay::framed(gb_get_framebuffer(ctx), float(w), float(h), overlay_alpha);
         return;

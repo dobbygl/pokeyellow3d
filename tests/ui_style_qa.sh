@@ -25,6 +25,8 @@ echo "QA output: $qa_dir"
 "$project/tests/ui_crossfade_qa.sh" "$rom" "$pallet" "$battle" > "$qa_dir/logs/crossfade.log" 2>&1
 "$project/tests/ui_full_pc_qa.sh" "$rom" "$pc_world" > "$qa_dir/logs/full-pc.log" 2>&1
 "$project/tests/ui_full_pokemon_qa.sh" "$rom" "$world" "$battle" > "$qa_dir/logs/full-pokemon.log" 2>&1
+"$project/tests/ui_full_items_qa.sh" "$rom" "$world" "$battle" > "$qa_dir/logs/full-items.log" 2>&1
+"$project/tests/ui_full_dex_qa.sh" "$rom" "$world" > "$qa_dir/logs/full-dex.log" 2>&1
 for style in classic integrated; do
     for operation in write read; do
         SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
@@ -71,6 +73,12 @@ report['full-pc'] = dict(directory=str(full_pc_root), scenarios=json.loads((full
 pokemon_text = (root / 'logs/full-pokemon.log').read_text()
 pokemon_root = Path(re.search(r'QA output: (\S+)', pokemon_text)[1])
 report['full-pokemon'] = dict(directory=str(pokemon_root), scenarios=json.loads((pokemon_root / 'logs/pokemon.json').read_text()))
+items_text = (root / 'logs/full-items.log').read_text()
+items_root = Path(re.search(r'QA output: (\S+)', items_text)[1])
+report['full-items'] = dict(directory=str(items_root), scenarios=json.loads((items_root / 'logs/items.json').read_text()))
+dex_text = (root / 'logs/full-dex.log').read_text()
+dex_root = Path(re.search(r'QA output: (\S+)', dex_text)[1])
+report['full-dex'] = dict(directory=str(dex_root), scenarios=json.loads((dex_root / 'logs/dex.json').read_text()))
 for camera in ('menu-motion', 'menu-motion-fp'):
     content = (root / camera / 'logs/run.log').read_text()
     assert 'PASS: real Start animation' in content, camera

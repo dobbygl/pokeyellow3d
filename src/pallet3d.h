@@ -76,6 +76,11 @@ struct PalletDexInfo {
     int row;
 };
 PalletDexInfo pallet3d_dex();
+struct PalletDexMenuInfo {
+    bool active = false, fallback = true;
+    std::array<int, 4> left{}, top{}, scale{};
+};
+PalletDexMenuInfo pallet3d_dex_menu();
 struct PalletAreaInfo {
     bool active, ready, blink;
     int species;

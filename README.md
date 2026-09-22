@@ -54,7 +54,11 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 | --- | --- |
 | [![Original item list, quantities and dialogue over the PC monitor in first person](docs/screenshots/integrated-player-pc.png)](docs/screenshots/integrated-player-pc.png) | [![Oak's original evaluation prompt and Yes/No choices, with seen and caught counters](docs/screenshots/integrated-oak-pc.png)](docs/screenshots/integrated-oak-pc.png) |
 | **Pokédex** | **Hall of Fame** |
-| [![Pokédex with shared-font counters and options, retaining the original list and portrait](docs/screenshots/integrated-pokedex.png)](docs/screenshots/integrated-pokedex.png) | [![Saved champion team on the Hall of Fame pedestals, with original labels and native information windows](docs/screenshots/integrated-hall.png)](docs/screenshots/integrated-hall.png) |
+| [![Original Pokedex list, caught marker, counters and side options in themed panels on the device](docs/screenshots/integrated-pokedex-list.png)](docs/screenshots/integrated-pokedex-list.png) | [![Saved champion team on the Hall of Fame pedestals, with original labels and native information windows](docs/screenshots/integrated-hall.png)](docs/screenshots/integrated-hall.png) |
+
+| Bag | Mart | Battle inventory |
+| --- | --- | --- |
+| [![Original bag names, quantities, cursor and retained Start window](docs/screenshots/integrated-bag.png)](docs/screenshots/integrated-bag.png) | [![Original stock, money, quantity and purchase confirmation in full-screen themed panels](docs/screenshots/integrated-mart.png)](docs/screenshots/integrated-mart.png) | [![Battle bag preserving original HUD and portrait fragments outside its item list](docs/screenshots/integrated-battle-bag.png)](docs/screenshots/integrated-battle-bag.png) |
 
 | Party | Pokémon summary | Moves and experience |
 | --- | --- | --- |
@@ -69,14 +73,14 @@ Download [v0.3.0 for Linux or Windows x86_64](https://github.com/dobbygl/pokeyel
 - **Linux:** built on Ubuntu 24.04; uses system SDL2, libcurl and OpenGL/GLES libraries listed in `DEPENDENCIES.txt`. Open a terminal in the package directory and run `./pokeyellow3d`.
 - **Windows 10/11 x64:** includes SDL2, CURL, ANGLE and MSVC runtime DLLs. Double-click `Start.cmd`, which selects the package directory before launching. Keep the DLLs beside the executable; no compiler or vcpkg installation is required.
 
-The integrated style shown above is currently available in source builds; the v0.2.0 packages retain the classic interface.
+The expanded full-screen menus shown here are available in source builds while v0.4.0 is in development. The v0.3.0 packages include the earlier integrated world and battle menus.
 
 Each ZIP has a companion `.sha256` checksum. The launcher is included in `pokeyellow3d`; it starts the game once the matching user-supplied ROM is available.
 
 ### Requirements
 
 ROM-backed journeys and capture comparisons run on Linux with Mesa. Native
-Windows/MSVC builds and all eighteen ROM-independent tests, including the
+Windows/MSVC builds and all twenty-four ROM-independent tests, including the
 Windows/ANGLE renderer, pass in CI. macOS has not been validated.
 
 - Git and CMake **3.18 or newer**.
@@ -193,7 +197,7 @@ Integrated panel backgrounds fade and move over about 150 ms using the Game Boy 
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
 | Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
 | Menus and transitions | A1/A2/A3, B1/B2 and C1/C2/C3 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle/save-state transitions, original boot into the 3D title, and Fly/Teleport/Dig travel. |
-| Integrated menus and HUD | Original ROM glyphs for recognized world and battle windows, names and compatible labels; complete Bill, player and Oak PC lists over their 3D backgrounds. Shared theme and persistent classic fallback. See `PLAN_ESTILO_MENUS.md` and `PLAN_PANTALLAS_COMPLETAS.md` for phase acceptance evidence. |
+| Integrated menus and HUD | Original ROM glyphs for recognized world and battle windows, names and compatible labels; complete Bill, player and Oak PC lists over their 3D backgrounds, party/summary, bag, full mart and the Pokedex list. Shared theme and persistent classic fallback. See `PLAN_ESTILO_MENUS.md` and `PLAN_PANTALLAS_COMPLETAS.md` for phase acceptance evidence. |
 | Pokédex and PC | 3D list/data device, ROM-verified portraits, AREA overview and Bill’s twelve-box storage are implemented. The item PC and Oak show live counters; the Hall of Fame reads saved teams from cartridge RAM into a pedestal gallery. |
 
 The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, and neighboring-map NPCs are not simulated. The engine may freeze an offscreen NPC; the renderer preserves that live state instead of inventing movement. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.

@@ -127,12 +127,16 @@ inline bool upload_graphics(const uint8_t *rom, size_t size) {
 }
 inline Drawn regions(const uint8_t *tiles, const uint8_t *vram, const uint8_t *rom, size_t rom_size,
                      const uint32_t *framebuffer, const menu_layout::Layout &layout, float width,
-                     float height, Placement placement = Placement::World) {
+                     float height, Placement placement = Placement::World,
+                     const Plan *positioned = nullptr) {
     Drawn drawn;
     const auto &font = rom_font::get(rom, rom_size);
-    auto plan =
-        prepare(tiles, vram, font, layout, width, height, ui_theme::Padding,
-                ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale, placement, rom, rom_size);
+    // Device screens may supply a validated plan positioned on their projected
+    // surfaces. Glyph validation and ownership still come from prepare().
+    auto plan = positioned ? *positioned
+                           : prepare(tiles, vram, font, layout, width, height, ui_theme::Padding,
+                                     ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale,
+                                     placement, rom, rom_size);
     if (placement == Placement::Full &&
         (!plan.count || !upload(font) || !upload_graphics(rom, rom_size) ||
          std::any_of(plan.panels.begin(), plan.panels.begin() + plan.count,

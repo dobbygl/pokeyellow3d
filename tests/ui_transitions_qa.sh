@@ -37,8 +37,9 @@ run house-fp house.state transitions-fp
 run mart mart.state transitions
 run mart-fp mart.state transitions-fp
 run white route.state transitions-white
+run white-fp route.state transitions-white-fp
 run reload house.state transition-reload ../house/logs/reds-house-1f.state
 run reload-fp house.state transition-reload-fp ../house/logs/reds-house-1f.state
-python3 "$project/tests/check_ui_traces.py" {house,house-fp,mart,mart-fp,white}/logs/bgp.csv | tee logs/traces.txt
+python3 "$project/tests/check_ui_traces.py" {house,house-fp,mart,mart-fp,white,white-fp}/logs/bgp.csv | tee logs/traces.txt
 sha256sum --check logs/inputs.sha256
 printf 'PASS: C1 doors, stairs, elevator, white return and savestate fade; evidence in %s\n' "$qa_dir" | tee logs/result.txt

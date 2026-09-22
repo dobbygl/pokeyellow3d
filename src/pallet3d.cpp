@@ -1489,6 +1489,8 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         return;
     }
     if (warp_overlay) {
+        // Closing menu decoration must not survive above the map fade.
+        menu_text::motion_suppressed = true;
         auto tone = fade::tone(ctx->io[0x47]);
         if (!(ctx->io[0x40] & 0x80))
             tone = {0, ctx->io[0x47] == 0 ? 1.f : 0.f};

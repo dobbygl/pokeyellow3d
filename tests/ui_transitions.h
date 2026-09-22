@@ -109,9 +109,16 @@ inline int run(GBContext *ctx, bool fp, bool white = false) {
     palettes.clear();
     qa_frame_observer = observe;
     int result = 0;
-    if (white)
+    if (white) {
+        if (fp) {
+            SDL_Event event{};
+            event.type = SDL_KEYDOWN;
+            event.key.keysym.scancode = SDL_SCANCODE_F3;
+            pallet3d_event(&event, false);
+        }
+        require(pallet3d_firstperson() == fp, "white return uses the requested camera", 0);
         result = battle_menus(ctx);
-    else if (pallet::read(ctx, pallet::Map) == 0)
+    } else if (pallet::read(ctx, pallet::Map) == 0)
         result = interior_journey(ctx, fp);
     else {
         if (fp) {

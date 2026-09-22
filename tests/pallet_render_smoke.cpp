@@ -497,8 +497,9 @@ int main(int argc, char **argv) {
         gb_platform_shutdown();
         return result;
     }
-    if (argc > 3 && !std::strcmp(argv[3], "transitions-white")) {
-        int result = transition_qa::run(ctx, false, true);
+    if (argc > 3 && (!std::strcmp(argv[3], "transitions-white") ||
+                     !std::strcmp(argv[3], "transitions-white-fp"))) {
+        int result = transition_qa::run(ctx, !std::strcmp(argv[3], "transitions-white-fp"), true);
         gb_platform_shutdown();
         return result;
     }

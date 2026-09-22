@@ -144,7 +144,7 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Con el pase desactivado, las 38 capturas exteriores, las 179 de interiores y las baterías de menús, combate, PC, Pokédex y título son idénticas byte a byte a v0.4.1.
+- [ ] Con el pase desactivado, las 38 capturas exteriores, las 179 de interiores y las baterías de menús, combate, PC, Pokédex y título son idénticas byte a byte a v0.4.1, salvo el panel de Esc y la eliminación autorizada de paneles residuales durante transiciones.
 - [x] Un fichero de preferencias de cualquier versión anterior sigue cargando y el ajuste se conserva tras reiniciar.
 - [x] El manifiesto cubre todas las familias y `tests/art_qa.sh` produce las capturas y las medidas de rendimiento de ambos modos.
 
@@ -326,6 +326,11 @@ Criterios de aceptación:
   baterías `tests/*_qa.sh` con el pase desactivado antes y después de cada
   fase; capturas idénticas a `7955aaa` en ambos estilos y cámaras; además,
   clásico idéntico a v0.3.0 (2.765 capturas y 38 exteriores).
+  Las únicas excepciones autorizadas son la interfaz del panel de Esc y la
+  eliminación de la decoración de menús residuales durante las transiciones
+  del juego. Esta última se limita a los paneles de cierre integrados que
+  quedaban sobre el fundido; no permite diferencias del mundo ni del estado
+  del motor. Cada diferencia se registra y verifica, sin tolerancias generales.
 - `tests/art_qa.sh` con el pase activado tras cada fase: catálogo exterior,
   catálogo de interiores, recorridos de Kanto y primera persona, tres horas
   del día, medición de rendimiento y comparación con la referencia
@@ -516,11 +521,9 @@ figuran en `inputs.json`, los informes de procedencia del benchmark y
   copia privada que suprime esa decoración durante `warp_overlay` pasa el
   recorrido completo y conserva el estado del motor del mismo fotograma.
   Evidencia privada: `art-transition-probe/result.json` y capturas antes/después.
-- Aplicar esa corrección al modo desactivado contradice la identidad visual
-  estricta solicitada. La decisión sobre una excepción acotada está pendiente
-  del usuario. La corrección permanece en la copia privada; esta incidencia
-  no se cuenta como una prueba aprobada. Continúan las comprobaciones de A1;
-  la fase y su fusión siguen pendientes.
+- Aplicar esa corrección al modo desactivado requería una excepción acotada a
+  la identidad visual solicitada. Se preparó y verificó primero en una copia
+  privada; la incidencia original no se cuenta como una prueba aprobada.
 - Un recorrido diagnóstico completo confirma que A1 desactivado conserva
   exactamente las 18 capturas y los 18 estados de `7955aaa`, incluidos los
   nueve fotogramas rechazados, 3883–3891. El diagnóstico continúa para recoger
@@ -531,3 +534,17 @@ figuran en `inputs.json`, los informes de procedencia del benchmark y
   `art-transition-fix-scope.json` delimita esa diferencia. Las 139 piezas de
   evidencia del diagnóstico y de la corrección aislada tienen una copia
   privada fuera de `build/qa`, verificada byte a byte al leer el archivo.
+
+### A1 — corrección de transición autorizada
+
+- El usuario autoriza corregir y documentar la excepción visual acotada de
+  los paneles residuales durante transiciones, también con el pase apagado.
+  Se suprime únicamente su decoración de cierre mientras `warp_overlay`
+  presenta el fundido original. No se modifica el estado del motor.
+- Antes de esta corrección, A1 completó las 27 baterías clásicas: 2.755
+  imágenes del juego y los 2.427 estados son idénticos a ambas referencias;
+  las diez imágenes de Esc son la excepción de interfaz ya autorizada.
+  `art-a1-classic-complete.json` registra la auditoría de todos los archivos.
+- Los binarios anteriores se conservan mientras terminan sus recorridos.
+  La versión corregida requiere su propia validación; las pruebas anteriores
+  no acreditan automáticamente el cambio. La fase sigue sin cerrar.

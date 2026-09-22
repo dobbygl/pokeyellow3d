@@ -452,3 +452,56 @@ PR #23 fusionada a las 01:16:09 UTC, merge
 `fullscreen-a2` parte de ese merge; se inicia el inventario de equipo y resumen,
 sin modificar todavía su renderizado. La fuente original y las referencias
 clásicas continúan fijadas a los mismos commits de pret y v0.3.0.
+
+### A2: implementación y validación inicial — 2026-09-22
+
+`pokemon_menu_state.h` reconoce equipo, acciones y las dos páginas de resumen
+por llamadas originales activas y geometría verificada. Los gráficos tienen
+perfiles propios para equipo y resumen; se comprueban ambos planos de VRAM,
+la fuente completa y el retrato descomprimido antes de presentar cualquier
+contenido integrado. Los iconos mantienen las dos fases del motor original.
+La selección del retrato lateral sigue la flecha pintada durante los frames
+pendientes de repintado. `DisplayFieldMoveMonMenu` añade una fila vacía sobre
+los movimientos de campo; esa variante está incluida.
+
+La experiencia procede del registro permanente de equipo, rival, caja o
+guardería. Se verificó que `CalcExpToLevelUp` sobrescribe `wLoadedMonExp`
+con la cantidad que falta, de modo que ese temporal no alimenta la barra.
+Evidencias privadas: `fullscreen-a2-source-inventory.json` (14 parejas de
+tilemap/estado), `fullscreen-a2-graphics-proof.json` (assets y patrones vivos)
+y `fullscreen-a2-stack-proof.json` (CALL de ROM y retornos activos).
+
+Validación inicial completada, sin cerrar todavía criterios de la fase:
+
+- CTest 40/40 y build independiente sin ROM 21/21; logs
+  `fullscreen-a2-ctest-initial.log` y `fullscreen-a2-no-rom-initial.log`.
+- Seis recorridos integrados en `build/qa/ui-full-pokemon-dwOSKY`: dos y seis
+  miembros, HP cero/mínimo/lleno, estados alterados, nivel 100, Corte/Surf,
+  pausa/carga, cinco respaldos negativos y resúmenes desde equipo/caja del PC,
+  en ambas cámaras. Los oráculos comprueban glifos, cobertura, cursor,
+  gráficos especiales y HP sobre la imagen final; la memoria se compara por
+  frame. El recorrido está incorporado a `tests/ui_style_qa.sh`.
+- Las 80 capturas y 80 estados de esos seis recorridos clásicos coinciden
+  exactamente con v0.3.0: `fullscreen-a2-compare-new-pokemon.json`. El renderer
+  de referencia permanece intacto; `fullscreen-a2-v030-new-driver-proof.json`
+  registra los hashes y el adaptador de diagnóstico exclusivo de pruebas.
+- Contactos de equipo, seis miembros y PC revisados en
+  `fullscreen-a2-{team,six,pc}-contact-review.json`. Tres imágenes del README
+  conservan todos los píxeles de las capturas, según
+  `fullscreen-a2-readme-images.json`.
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 \
+  tests/ui_full_pokemon_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-KfpanN/pallet.state
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=classic QA_CAPTURE_STATES=1 \
+  tests/ui_full_pokemon_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-KfpanN/pallet.state
+python3 build/qa/logs/run-fullscreen-a2-v030.py
+python3 tests/compare_classic_captures.py \
+  build/qa/ui-full-pokemon-v030-qdzd_4yu build/qa/ui-full-pokemon-vQsPXJ \
+  --report build/qa/logs/fullscreen-a2-compare-new-pokemon.json
+```
+
+Quedan pendientes la batería integrada acumulada, todas las regresiones
+clásicas y exteriores, el cierre de evidencia y la PR con CI verde.

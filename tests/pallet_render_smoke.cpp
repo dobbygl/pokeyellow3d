@@ -9,6 +9,7 @@ extern "C" {
 #include "pallet_state.h"
 #include "assets_manifest_pokeyellow.h"
 #include "mon_pic_cache.h"
+#include "pokemon_menu_state.h"
 #include <SDL_opengles2.h>
 #include <cstdio>
 #include <cstdlib>
@@ -53,6 +54,7 @@ static void capture_surface(const char *path) {
 #include "special_transitions.h"
 #include "dex_integration.h"
 #include "pc_integration.h"
+#include "pokemon_menu_integration.h"
 #include "pc_details_integration.h"
 #include "pc_hall_integration.h"
 #include "tile_animation_integration.h"
@@ -128,6 +130,31 @@ int main(int argc, char **argv) {
     }
     if (!gb_context_load_state_file(ctx, argv[2]))
         return 5;
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "pokemon-pc") || !std::strcmp(argv[3], "pokemon-pc-fp"))) {
+        int result = pokemon_qa::pc(ctx, std::strstr(argv[3], "-fp") != nullptr);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "pokemon") || !std::strcmp(argv[3], "pokemon-fp") ||
+         !std::strcmp(argv[3], "pokemon-six") || !std::strcmp(argv[3], "pokemon-six-fp"))) {
+        int result = pokemon_qa::run(ctx, std::strstr(argv[3], "-fp") != nullptr,
+                                     std::strstr(argv[3], "-six") != nullptr);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && !std::strcmp(argv[3], "pokemon-audit")) {
+        mon_pic::Cache portraits;
+        auto snapshot = pokemon_menu::prepare(ctx, portraits);
+        std::printf("[POKEMON] kind=%d valid=%d species=%d selected=%d count=%d bars=%zu "
+                    "experience=%d fraction=%.6f sp=%04x\n",
+                    int(snapshot.kind), snapshot.valid, snapshot.species, snapshot.selected,
+                    snapshot.count, snapshot.bar_count, snapshot.experience,
+                    snapshot.experience_fraction, ctx->sp);
+        gb_platform_shutdown();
+        return snapshot.valid ? 0 : 65;
+    }
     if (argc > 5 &&
         (!std::strcmp(argv[3], "preferences-write") || !std::strcmp(argv[3], "preferences-read"))) {
         pallet3d_load_preferences(argv[4]);

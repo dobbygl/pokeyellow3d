@@ -56,6 +56,10 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 | **Pokédex** | **Hall of Fame** |
 | [![Pokédex with shared-font counters and options, retaining the original list and portrait](docs/screenshots/integrated-pokedex.png)](docs/screenshots/integrated-pokedex.png) | [![Saved champion team on the Hall of Fame pedestals, with original labels and native information windows](docs/screenshots/integrated-hall.png)](docs/screenshots/integrated-hall.png) |
 
+| Party | Pokémon summary | Moves and experience |
+| --- | --- | --- |
+| [![Original party icons, cursor and HP with the selected Pokemon portrait](docs/screenshots/integrated-party.png)](docs/screenshots/integrated-party.png) | [![Pikachu's original portrait, statistics, status and HP in themed panels](docs/screenshots/integrated-summary.png)](docs/screenshots/integrated-summary.png) | [![Original moves and PP with a theme experience bar, over the retained first-person scene](docs/screenshots/integrated-moves.png)](docs/screenshots/integrated-moves.png) |
+
 ## Get started
 
 ### Prebuilt packages

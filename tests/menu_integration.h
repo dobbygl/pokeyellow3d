@@ -100,8 +100,10 @@ inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -
     auto info = pallet3d_menu();
     auto pc = pallet3d_pc();
     auto complete = pallet3d_full_menu();
+    auto pokemon = pallet3d_pokemon_menu();
     if (pallet3d_menu_style() == ui_preferences::Style::Integrated && pc.active &&
-        pc.mode >= int(pc_state::Mode::Center) && pc.mode <= int(pc_state::Mode::Oak)) {
+        pc.mode >= int(pc_state::Mode::Center) && pc.mode <= int(pc_state::Mode::Oak) &&
+        !pokemon.active) {
         bool corrupt_storage = pc.mode == int(pc_state::Mode::Bill) && !pc_storage::read(ctx).valid;
         run.require(complete.active && (corrupt_storage ? complete.fallback : !complete.fallback),
                     "supported PC capture is integrated; corrupt storage retains full LCD");
@@ -161,7 +163,8 @@ inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -
                         storage.uploads == pallet3d_storage().uploads,
                     "unchanged box/party bytes reuse shelf geometry and portraits");
     if (pallet3d_menu_style() == ui_preferences::Style::Integrated &&
-        ((!info.full && !pc.active) || (complete.active && !complete.fallback))) {
+        ((!info.full && !pc.active) || (complete.active && !complete.fallback) ||
+         (pokemon.active && !pokemon.fallback))) {
         run.require(ui_style_qa::enabled, "integrated capture requires per-frame glyph oracle");
         ui_style_qa::observe(ctx, w, h, false);
         full_menu_negative_controls(run);

@@ -24,6 +24,7 @@ echo "QA output: $qa_dir"
 "$project/tests/ui_battles_qa.sh" "$rom" "$wild" "$trainer" > "$qa_dir/logs/battles.log" 2>&1
 "$project/tests/ui_crossfade_qa.sh" "$rom" "$pallet" "$battle" > "$qa_dir/logs/crossfade.log" 2>&1
 "$project/tests/ui_full_pc_qa.sh" "$rom" "$pc_world" > "$qa_dir/logs/full-pc.log" 2>&1
+"$project/tests/ui_full_pokemon_qa.sh" "$rom" "$world" > "$qa_dir/logs/full-pokemon.log" 2>&1
 for style in classic integrated; do
     for operation in write read; do
         SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
@@ -67,6 +68,9 @@ assert sum(s['glyphs'] for s in report['menus']['scenarios']) > 0
 full_pc_text = (root / 'logs/full-pc.log').read_text()
 full_pc_root = Path(re.search(r'QA output: (\S+)', full_pc_text)[1])
 report['full-pc'] = dict(directory=str(full_pc_root), scenarios=json.loads((full_pc_root / 'logs/full-pc.json').read_text()))
+pokemon_text = (root / 'logs/full-pokemon.log').read_text()
+pokemon_root = Path(re.search(r'QA output: (\S+)', pokemon_text)[1])
+report['full-pokemon'] = dict(directory=str(pokemon_root), scenarios=json.loads((pokemon_root / 'logs/pokemon.json').read_text()))
 for camera in ('menu-motion', 'menu-motion-fp'):
     content = (root / camera / 'logs/run.log').read_text()
     assert 'PASS: real Start animation' in content, camera

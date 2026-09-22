@@ -1228,6 +1228,7 @@ void hud(GBContext *ctx) {
 
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
     full_menu::shown = {};
+    pokemon_menu::shown = {};
     menu_text::FrameEnd menu_frame_end{active, failed};
     battle3d::integrated_menu = false;
     battle3d::menu_panels = 0;
@@ -1486,7 +1487,8 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
             menu_blurred = scene_filter::draw(width, height);
             if (!menu_blurred)
                 draw_world_frame(width, height, {.42f, 0});
-            if (!menu_open)
+            if (!menu_open && !(menu_style == ui_preferences::Style::Integrated &&
+                                pokemon_menu::draw(ctx, width, height)))
                 lcd_overlay::framed(gb_get_framebuffer(ctx), float(width), float(height));
         } else if (!menu_open) {
             if (menu_style == ui_preferences::Style::Integrated)
@@ -1635,6 +1637,7 @@ void pallet3d_shutdown() {
     dex3d::shutdown();
     dex_area3d::shutdown();
     pc3d::shutdown();
+    pokemon_menu::shutdown();
     menu_text::shutdown();
     lcd_overlay::shutdown();
     scene_filter::shutdown();
@@ -1858,6 +1861,9 @@ PalletMenuInfo pallet3d_menu() {
 }
 PalletFullMenuInfo pallet3d_full_menu() {
     return full_menu::shown;
+}
+PalletPokemonMenuInfo pallet3d_pokemon_menu() {
+    return pokemon_menu::shown;
 }
 PalletPCInfo pallet3d_pc() {
     return {pc3d::presented && active,

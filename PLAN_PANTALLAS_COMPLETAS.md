@@ -1,6 +1,6 @@
 # Plan: pantallas completas con el estilo integrado
 
-Fecha: 2026-09-22. Estado: A1–A2 fusionadas; A3 validada, pendiente de fusión; A4 pendiente.
+Fecha: 2026-09-22. Estado: A1–A3 fusionadas; A4 en desarrollo.
 12/24 criterios acreditados. Base: release v0.3.0.
 
 ## Análisis del estado actual
@@ -175,7 +175,7 @@ Criterios de aceptación:
 - [x] Scroll, cursor, extremos y cambios de lista mantienen el orden y la selección del motor por frame; toda disposición o gráfico desconocido conserva el LCD enmarcado.
 - [x] Los recorridos de A3 añadidos a `ui_style_qa.sh` pasan glifo a glifo, cursor, memoria intacta y transiciones en ambas cámaras.
 - [x] CTest completo, pruebas independientes sin ROM, formato y todas las baterías clásicas pasan con capturas idénticas a v0.3.0, incluidas las 38 exteriores.
-- [ ] Contactos de mochila, tienda y Pokédex están revisados y registrados; A3 se fusiona con CI verde antes de comenzar A4.
+- [x] Contactos de mochila, tienda y Pokédex están revisados y registrados; A3 se fusiona con CI verde antes de comenzar A4.
 
 ### Fase A4: opciones, tarjeta de entrenador y nombres
 
@@ -884,3 +884,19 @@ Se acredita el quinto criterio de A3. El sexto espera la fusión verificada
 de la PR #25 después del CI del commit documental final. El commit anterior
 `d928a6c` ya pasó las cinco comprobaciones obligatorias en `35686222576`;
 ese resultado no sustituye al CI del nuevo commit. A4 no ha comenzado.
+
+
+### A3 fusionada; comienzo de A4 — 2026-09-22
+
+La PR [#25](https://github.com/dobbygl/pokeyellow3d/pull/25) se fusionó a las
+04:27:19 UTC con CI `35686785769` en verde en las cinco comprobaciones
+obligatorias del commit `0986e3c`. `main` contiene A3 en
+`3de5e528e87e0695eedfb30ccaff820a9893aab5`; los archivos de producción y los
+dos ejecutables coinciden con los validados. Las pruebas y la revisión visual
+están en `fullscreen-a3-evidence.json`; CI y fusión quedan registrados en
+`fullscreen-a3-ci-final-head.json` y `fullscreen-a3-merged.json`.
+
+Se acredita el sexto criterio de A3 tras verificar la fusión. La rama
+`fullscreen-a4` parte de ese `main`. A4 empieza por inventariar las disposiciones
+originales de opciones, tarjeta de entrenador y nombres de jugador, rival y
+Pokémon. Ningún criterio de A4 está acreditado todavía.

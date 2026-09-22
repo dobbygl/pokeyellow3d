@@ -615,3 +615,34 @@ A2 queda acreditada 6/6 y el plan alcanza 12/24.
 `fullscreen-a3` parte de esa fusión. Se inicia el inventario de mochila,
 tienda completa y lista de Pokédex, manteniendo el motor y las referencias
 clásicas fijadas a v0.3.0. Todavía no hay criterios acreditados de A3.
+
+
+### A3 — inventario inicial, 2026-09-22
+
+Se verifican doce parejas privadas de tilemap/estado en ambas cámaras:
+mochila, Pokédex y cuatro estados de compra. Inventario y SHA en
+`build/qa/logs/fullscreen-a3-source-inventory.json`; volcado legible en
+`fullscreen-a3-tilemaps.txt`. El script privado `inventory-fullscreen-a3.py`
+comprueba que cada tilemap coincide con la WRAM de su savestate.
+
+`home/list_menu.asm` confirma que mochila, venta y compra comparten la lista
+de cuatro filas pintadas —tres seleccionables antes de desplazar— y la
+cantidad `×`; compra/venta añaden precios y confirmaciones. Mochila conserva
+partes del menú Start detrás de su lista, por lo que hay que respetar el orden
+de ventanas original. La lista de Pokédex contiene siete entradas, con
+scroll de una o siete filas y un submenú independiente.
+
+Los gráficos de la Pokédex están cotejados: sus 288 bytes desde ROM `11018`
+coinciden con `gfx/pokedex/pokedex.png` y VRAM; `70/71` son el separador y
+`72` es la marca de captura, cargada desde `3AA28`. Se conserva la distinción
+respecto de esos mismos índices en otros perfiles gráficos. Evidencia:
+`fullscreen-a3-graphics-proof.json`; fuente original en
+`engine/gfx/load_pokedex_tiles.asm` y `engine/menus/pokedex.asm`.
+
+El puntero de lista está en `CF8A`, sus variantes en `CF93`, precio en
+`CF92` y cantidad en `CF95`, contrastados con `pokeyellow_internal.h` y
+`ram/wram.asm`. `fullscreen-a3-call-proof.json` contrasta con la ROM las
+llamadas originales de lista, acciones, cantidad y mensajes de mochila y
+compras/ventas. Faltan ampliar fixtures de venta, acciones, listas largas y
+vacías, implementar la presentación y ejecutar la validación completa.
+Todavía no se acredita ningún criterio de A3.

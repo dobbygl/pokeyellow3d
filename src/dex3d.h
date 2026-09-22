@@ -138,7 +138,7 @@ void list_text(GBContext *ctx, int w, int h, const firstperson::Matrix &matrix) 
                          {from.x + cell, from.y + cell}, {.5f, 0}, {1, 1}, ui_theme::White);
         }
 }
-bool draw(GBContext *ctx, int w, int h, bool) {
+bool draw(GBContext *ctx, int w, int h, bool menu_open) {
     presented = false;
     auto desired = dex_state::list(ctx);
     bool was_list = list_mode;
@@ -290,7 +290,9 @@ bool draw(GBContext *ctx, int w, int h, bool) {
     glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);
-    if (list_mode && menu_style == ui_preferences::Style::Integrated)
+    // Foreground glyphs would cover the Esc settings window; the solid device
+    // panel stays underneath it, as the GL-only LCD regions did in v0.3.0.
+    if (list_mode && menu_style == ui_preferences::Style::Integrated && !menu_open)
         list_text(ctx, w, h, matrix);
     presented = true;
     return true;

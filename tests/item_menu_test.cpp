@@ -24,6 +24,11 @@ int main(int argc, char **argv) {
         using full_menu::Context;
         using full_menu::Kind;
         check(item_menu::context(nullptr) == Context::None, "null item context");
+        auto *tiles = machine.wram.data() + 0x3a0;
+        // Calls are checked over the original list; UseItem additionally needs it.
+        std::fill_n(tiles, 360, 0);
+        box(tiles, {10, 0, 10, 16});
+        box(tiles, full_menu::List);
         struct Call {
             size_t offset;
             int target;
@@ -51,7 +56,19 @@ int main(int argc, char **argv) {
             check(item_menu::context(ctx) == Context::None, "palette transition rejected");
             machine.io[0x47] = 0xe4;
         }
-        auto *tiles = machine.wram.data() + 0x3a0;
+        {
+            // ItemUseBicycle, fishing and the other field items reload the
+            // overworld inside UseItem: only a dialogue box survives.
+            ctx->sp = 0xdffd;
+            machine.write(0xdffd, (0x5f7a + 3) & 255);
+            machine.write(0xdffe, (0x5f7a + 3) >> 8);
+            check(item_menu::context(ctx) == Context::Bag, "UseItem over the original bag list");
+            std::fill_n(tiles, 360, 0);
+            box(tiles, menu_layout::Bottom);
+            check(item_menu::context(ctx) == Context::None,
+                  "UseItem after overworld reload is not the bag");
+            ctx->sp = 0xdfff;
+        }
         std::fill_n(tiles, 360, 0);
         box(tiles, {10, 0, 10, 16});
         box(tiles, full_menu::List);

@@ -14,7 +14,7 @@ struct Bar {
 };
 struct Snapshot {
     Kind kind = Kind::None;
-    bool valid = false;
+    bool valid = false, portrait = true;
     int species = 0, selected = 0, count = 0;
     int experience = 0;
     float experience_fraction = 0;
@@ -43,10 +43,17 @@ inline bool party_return(const GBContext *ctx) {
             return true;
     return false;
 }
+// StatusScreen is visible from its GBPalNormal while LoadFlippedFrontSpriteByMonIndex
+// decompresses the portrait, then during PlayCry or Pikachu's FarCall'd PCM clip,
+// before its WaitForTextScrollButtonPress.
+inline bool stats_loading(const GBContext *ctx) {
+    return battle::live_return(ctx, 0x115e1, 0x3de0) || battle::live_return(ctx, 0x115e7, 0x1144);
+}
 inline Kind context(const GBContext *ctx) {
     if (!ready(ctx))
         return Kind::None;
-    if (battle::live_return(ctx, 0x1161d, 0x3852))
+    if (battle::live_return(ctx, 0x1161d, 0x3852) || battle::live_return(ctx, 0x1161a, 0x118b) ||
+        battle::live_return(ctx, 0x11612, 0x3e84) || stats_loading(ctx))
         return Kind::Stats;
     if (battle::live_return(ctx, 0x11814, 0x3852))
         return Kind::Moves;
@@ -230,16 +237,25 @@ inline Snapshot prepare(const GBContext *ctx, mon_pic::Cache &portraits) {
     if (summary) {
         out.species = battle::read(ctx, 0xcf97);
         const auto &picture = portraits.get(ctx->rom, ctx->rom_size, out.species, true);
-        if (!picture.valid ||
-            std::memcmp(picture.tiles.data(), ctx->vram + 0x1000, mon_pic::TileBytes) ||
-            !experience(ctx, out))
+        if (!picture.valid || !experience(ctx, out))
             return out;
-        for (int y = 0; y < 7; ++y)
-            for (int x = 1; x < 8; ++x) {
-                if (tiles[y * 20 + x] != (7 - x) * 7 + y)
-                    return out;
-                out.cells[y * 20 + x] = Cell::Portrait;
-            }
+        // Until the decompressed picture is placed, the original shows a blank
+        // area; its partially written VRAM is not yet referenced by the map.
+        bool blank = out.kind == Kind::Stats && stats_loading(ctx);
+        for (int y = 0; y < 7 && blank; ++y)
+            for (int x = 1; x < 8; ++x)
+                blank &= tiles[y * 20 + x] == 0x7f;
+        out.portrait = !blank;
+        if (out.portrait) {
+            if (std::memcmp(picture.tiles.data(), ctx->vram + 0x1000, mon_pic::TileBytes))
+                return out;
+            for (int y = 0; y < 7; ++y)
+                for (int x = 1; x < 8; ++x) {
+                    if (tiles[y * 20 + x] != (7 - x) * 7 + y)
+                        return out;
+                    out.cells[y * 20 + x] = Cell::Portrait;
+                }
+        }
         for (int y = 1; y < 7; ++y) {
             if (out.kind == Kind::Stats && y == 3)
                 continue;

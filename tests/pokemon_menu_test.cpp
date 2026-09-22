@@ -29,6 +29,11 @@ int main() {
         for (const auto call : {Call{0x1230, 0x3aaf, 0x1233, Kind::Party},
                                 Call{0x11c95, 0x3aab, 0x5c98, Kind::Actions},
                                 Call{0x1161d, 0x3852, 0x5620, Kind::Stats},
+                                // Portrait decompression, cry and Pikachu's FarCall'd clip.
+                                Call{0x115e1, 0x3de0, 0x55e4, Kind::Stats},
+                                Call{0x115e7, 0x1144, 0x55ea, Kind::Stats},
+                                Call{0x1161a, 0x118b, 0x561d, Kind::Stats},
+                                Call{0x11612, 0x3e84, 0x5615, Kind::Stats},
                                 Call{0x11814, 0x3852, 0x5817, Kind::Moves}}) {
             rom[call.address] = 0xcd;
             rom[call.address + 1] = uint8_t(call.target);

@@ -94,8 +94,12 @@ struct QaWalk {
                    pallet3d_warp_overlay() || pallet3d_menu().active ||
                    (state == pallet::View::Dialogue && pallet::bottom_dialogue(ctx))))),
             "scene selection");
+        // A save loaded inside a party screen is presented over a neutral
+        // backdrop: its icons replace the sprite VRAM a live scene would need.
         if (pallet3d_menu().active)
-            require(!read(pallet::Battle) && pallet3d_world_frame().map == read(pallet::Map) &&
+            require(!read(pallet::Battle) &&
+                        (pallet3d_world_frame().map == read(pallet::Map) ||
+                         pallet3d_pokemon_menu().active) &&
                         (menu_state::running(ctx) || state == pallet::View::Dialogue ||
                          state == pallet::View::Transition),
                     "menu has a valid retained scene and positive lifetime");

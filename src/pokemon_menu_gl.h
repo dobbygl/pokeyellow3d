@@ -138,8 +138,9 @@ inline bool draw(GBContext *ctx, int width, int height) {
     }
     bool summary = snapshot.kind == Kind::Stats || snapshot.kind == Kind::Moves;
     if (summary) {
-        dl->AddImage((ImTextureID)(intptr_t)portrait_texture.id, {left + 8 * scale, top},
-                     {left + 64 * scale, top + 56 * scale});
+        if (snapshot.portrait)
+            dl->AddImage((ImTextureID)(intptr_t)portrait_texture.id, {left + 8 * scale, top},
+                         {left + 64 * scale, top + 56 * scale});
         if (snapshot.kind == Kind::Moves) {
             // Original page two leaves row two empty above EXP POINTS.
             float x = left + 72 * scale, y = top + 18 * scale;

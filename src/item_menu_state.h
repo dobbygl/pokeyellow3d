@@ -28,8 +28,14 @@ inline full_menu::Context context(const GBContext *ctx) {
     // StartMenu_Item: list, Use/Toss, quantity, UseItem and TossItem. CALL bytes
     // and live stacks verified against the pinned pret source and private states.
     if (live_call(ctx, 0x11ed2, 0x2ae0) || live_call(ctx, 0x11f21, 0x3aab) ||
-        live_call(ctx, 0x11fc5, 0x2c51) || live_call(ctx, 0x11f7a, 0x2fe4) ||
-        live_call(ctx, 0x11fce, 0x2fec))
+        live_call(ctx, 0x11fc5, 0x2c51) || live_call(ctx, 0x11fce, 0x2fec))
+        return full_menu::Context::Bag;
+    // Bicycle, Escape Rope, Poke Flute, Itemfinder and the rods stay inside
+    // UseItem after ItemUseReloadOverworldData. Only the surviving bag windows
+    // keep that call in the bag; otherwise the overworld presentation applies.
+    if (live_call(ctx, 0x11f7a, 0x2fe4) &&
+        full_menu::classify(ctx->wram + 0x3a0, full_menu::Context::Bag).kind !=
+            full_menu::Kind::Unknown)
         return full_menu::Context::Bag;
     return full_menu::Context::None;
 }

@@ -64,6 +64,9 @@ inline void controls(QaWalk &run) {
     menu_motion_qa::escape(ctx);
     render(ctx);
     run.require(menu_motion::state.paused && ctx->cycles == cycles, "Esc freezes dex decoration");
+    // The list glyphs and caught marks use the foreground list, which ImGui
+    // draws above every window; they must not be emitted over Esc settings.
+    run.require(!pallet3d_dex_menu().active, "Esc settings are not covered by dex list glyphs");
     menu_motion_qa::escape(ctx);
     run.require(differences(pixels, render(ctx)) == 0, "Esc restores identical dex list");
     run.require(gb_context_save_state_file(ctx, "logs/dex-open.state"), "private open dex save");

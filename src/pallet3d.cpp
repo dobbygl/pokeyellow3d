@@ -164,8 +164,12 @@ bool can_compose_menu(const GBContext *ctx) {
         return false;
     const auto state = pallet::view(ctx);
     bool resident = world_frame.map >= 0 && world_frame.map == pallet::read(ctx, pallet::Map);
+    // A save loaded inside a complete screen has no resident frame yet. These
+    // screens are presented from their own validated sources over the map.
     if (!resident && menu_style == ui_preferences::Style::Integrated &&
-        (options_menu::active(ctx) || trainer_card::active(ctx) || naming_menu::active(ctx))) {
+        (options_menu::active(ctx) || trainer_card::active(ctx) || naming_menu::active(ctx) ||
+         pokemon_menu::context(ctx) != pokemon_menu::Kind::None ||
+         item_menu::context(ctx) != full_menu::Context::None)) {
         const auto *scene = pallet::scene(pallet::read(ctx, pallet::Map));
         if (scene && pallet::valid_live_map(ctx, *scene))
             return true;
@@ -1495,7 +1499,17 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         // Only an initial recognized dialogue needs live preparation. Once a
         // scene is resident, party/PC buffers and menu VRAM are never consulted.
         bool prepare = world_frame.map < 0 || (dialogue_overlay && can_compose_dialogue(ctx));
-        if (prepare) {
+        // The party screens replace sprite VRAM with their icons, so a cold load
+        // there cannot rebuild the live actors. Keep a neutral backdrop instead.
+        bool backdrop = menu_style == ui_preferences::Style::Integrated &&
+                        world_frame.map != pallet::read(ctx, pallet::Map) &&
+                        pokemon_menu::context(ctx) != pokemon_menu::Kind::None;
+        if (backdrop) {
+            glViewport(0, 0, width, height);
+            glClearColor(.035f, .065f, .075f, 1);
+            glClear(GL_COLOR_BUFFER_BIT);
+            scene_filter::invalidate();
+        } else if (prepare) {
             world(ctx, width, height);
             scene_filter::invalidate();
         } else
@@ -1507,7 +1521,7 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
                 scene_filter::height != height)
                 scene_filter::capture(width, height);
             menu_blurred = scene_filter::draw(width, height);
-            if (!menu_blurred)
+            if (!menu_blurred && !backdrop)
                 draw_world_frame(width, height, {.42f, 0});
             if (!menu_open && !(menu_style == ui_preferences::Style::Integrated &&
                                 (pokemon_menu::draw(ctx, width, height) ||

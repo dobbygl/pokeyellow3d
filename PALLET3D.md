@@ -871,7 +871,11 @@ visuales se encuentran en `src/ui_theme.h`.
 | PC: cambio de caja | Número (0, 0, 11, 4), doce cajas (11, 0, 9, 14), sobre el menú y diálogo originales |
 | PC del jugador | Principal (0, 0, 16, 10), lista (4, 2, 16, 11), cantidad (15, 9, 5, 3), cuadro inferior y confirmación |
 | PC de Oak | Menú del terminal, cuadro inferior y Sí / No; conserva los diálogos y la evaluación originales |
-| Equipo, mochila y pantalla desconocida | LCD completo enmarcado |
+| Equipo | Cuadrícula (0, 0, 20, 18), seis filas de dos tiles; cuadro inferior (0, 12, 20, 6); iconos originales y retrato de la fila seleccionada |
+| Acciones de equipo | Sin movimientos de campo: (11, 11, 9, 7). Con ellos: borde izquierdo verificado, alto variable y una fila extra sobre la primera opción |
+| Resumen: estadísticas | Retrato (1, 0, 7, 7), caja de estadísticas (0, 8, 10, 10), líneas originales derechas; HP con los tokens del HUD |
+| Resumen: movimientos | Retrato (1, 0, 7, 7), movimientos/PP (0, 8, 20, 10), barra de experiencia en la fila vacía 2; conserva ambos textos de experiencia |
+| Mochila y pantalla desconocida | LCD completo enmarcado |
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
 no se repite texto al separar el diálogo inferior de los cuadros superiores.
@@ -900,8 +904,8 @@ cantidades ni listas. Los gráficos LV (`6E`) y caja ocupada (`78`) se contrasta
 con ambos planos de VRAM y sus gráficos originales en ROM antes de presentarlos.
 Un borde desconocido, selección inválida o glifo reemplazado conserva **todo**
 el LCD enmarcado. Las páginas de impresión, Hall of Fame y otras disposiciones
-que no figuran en esta tabla mantienen su presentación previa. Equipo y resumen,
-mochila, lista de Pokédex, opciones, tarjeta y nombres se abordan en A2–A4 de
+que no figuran en esta tabla mantienen su presentación previa. Mochila, lista de
+Pokédex, opciones, tarjeta y nombres se abordan en A3–A4 de
 `PLAN_PANTALLAS_COMPLETAS.md`.
 
 La batería específica es `tests/ui_full_pc_qa.sh ROM PC_WORLD`, con
@@ -1029,3 +1033,33 @@ ampliada añade 110 capturas y estados exactos. Las 38 vistas exteriores
 originales siguen intactas. CTest pasa 39/39 y el build independiente sin
 ROM 20/20. Véanse `PLAN_PANTALLAS_COMPLETAS.md` y la evidencia privada
 `build/qa/logs/fullscreen-a1-evidence.json`.
+
+
+### Equipo y resumen integrados (A2)
+
+`pokemon_menu_state.h` comprueba las llamadas originales activas, los bordes,
+las dos páginas del resumen, la fuente y los gráficos de VRAM antes de sustituir
+el LCD. Los símbolos especiales tienen perfiles distintos de los del PC: por
+ejemplo, `78` es aquí un borde vertical y `6E` procede del HUD del resumen.
+El retrato se descomprime de la ROM y se compara completo con VRAM; los iconos
+animados conservan los sprites, posiciones y fases del motor original.
+
+El retrato lateral del equipo sigue la flecha pintada, incluido el frame en
+que el motor aún no ha repintado una nueva selección. Se muestra cuando cabe
+a escala entera en el margen; los iconos originales del equipo permanecen en
+la cuadrícula. Las barras de HP leen la longitud y el color pintados por el
+juego. Las porciones ocultas por un menú de acciones conservan sus gráficos
+originales visibles. La barra de experiencia lee el registro permanente del
+Pokémon: `CalcExpToLevelUp` sustituye temporalmente `wLoadedMonExp` por la
+cantidad que falta para subir de nivel. Ninguna etiqueta ni cifra se reconstruye.
+
+`tests/ui_full_pokemon_qa.sh ROM TWO_POKEMON_WORLD READY_BATTLE` recorre equipo, acciones,
+ambas páginas del resumen y los resúmenes de equipo/caja desde el PC, en ambas
+cámaras, y las mismas pantallas desde un combate. Con
+`QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1` comprueba glifos,
+cursores, gráficos especiales y barras por frame, además de memoria intacta,
+pausa/carga y cinco alteraciones que deben conservar el LCD completo.
+La copia privada de seis miembros incluye HP cero y mínimo, todos los estados
+alterados, nivel 100 y movimientos de campo. El mismo recorrido clásico sirve
+para la comparación exacta con v0.3.0. La evidencia y el estado de aceptación
+de esta fase se registran en `PLAN_PANTALLAS_COMPLETAS.md`.

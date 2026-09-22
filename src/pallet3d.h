@@ -58,6 +58,13 @@ struct PalletFullMenuInfo {
     int current = 0, scroll = 0, selected = 0, cursor_x = -1, cursor_y = -1;
 };
 PalletFullMenuInfo pallet3d_full_menu();
+struct PalletPokemonMenuInfo {
+    bool active = false, fallback = false;
+    int kind = 0, selected = 0, species = 0;
+    size_t bars = 0;
+};
+PalletPokemonMenuInfo pallet3d_pokemon_menu();
+
 struct PalletDexInfo {
     bool active, verified;
     int species;

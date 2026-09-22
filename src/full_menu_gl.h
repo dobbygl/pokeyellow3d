@@ -2,6 +2,7 @@
 #include "full_menu_layout.h"
 #include "menu_text_gl.h"
 #include "pc_state.h"
+#include "pokemon_menu_gl.h"
 
 namespace full_menu {
 inline PalletFullMenuInfo shown{};
@@ -21,6 +22,8 @@ inline Context context(pc_state::Mode mode) {
 }
 inline void draw(GBContext *ctx, pc_state::Mode mode, int width, int height,
                  bool verified_background = true) {
+    if (verified_background && pokemon_menu::draw(ctx, width, height))
+        return;
     auto domain = context(mode);
     auto layout = classify(ctx->wram + 0x3a0, domain);
     shown = {true, true, int(domain), int(layout.kind), int(layout.text.count)};

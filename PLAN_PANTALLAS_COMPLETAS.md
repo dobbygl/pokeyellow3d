@@ -1,7 +1,7 @@
 # Plan: pantallas completas con el estilo integrado
 
-Fecha: 2026-09-22. Estado: plan confirmado para ejecución; A1–A4 pendientes,
-0/24 criterios acreditados. Base: release v0.3.0.
+Fecha: 2026-09-22. Estado: A1 fusionada; A2 validada, pendiente de fusión; A3–A4 pendientes.
+11/24 criterios acreditados. Base: release v0.3.0.
 
 ## Análisis del estado actual
 
@@ -148,11 +148,11 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Equipo y todas las páginas del resumen inventariadas presentan su contenido original completo y permiten las acciones y navegación originales en ambas cámaras.
-- [ ] Retratos, HP y experiencia corresponden al Pokémon seleccionado, usan los tokens del HUD y coinciden con los valores y gráficos originales verificados, incluidos límites y estados alterados.
-- [ ] Cada carácter y cursor coincide por frame con su tile original; los índices especiales están contrastados con charmap y rutinas pret antes de su uso.
-- [ ] Los recorridos de A2 añadidos a `ui_style_qa.sh` verifican glifos, cursor, memoria intacta, cambios de página y respaldo LCD ante datos o gráficos no reconocidos.
-- [ ] CTest completo, pruebas independientes sin ROM, formato y todas las baterías clásicas pasan; no cambia ninguna captura clásica respecto a v0.3.0, incluidas las 38 exteriores.
+- [x] Equipo y todas las páginas del resumen inventariadas presentan su contenido original completo y permiten las acciones y navegación originales en ambas cámaras.
+- [x] Retratos, HP y experiencia corresponden al Pokémon seleccionado, usan los tokens del HUD y coinciden con los valores y gráficos originales verificados, incluidos límites y estados alterados.
+- [x] Cada carácter y cursor coincide por frame con su tile original; los índices especiales están contrastados con charmap y rutinas pret antes de su uso.
+- [x] Los recorridos de A2 añadidos a `ui_style_qa.sh` verifican glifos, cursor, memoria intacta, cambios de página y respaldo LCD ante datos o gráficos no reconocidos.
+- [x] CTest completo, pruebas independientes sin ROM, formato y todas las baterías clásicas pasan; no cambia ninguna captura clásica respecto a v0.3.0, incluidas las 38 exteriores.
 - [ ] Contactos de equipo y resumen están revisados y registrados; A2 se fusiona con CI verde antes de iniciar A3.
 
 ### Fase A3: mochila, tienda completa y lista de Pokédex
@@ -518,3 +518,86 @@ La batería específica pasa a ocho recorridos y recibe un tercer argumento:
 La primera CI de #24 (`35677979317`) terminó con las cinco comprobaciones
 obligatorias verdes sobre `8f74f5f`; las regresiones en curso se detuvieron
 al ampliar este caso y se reinician sobre la revisión final.
+
+
+### A2 — revisión final y recorridos específicos, 2026-09-22
+
+La revisión `5a49174295861667fac4d8b4458d15e2ae37ffbc` supera las cinco
+comprobaciones obligatorias de CI en el run `35678666460`. La PR #24 sigue
+como borrador mientras terminan la batería integrada acumulativa y las veinte
+regresiones clásicas. No se ha iniciado A3 ni se cierran criterios de A2 todavía.
+
+Sobre ese mismo código pasan CTest 40/40, el build independiente sin ROM 21/21
+y clang-format 18.1.8. Los ocho recorridos específicos integrados comprueban
+6.869 frames, 547.075 glifos, 35.012.800 bits y 3.996 cursores; los veinte
+controles negativos conservan el LCD completo. La batería incluye equipo,
+acciones y resumen desde mundo, PC y combate, en ambas cámaras.
+
+Los ocho recorridos clásicos nuevos conservan 88 capturas y 88 estados exactos
+contra v0.3.0; el PC conserva sus 110 capturas y 110 estados exactos. Los cien
+archivos de captura compartidos con los tres contactos revisados previamente
+siguen idénticos sobre esta revisión; se añade el contacto de combate revisado.
+Evidencias bajo `build/qa/logs/`:
+`fullscreen-a2-pokemon-totals-final.json`,
+`fullscreen-a2-compare-new-pokemon-final.json`,
+`fullscreen-a2-compare-full-pc-final.json`,
+`fullscreen-a2-reviewed-captures-final-parity.json` y
+`fullscreen-a2-battle-contact-review.json`.
+
+Los comandos específicos actuales incluyen el estado de combate como tercer
+argumento; sustituyen los comandos de dos argumentos del registro inicial:
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 \
+  tests/ui_full_pokemon_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-KfpanN/pallet.state build/qa/ui-crossfade-5bOG41/battle.state
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=classic QA_CAPTURE_STATES=1 \
+  tests/ui_full_pokemon_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-KfpanN/pallet.state build/qa/ui-crossfade-5bOG41/battle.state
+python3 build/qa/logs/run-fullscreen-a2-v030.py
+python3 tests/compare_classic_captures.py \
+  build/qa/ui-full-pokemon-v030-1ut0ba_s build/qa/ui-full-pokemon-QfkfzU \
+  --report build/qa/logs/fullscreen-a2-compare-new-pokemon-final.json
+python3 tests/compare_classic_captures.py \
+  build/qa/ui-full-pc-v030-JXA8p8 build/qa/ui-full-pc-oNcFUK \
+  --report build/qa/logs/fullscreen-a2-compare-full-pc-final.json
+```
+
+
+### A2 — cierre de validación local, 2026-09-22
+
+Las veinte baterías clásicas finalizan con código 0. Sus 2.169 capturas y
+1.831 estados completos son idénticos a v0.3.0, sin excluir vistas de ajustes.
+Los recorridos nuevos conservan además las 110 capturas/estados del PC y las
+88 capturas/estados de equipo y resumen. Las 38 vistas exteriores originales
+permanecen exactas. Las entradas de cada comparación clásica son las mismas
+que ejecuta su referencia v0.3.0; las comprobaciones adicionales de pausa y
+carga pertenecen a los recorridos integrados.
+
+`build/qa/ui-style-kAi1Im/logs/glyphs.json` acredita los 38 recorridos integrados:
+ocho de menús, cuatro de combate, seis de fundidos, doce de PC y ocho de equipo
+y resumen. También pasan pausa/carga en ambas cámaras, sin glifos de sustitución,
+errores GL ni cambios de memoria por el compositor.
+
+El recopilador `build/qa/logs/collect-fullscreen-a2-evidence.py` pasa y genera
+`fullscreen-a2-evidence.json` sobre el código `5a49174`. Comprueba las fuentes
+congeladas, binarios coincidentes en todas las baterías, CTest 40/40, build
+independiente sin ROM 21/21 con llvmpipe, formato 18.1.8, cuatro contactos
+revisados y las tres imágenes del README exactas. El runtime sigue limpio en
+`00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e`; el C generado no cambia.
+
+```sh
+bash build/qa/logs/run-fullscreen-a2-regressions.sh
+python3 build/qa/logs/collect-fullscreen-a2-classic.py
+python3 build/qa/logs/collect-fullscreen-a2-evidence.py
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
+  build/roms/pokeyellow.gbc build/qa/battles-eovzS8/logs/capture-complete.state \
+  build/qa/firstperson-9cB3FJ/route.state build/qa/battles-LojUdN/logs/route22-trainer.state \
+  build/qa/ui-crossfade-5bOG41/world.state build/qa/ui-crossfade-5bOG41/battle.state \
+  build/qa/pc-storage-fJ2Oob/capture/logs/capture-complete.state
+```
+
+Quedan acreditados cinco de los seis criterios de A2. El último se marcará
+tras verificar la fusión de la PR #24 con CI verde, antes de comenzar A3.

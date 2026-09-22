@@ -18,7 +18,8 @@ enum class Context {
     Mart,
     BattleBag,
     Options,
-    TrainerCard
+    TrainerCard,
+    Naming
 };
 enum class Kind {
     Unknown,
@@ -33,6 +34,7 @@ enum class Kind {
     BattleBag,
     Options,
     TrainerCard,
+    Naming,
     Count
 };
 struct Layout {
@@ -75,6 +77,22 @@ inline Layout classify(const uint8_t *tiles, Context context) {
         return true;
     };
     constexpr auto bottom = menu_layout::Bottom, yes_no = menu_layout::YesNo;
+    if (context == Context::Naming) {
+        constexpr Rect keyboard{0, 4, 20, 11};
+        for (int y = 4; y <= 14; ++y)
+            for (int x = 0; x < 20; ++x) {
+                int expected = menu_layout::border(keyboard, x, y);
+                if (expected && tiles[y * 20 + x] != expected)
+                    return {};
+            }
+        result.kind = Kind::Naming;
+        result.text.kind = menu_layout::Kind::Partial;
+        result.text.count = 3;
+        result.text.regions[0] = {0, 0, 20, 4};
+        result.text.regions[1] = keyboard;
+        result.text.regions[2] = {0, 15, 20, 3};
+        return result;
+    }
     if (context == Context::TrainerCard) {
         // TrainerInfo_DrawTextBox uses a distinct right/bottom edge. The middle
         // label and side background also belong to this complete source page.

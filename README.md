@@ -64,11 +64,13 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 | --- | --- | --- |
 | [![Original party icons, cursor and HP with the selected Pokemon portrait](docs/screenshots/integrated-party.png)](docs/screenshots/integrated-party.png) | [![Pikachu's original portrait, statistics, status and HP in themed panels](docs/screenshots/integrated-summary.png)](docs/screenshots/integrated-summary.png) | [![Original moves and PP with a theme experience bar, over the retained first-person scene](docs/screenshots/integrated-moves.png)](docs/screenshots/integrated-moves.png) |
 
-The A4 development branch also integrates the original options and trainer card:
+The A4 development branch also integrates the original options, trainer card and naming keyboard:
 
 | Options | Trainer card |
 | --- | --- |
 | [![Original option values and arrow in a themed panel over the first-person world](docs/screenshots/integrated-options.png)](docs/screenshots/integrated-options.png) | [![Original trainer name, money, time, Red portrait and mixed badges with themed panels](docs/screenshots/integrated-trainer-card.png)](docs/screenshots/integrated-trainer-card.png) |
+
+[![Original naming alphabet, arrow, mixed-case nickname and animated Pokemon icon in the themed keyboard](docs/screenshots/integrated-naming.png)](docs/screenshots/integrated-naming.png)
 
 ## Get started
 

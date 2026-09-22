@@ -7,6 +7,7 @@
 #include "battle_bag_state.h"
 #include "options_menu_state.h"
 #include "trainer_card_state.h"
+#include "naming_menu_gl.h"
 
 namespace full_menu {
 inline PalletFullMenuInfo shown{};
@@ -19,6 +20,7 @@ inline void shutdown() {
     battle_pictures = {};
     trainer_graphics.reset();
     trainer_picture = {};
+    naming_menu::graphics.reset();
     shown = {};
 }
 inline bool upload_battle_graphics(const GBContext *ctx, const battle_bag::Snapshot &snapshot) {
@@ -74,6 +76,15 @@ inline void draw_context(GBContext *ctx, Context domain, int width, int height,
     shown.cursor_x = selection.cursor_x;
     shown.cursor_y = selection.cursor_y;
     menu_text::prime();
+    if (domain == Context::Naming) {
+        auto snapshot = naming_menu::prepare(ctx);
+        shown.current = shown.selected = ctx->wram[0xc26];
+        shown.scroll = 0;
+        shown.cursor_x = snapshot.cursor_x;
+        shown.cursor_y = snapshot.cursor_y;
+        shown.fallback = !naming_menu::draw(ctx, snapshot, layout.text, width, height);
+        return;
+    }
     if (domain == Context::TrainerCard) {
         auto snapshot = trainer_card::prepare(ctx, trainer_picture);
         if (!snapshot.ready) {
@@ -183,6 +194,12 @@ inline bool draw_trainer(GBContext *ctx, int width, int height) {
     if (!trainer_card::active(ctx))
         return false;
     draw_context(ctx, Context::TrainerCard, width, height);
+    return true;
+}
+inline bool draw_naming(GBContext *ctx, int width, int height) {
+    if (!naming_menu::active(ctx))
+        return false;
+    draw_context(ctx, Context::Naming, width, height);
     return true;
 }
 } // namespace full_menu

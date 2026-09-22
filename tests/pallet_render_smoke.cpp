@@ -135,8 +135,19 @@ int main(int argc, char **argv) {
     }
     if (!gb_context_load_state_file(ctx, argv[2]))
         return 5;
+    if (argc > 3 && !std::strncmp(argv[3], "naming-", 7)) {
+        int result = naming_qa::journey(ctx, std::strstr(argv[3], "-fp") != nullptr,
+                                        std::strstr(argv[3], "-end") != nullptr);
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 3 && !std::strcmp(argv[3], "prepare-names")) {
         int result = naming_qa::prepare(ctx);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && !std::strcmp(argv[3], "prepare-captured-name")) {
+        int result = naming_qa::prepare_capture(ctx);
         gb_platform_shutdown();
         return result;
     }

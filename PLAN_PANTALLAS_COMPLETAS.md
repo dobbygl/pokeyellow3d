@@ -981,3 +981,51 @@ No se cierra A4: quedan jugador/rival/Pokémon con cuadrícula integrada,
 las regresiones clásicas exactas y toda la batería acumulativa sobre fuentes
 congeladas, además de CI, fusión y paquetes v0.4.0. Los criterios permanecen
 18/24 en la rama y 0/6 para A4.
+
+### A4 — teclado integrado y dieciséis recorridos originales, 2026-09-22
+
+Se implementa la cuadrícula de nombres del jugador, rival y Pokémon. Los
+caracteres, la flecha, ED, los subrayados y las fases del icono OAM proceden
+del juego. Las tablas de ambos alfabetos se verifican contra `charmap.asm`
+y la ROM; ED y todos los gráficos de estado también contra sus PNG de pret.
+Las cuatro llamadas a `DisplayNamingScreen` y 96 estados privados validan
+su procedencia en `fullscreen-a4-naming-graphics-proof.json`.
+
+Se cubren las entradas desde Oak, el inspector de motes y la captura salvaje.
+La carga directa de un teclado recupera la escena correspondiente; la ruta
+de arena exige combate activo. El icono sigue los sprites animados originales
+y el renderer no modifica OAM, HRAM ni IO; estas regiones se añaden a la
+invariante existente de WRAM, VRAM, RAM del cartucho y framebuffer por frame.
+
+- `build/qa/ui-full-naming-ABaR9a`: 16 recorridos, 112 capturas; 21.172 frames,
+  1.460.496 glifos, 201.808 gráficos, 108.082.176 bits, 20.960 cursores y
+  212 frames de respaldo LCD comprobados. Pasa cambio de caja, wrap de filas
+  y columnas, borrado, límites 7/10, rechazo de un carácter adicional y envío
+  por Start/ED con verificación del nombre almacenado por el motor.
+- Pausa sin foco/Esc y carga con paneles abiertos pasan en los 16 recorridos.
+  Los ocho de Pokémon comprueban 120 frames de animación OAM y alteraciones
+  de prueba del gráfico y posición del icono. Los controles negativos de
+  fuente, cursor, borde, tile extraño, ED y subrayados conservan el LCD completo.
+- Prueba sintética nueva: tres tipos de nombre, ambos alfabetos, las 46
+  posiciones de cursor, retorno activo, gráficos y rechazos sin escrituras.
+  CTest pasa 46/46 y el build independiente sin ROM 27/27; formato 18.1.8
+  comprobado en `fullscreen-a4-naming-initial-checks.json`.
+- Contacto revisado: `fullscreen-a4-naming-contact-review.json`. Captura del
+  inspector de motes en el README, con equivalencia de píxeles documentada.
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_CAPTURE_STATES=1 \
+  tests/ui_full_naming_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/battles-eovzS8/logs/capture-complete.state \
+  build/qa/battles-eovzS8/logs/capture-throw.state \
+  build/qa/fullscreen-a4-fixtures/title-menu.state
+python3 build/qa/logs/verify-fullscreen-a4-naming.py
+ctest --test-dir build --output-on-failure
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+```
+
+La batería se incorpora a `ui_style_qa.sh`, que recibe un octavo argumento:
+el estado de un lanzamiento que captura al Pokémon mediante las reglas
+originales. No se inyecta el resultado. A4 no se cierra todavía: quedan las
+27 baterías clásicas frente a v0.3.0, la validación acumulativa sobre fuentes
+congeladas, CI, fusión y release. Ningún criterio nuevo se acredita aquí.

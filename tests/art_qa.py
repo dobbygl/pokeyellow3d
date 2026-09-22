@@ -82,6 +82,23 @@ def main():
                 _, text = run(f'{style}-{camera}-journey-{enabled}', 'candidate', 'pallet.state', mode,
                               QA_MENU_STYLE=style, QA_ART_PASS=enabled)
                 assert 'PASS' in text
+            hours = {}
+            for enabled in ('off', 'on'):
+                mode = 'daylight' + ('-fp' if camera == 'fp' else '')
+                directory, text = run(f'{style}-{camera}-hours-{enabled}', 'candidate',
+                                      'pallet.state', mode, QA_MENU_STYLE=style,
+                                      QA_ART_PASS=enabled)
+                assert 'PASS: four hours' in text
+                # Esc is a runtime settings panel: its checkbox intentionally
+                # differs. Every game image and engine snapshot remains exact.
+                images = {p.name: sha(p) for p in (directory / 'logs').glob('*.ppm')
+                          if p.name != 'settings.ppm'}
+                states = {p.name: sha(p) for p in (directory / 'logs').glob('*.machine')}
+                assert len(images) == 6 and len(states) == 7
+                hours[enabled] = (images, states)
+                results.append(dict(label=f'{style}-{camera}-hours-{enabled}',
+                                    images=images, states=states))
+            assert hours['off'] == hours['on'], (style, camera, 'A1 hour captures differ')
 
     # Same scene, driver, process setup and synchronization. Alternate order to
     # expose warm-up/drift rather than comparing against an unrelated old number.

@@ -67,10 +67,12 @@ inline int captures(GBContext *ctx, bool fp) {
     for (int i = 0; i < 90; ++i)
         presentation_qa::render(ctx);
     const auto style = pallet3d_menu_style();
+    const bool artistic = pallet3d_artistic();
     pallet3d_load_preferences("logs/lighting.cfg");
     // A new preferences file defaults to integrated. Keep the style selected
     // by this QA run while exercising lighting persistence in isolation.
     run.require(pallet3d_menu_style(style, true), "persist selected QA menu style");
+    run.require(pallet3d_artistic(artistic, true), "persist selected QA artistic setting");
     run.require(pallet3d_daylight({}, true), "save disabled setting separately from cartridge");
     auto disabled = presentation_qa::render(ctx);
     capture_surface("logs/disabled-before.ppm");
@@ -80,6 +82,8 @@ inline int captures(GBContext *ctx, bool fp) {
                     "persist fixed lighting");
         pallet3d_load_preferences("logs/lighting.cfg");
         run.require(pallet3d_menu_style() == style, "lighting reload preserves selected QA style");
+        run.require(pallet3d_artistic() == artistic,
+                    "lighting reload preserves selected QA artistic setting");
         auto image = presentation_qa::render(ctx);
         auto light = pallet3d_daylight_frame();
         run.require(light.enabled && light.hour == hour && image != disabled,

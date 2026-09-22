@@ -12,7 +12,7 @@
 namespace ui_full_menu_qa {
 inline size_t frames = 0, glyphs = 0, bits = 0, graphics = 0, fallbacks = 0, cursors = 0;
 inline size_t pending_cursors = 0;
-inline std::array<size_t, 10> kinds{};
+inline std::array<size_t, size_t(full_menu::Kind::Count)> kinds{};
 inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
     std::fprintf(stderr, "[UI-FULL] FAIL frame=%zu %s tile=%02x at=%d,%d\n", frames, message, tile,
                  x, y);
@@ -21,10 +21,11 @@ inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
 inline void report() {
     std::fprintf(stderr,
                  "[UI-FULL] frames=%zu glyphs=%zu bits=%zu graphics=%zu fallback=%zu "
-                 "cursor=%zu pending_cursor=%zu kinds=%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu\n",
-                 frames, glyphs, bits, graphics, fallbacks, cursors, pending_cursors, kinds[0],
-                 kinds[1], kinds[2], kinds[3], kinds[4], kinds[5], kinds[6], kinds[7], kinds[8],
-                 kinds[9]);
+                 "cursor=%zu pending_cursor=%zu kinds=",
+                 frames, glyphs, bits, graphics, fallbacks, cursors, pending_cursors);
+    for (size_t i = 0; i < kinds.size(); ++i)
+        std::fprintf(stderr, "%s%zu", i ? "," : "", kinds[i]);
+    std::fputc('\n', stderr);
 }
 inline void observe(GBContext *ctx, int width, int height) {
     auto shown = pallet3d_full_menu();
@@ -34,8 +35,18 @@ inline void observe(GBContext *ctx, int width, int height) {
     if (shown.kind < 0 || shown.kind >= int(kinds.size()))
         fail("invalid disposition identifier");
     ++kinds[size_t(shown.kind)];
-    if (shown.current != ctx->wram[0xc26] || shown.scroll != ctx->wram[0xc36] ||
-        shown.selected != int(ctx->wram[0xc26]) + ctx->wram[0xc36])
+    bool options = shown.context == int(full_menu::Context::Options);
+    bool trainer = shown.context == int(full_menu::Context::TrainerCard);
+    bool naming = shown.context == int(full_menu::Context::Naming);
+    if (options) {
+        if (shown.current != ctx->wram[0xd3d] || shown.selected != ctx->wram[0xd3d] ||
+            shown.scroll != 0)
+            fail("options selection differs from its dedicated original variable");
+    } else if (naming) {
+        if (shown.current != ctx->wram[0xc26] || shown.selected != ctx->wram[0xc26] || shown.scroll)
+            fail("naming selection differs from original menu variable");
+    } else if (shown.current != ctx->wram[0xc26] || shown.scroll != ctx->wram[0xc36] ||
+               shown.selected != int(ctx->wram[0xc26]) + ctx->wram[0xc36])
         fail("list selection or scroll differs from the original engine");
     auto layout = full_menu::classify(ctx->wram + 0x3a0, full_menu::Context(shown.context));
     if (int(layout.kind) != shown.kind)
@@ -108,13 +119,50 @@ inline void observe(GBContext *ctx, int width, int height) {
             int tile = ctx->wram[0x3a0 + ty * 20 + tx];
             if (!owned[size_t(ty * 20 + tx)] || (tile >= 0x79 && tile < 0x80))
                 continue;
-            if (tile >= 0x80 && coverage[size_t(ty * 20 + tx)] != 1)
+            if (trainer && (tile == 0x77 || tile == 0x78))
+                continue; // Original trainer-card bottom/right decoration.
+            bool trainer_graphic = trainer && tile >= 0xd6 && tile <= 0xdf;
+            bool naming_graphic = naming && tile == 0xf0;
+            if (tile >= 0x80 && !trainer_graphic && !naming_graphic &&
+                coverage[size_t(ty * 20 + tx)] != 1)
                 fail("original font cell omitted or submitted more than once", tile, tx, ty);
             bool battle_bag = shown.context == int(full_menu::Context::BattleBag);
             bool portrait = battle_bag && ((tx >= 12 && tx <= 18 && ty <= 1) ||
                                            (tx >= 1 && tx <= 3 && ty >= 5 && ty <= 11));
+            bool red = trainer && tx >= 15 && tx <= 18 && ty >= 1 && ty <= 6;
             size_t source = tile == 0x6e ? 0x10ae0 : tile == 0x78 ? 0x3aa28 : 0;
             bool one_bit = false;
+            if (naming) {
+                source = tile == 0x76 || tile == 0x77 ? 0x10b60 + (tile - 0x76) * 16
+                         : tile == 0xf0               ? 0x64e5
+                                                      : 0;
+                one_bit = tile == 0xf0;
+                if (source && !((tile == 0xf0 && tx == 18 && ty == 13) ||
+                                (tile != 0xf0 && ty == 3 && tx >= 10 &&
+                                 tx < (ctx->wram[0x107c] == 2 ? 20 : 17))))
+                    fail("naming graphic outside original cell", tile, tx, ty);
+            }
+            if (trainer) {
+                source = tile >= 0x20 && tile <= 0x5f   ? 59675 + (tile - 0x20) * 16
+                         : tile >= 0x60 && tile <= 0x76 ? 1006772 + (tile - 0x60) * 16
+                         : tile == 0xd6                 ? 0x10ee8
+                         : tile == 0xd7                 ? 1006756
+                         : tile >= 0xd8 && tile <= 0xdf ? 1007140 + (tile - 0xd8) * 16
+                                                        : 0;
+                if (red && tile != (tx - 15) * 7 + ty - 1)
+                    fail("trainer portrait fragment differs from source position", tile, tx, ty);
+                for (int badge = 0; badge < 8; ++badge) {
+                    int bx = 3 + badge % 4 * 4, by = 12 + badge / 4 * 3;
+                    if (tx >= bx && tx <= bx + 1 && ty >= by && ty <= by + 1) {
+                        int expected = 0x20 + badge * 8 +
+                                       ((ctx->wram[0x1355] & (1 << badge)) ? 4 : 0) +
+                                       (ty - by) * 2 + tx - bx;
+                        if (tile != expected)
+                            fail("face/badge differs from original obtained-badge bit", tile, tx,
+                                 ty);
+                    }
+                }
+            }
             if (battle_bag && !portrait && tile < 128) {
                 if (tile == 0x6e) {
                     source = 0x10c08;
@@ -130,13 +178,13 @@ inline void observe(GBContext *ctx, int width, int height) {
                 if (tile != expected)
                     fail("portrait fragment uses an unexpected original tile", tile, tx, ty);
             }
-            if (tile < 0x80 && !source && !portrait)
+            if (tile < 0x80 && !source && !portrait && !red)
                 fail("unsupported graphic did not retain LCD", tile, tx, ty);
             auto original_byte = [&](int row, int plane) -> uint8_t {
                 // ROM picture decompression is independently checked against all
                 // 151 pret back PNGs and private full VRAM pictures. Here compare the
                 // actually presented fragment to the original live 2bpp bytes.
-                if (portrait)
+                if (portrait || red)
                     return ctx->vram[0x1000 + tile * 16 + row * 2 + plane];
                 if (source)
                     return ctx->rom[source + row * (one_bit ? 1 : 2) + (one_bit ? 0 : plane)];
@@ -170,7 +218,26 @@ inline void observe(GBContext *ctx, int width, int height) {
                              ty * 8 + y);
                     ++bits;
                 }
-            (source || portrait) ? ++graphics : ++glyphs;
+            (source || portrait || red) ? ++graphics : ++glyphs;
+            if (naming && tile == 0xed) {
+                int pointer = ctx->wram[0xc30] | (ctx->wram[0xc31] << 8);
+                bool grid = ty >= 5 && ty <= 13 && ty % 2 && tx >= 1 && tx <= 17 && tx % 2;
+                if ((!grid && !(tx == 1 && ty == 15)) || pointer != 0xc3a0 + ty * 20 + tx ||
+                    shown.cursor_x != tx || shown.cursor_y != ty)
+                    fail("naming arrow differs from original pointer or keyboard cell", tile, tx,
+                         ty);
+                ++cursors;
+                pending_cursors += ty != 3 + 2 * ctx->wram[0xc26];
+                continue;
+            }
+            if (options && tile == 0xed) {
+                if (tx != 1 || (ty != 2 && ty != 4 && ty != 6 && ty != 8 && ty != 10 && ty != 16) ||
+                    shown.cursor_x != tx || shown.cursor_y != ty)
+                    fail("options arrow differs from the original painted row", tile, tx, ty);
+                ++cursors;
+                pending_cursors += ty != 2 + 2 * ctx->wram[0xd3d];
+                continue;
+            }
             int pointer = ctx->wram[0xc30] | (ctx->wram[0xc31] << 8);
             if (tile == 0xed && pointer == 0xc3a0 + ty * 20 + tx) {
                 int step = ctx->hram[0x7a] & 2 ? 1 : 2;
@@ -190,6 +257,42 @@ inline void observe(GBContext *ctx, int width, int height) {
                 pending_cursors += ty != current_y || box_return;
             }
         }
+    if (naming && ctx->wram[0x107c] == 2) {
+        constexpr ImU32 colors[]{ui_theme::White, ui_theme::DimInk,
+                                 ui_theme::FrameEdge | IM_COL32_A_MASK, ui_theme::Ink};
+        // Independent OAM priority, flips and OBJ palette decoding. All visible
+        // pixels must match the current original animation, not a cached frame.
+        for (int y = 0; y < 17; ++y)
+            for (int x = 8; x < 24; ++x) {
+                int index = 0, flags = 0;
+                for (int sprite = 0; sprite < 4; ++sprite) {
+                    const auto *oam = ctx->oam + sprite * 4;
+                    int px = x - (oam[1] - 8), py = y - (oam[0] - 16);
+                    if (px < 0 || px >= 8 || py < 0 || py >= 8)
+                        continue;
+                    if (oam[3] & 0x20)
+                        px = 7 - px;
+                    if (oam[3] & 0x40)
+                        py = 7 - py;
+                    const auto *row = ctx->vram + oam[2] * 16 + py * 2;
+                    index = ((row[0] >> (7 - px)) & 1) | (((row[1] >> (7 - px)) & 1) << 1);
+                    if (index) {
+                        flags = oam[3];
+                        break;
+                    }
+                }
+                if (!index)
+                    continue;
+                int shade = (ctx->io[flags & 0x10 ? 0x49 : 0x48] >> (index * 2)) & 3;
+                auto color = colors[shade];
+                const auto *actual = pixel(x, y);
+                if (actual[0] != uint8_t(color >> IM_COL32_R_SHIFT) ||
+                    actual[1] != uint8_t(color >> IM_COL32_G_SHIFT) ||
+                    actual[2] != uint8_t(color >> IM_COL32_B_SHIFT))
+                    fail("naming icon differs from original animated OAM", -1, x, y);
+                ++bits;
+            }
+    }
     if (glGetError() != GL_NO_ERROR)
         fail("OpenGL error in full-screen observer");
 }

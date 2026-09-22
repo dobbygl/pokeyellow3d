@@ -76,7 +76,10 @@ inline void full_menu_negative_controls(QaWalk &run) {
         std::fprintf(stderr, "[UI-FULL-NEGATIVE] %s full LCD verified and source restored\n",
                      label);
     };
-    if (ctx->wram[0xc28] < 255)
+    if (pallet3d_full_menu().context == int(full_menu::Context::Options))
+        probe(ctx->wram[0xd3d], 8, 32, "selection");
+    else if (pallet3d_full_menu().context != int(full_menu::Context::TrainerCard) &&
+             ctx->wram[0xc28] < 255)
         probe(ctx->wram[0xc26], uint8_t(ctx->wram[0xc28] + 1), 32, "selection");
     for (int cell = 0; cell < 360; ++cell) {
         int tile = tiles[cell];

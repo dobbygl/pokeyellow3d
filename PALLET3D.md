@@ -885,7 +885,22 @@ visuales se encuentran en `src/ui_theme.h`.
 | Tienda completa | Buy, dinero y stock en cuadrícula completa; cantidad, confirmaciones y mensaje de objeto no vendible conservan el orden de ventanas |
 | Lista Pokédex | Lista (0, 0, 14, 18), lateral (15, 8, 5, 9), contadores (16, 1, 4, 2) y (16, 4, 4, 2), sobre el dispositivo |
 | Mochila en combate | Cuadrícula completa, inferior y lista; texto y fragmentos de HUD/retratos originales fuera de las ventanas, verificados contra ROM y VRAM |
+| Opciones | (0, 0, 20, 18), desde Start y desde el menú inicial; cursor propio CD3D y flecha original en filas 2/4/6/8/10/16 |
+| Tarjeta de entrenador | Superior (0, 0, 20, 8), etiqueta central (0, 8, 20, 2), inferior (0, 10, 20, 8); conserva retrato, caras/medallas, números y colon propios |
+| Nombres | Cabecera (0, 0, 20, 4), teclado (0, 4, 20, 11), cambio de caja (0, 15, 20, 3); cuadrícula de 5 × 9 teclas, flecha, ED, subrayados e icono animado originales |
 | Pantalla desconocida | LCD completo enmarcado |
+
+Las siguientes pantallas conservan su composición previa, fuera de los
+perfiles completos de A1–A4:
+
+| Pantalla | Presentación conservada |
+| --- | --- |
+| Impresión del PC | Página original; no se convierte en una lista integrada nueva |
+| Salón de la Fama | Galería y retratos con sus ventanas de información originales |
+| Pokédex DATA y CRY | Datos y retrato sobre el dispositivo existente |
+| Pokédex AREA | Catálogo de Kanto, nidos y texto originales |
+| Geometría, fuente o gráfico no reconocidos | LCD completo enmarcado, sin recomponer parcialmente la pantalla |
+
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
 no se repite texto al separar el diálogo inferior de los cuadros superiores.
@@ -896,8 +911,10 @@ ni selección se reconstruye desde nombres o estados del menú.
 
 El orden de las regiones conserva los solapamientos originales. Las nuevas
 pruebas se ejecutan con `tests/ui_style_qa.sh ROM WORLD ROUTE1 ROUTE22 PALLET
-READY_BATTLE PC_WORLD`. `PC_WORLD` debe contener a Pikachu, un Pidgey capturado
+READY_BATTLE PC_WORLD SUCCESSFUL_CAPTURE_THROW`. `PC_WORLD` debe contener a Pikachu, un Pidgey capturado
 y una caja vacía; los recorridos de almacenamiento verifican ese requisito.
+El último estado debe proceder de un lanzamiento original que captura al
+Pokémon y permite abrir su teclado de mote; no se modifica el resultado.
 El helper acepta `menus-styled`, `menus-fp-styled`,
 `battle3d-styled` y `crossfade-styled`, además de las variantes de los
 recorridos. Los modos clásicos existentes siguen siendo la referencia.
@@ -914,9 +931,8 @@ cantidades ni listas. Los gráficos LV (`6E`) y caja ocupada (`78`) se contrasta
 con ambos planos de VRAM y sus gráficos originales en ROM antes de presentarlos.
 Un borde desconocido, selección inválida o glifo reemplazado conserva **todo**
 el LCD enmarcado. Las páginas de impresión, Hall of Fame y otras disposiciones
-que no figuran en esta tabla mantienen su presentación previa. Opciones,
-tarjeta y nombres siguen pendientes en A4 de
-`PLAN_PANTALLAS_COMPLETAS.md`.
+que no figuran en los perfiles completos mantienen su presentación previa.
+Opciones, tarjeta y nombres se incluyen en los perfiles de A4 descritos arriba.
 
 La batería específica es `tests/ui_full_pc_qa.sh ROM PC_WORLD`, con
 `QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1` para el estilo integrado.
@@ -1109,3 +1125,59 @@ revisados. Las 24 baterías clásicas conservan 2.497 capturas y 2.159 estados
 exactos frente a v0.3.0, incluidas las 38 vistas exteriores originales.
 CTest pasa 43/43 y el build independiente sin ROM 24/24. La evidencia y el
 estado de CI/fusión están registrados en `PLAN_PANTALLAS_COMPLETAS.md`.
+
+### Opciones, tarjeta de entrenador y nombres
+
+Opciones lee `wOptionsCursorLocation` (CD3D, alias `wWhichTrade` en el C
+generado), porque `wCurrentMenuItem` puede conservar la selección de Start.
+La flecha de `wTileMap` sigue siendo la autoridad visual durante un repintado.
+El perfil reconoce la llamada original compartida por Start y el menú inicial.
+Sus cinco ajustes, sus ciclos y Cancel siguen ejecutándose en el motor.
+
+La tarjeta valida el recorte del retrato de Red contra la ROM descomprimida,
+los bordes propios y cada gráfico visible. Los tiles D6–DF contienen el colon,
+fondo y números de medalla; no son caracteres de la fuente. Las caras y
+medallas se cotejan además con los bits de `wObtainedBadges`. Un gráfico,
+fuente, borde o disposición desconocidos conserva el LCD completo enmarcado.
+
+`tests/ui_full_options_qa.sh ROM WORLD_WITH_POKEDEX [INITIAL_MENU_STATE]`
+recorre todos los valores en ambas direcciones, el salto de filas vacías,
+wrap y salidas por Cancel, Start y B, desde ambos menús y en ambas cámaras.
+Sin el tercer argumento obtiene el estado inicial mediante el arranque original.
+`tests/ui_full_trainer_qa.sh ROM WORLD_WITH_POKEDEX` recorre medallas ausentes,
+mixtas y completas, nombre de siete caracteres y extremos de dinero/tiempo.
+Estas baterías están incluidas en `ui_style_qa.sh`; con estilo integrado
+comprueban fuente/gráficos/píxeles por frame, memoria intacta, pausa y carga.
+
+El teclado reconoce las llamadas originales al nombrar al jugador, al rival,
+en el inspector de motes y después de una captura. Lee el alfabeto y el texto
+de `wTileMap`; valida cada tecla y el cambio de caja contra las tablas de la
+ROM. ED y los subrayados se comprueban contra ROM/VRAM. El icono de Pokémon
+conserva los cuatro sprites OAM, sus fases, reflejos y paleta originales.
+El cursor pintado manda durante la llamada de animación, que reutiliza
+temporalmente `wCurrentMenuItem`. La rejilla añade fondos a las teclas sin
+mover ni sustituir caracteres. Cualquier gráfico, fuente o posición desconocidos
+devuelve atómicamente la pantalla LCD completa.
+
+`tests/ui_full_naming_qa.sh ROM TWO_POKEMON_WORLD SUCCESSFUL_CAPTURE_THROW
+[INITIAL_MENU_STATE]` obtiene los teclados con diálogos e inputs originales
+y recorre dieciséis combinaciones de entrada, cámara y envío por Start/ED.
+Comprueba mayúsculas/minúsculas, wrap, borrado, límites de 7/10 caracteres,
+nombre aceptado, icono animado, pausa, carga y controles negativos. También
+está incluida en `ui_style_qa.sh`. La invariante por frame incluye OAM,
+HRAM e IO además de WRAM, VRAM, RAM del cartucho y framebuffer.
+
+La validación inicial suma cuatro recorridos de opciones y seis de tarjeta,
+45/45 CTest y 26/26 pruebas en el build independiente sin ROM. Los contactos
+están revisados en `build/qa/logs/fullscreen-a4-*-contact-review.json`.
+Con el teclado añadido pasan dieciséis recorridos más, 46/46 CTest y 27/27
+pruebas sin ROM. La batería de nombres comprueba 21.172 frames, 1.460.496
+glifos y 20.960 cursores; el contacto incluye jugador, rival, inspector de
+motes y captura, con ambos alfabetos y nombres de longitud máxima.
+La batería acumulativa final pasa 82 recorridos, además de pausa/carga en
+ambas cámaras. Los tres contactos finales de A4 están revisados y CI pasa
+GCC, Clang, Linux 2D, MSVC y formato; Windows verifica también 27/27 pruebas
+sin ROM con ANGLE. Las 27 baterías clásicas conservan 2.765 capturas y
+2.427 estados idénticos a v0.3.0, incluidas las 38 vistas exteriores originales.
+La evidencia final está en `fullscreen-a4-evidence.json`; quedan la fusión
+y la publicación verificada de v0.4.0.

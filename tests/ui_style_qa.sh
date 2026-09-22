@@ -2,8 +2,8 @@
 # Reuse the engine-driven journeys in both cameras; enable the independent
 # per-frame glyph observer in the smoke executable. No fixture is committed.
 set -euo pipefail
-if (( $# != 7 )); then
-    echo "Usage: $0 ROM TWO_POKEMON_WORLD ROUTE1 ROUTE22 PALLET_9_7 READY_BATTLE NATURAL_PIDGEY_WORLD_WITH_EMPTY_BOX" >&2
+if (( $# != 8 )); then
+    echo "Usage: $0 ROM TWO_POKEMON_WORLD ROUTE1 ROUTE22 PALLET_9_7 READY_BATTLE NATURAL_PIDGEY_WORLD_WITH_EMPTY_BOX SUCCESSFUL_CAPTURE_THROW" >&2
     exit 2
 fi
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -14,6 +14,7 @@ trainer=$(realpath -- "$4")
 pallet=$(realpath -- "$5")
 battle=$(realpath -- "$6")
 pc_world=$(realpath -- "$7")
+capture_throw=$(realpath -- "$8")
 qa_dir=$(mktemp -d "$project/build/qa/ui-style-XXXXXX")
 mkdir -p "$qa_dir/logs"
 # Inherit the renderer used by the other journey suites. Call with
@@ -27,6 +28,9 @@ echo "QA output: $qa_dir"
 "$project/tests/ui_full_pokemon_qa.sh" "$rom" "$world" "$battle" > "$qa_dir/logs/full-pokemon.log" 2>&1
 "$project/tests/ui_full_items_qa.sh" "$rom" "$world" "$battle" > "$qa_dir/logs/full-items.log" 2>&1
 "$project/tests/ui_full_dex_qa.sh" "$rom" "$world" > "$qa_dir/logs/full-dex.log" 2>&1
+"$project/tests/ui_full_options_qa.sh" "$rom" "$world" > "$qa_dir/logs/full-options.log" 2>&1
+"$project/tests/ui_full_trainer_qa.sh" "$rom" "$world" > "$qa_dir/logs/full-trainer.log" 2>&1
+"$project/tests/ui_full_naming_qa.sh" "$rom" "$world" "$capture_throw" > "$qa_dir/logs/full-naming.log" 2>&1
 for style in classic integrated; do
     for operation in write read; do
         SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
@@ -79,6 +83,15 @@ report['full-items'] = dict(directory=str(items_root), scenarios=json.loads((ite
 dex_text = (root / 'logs/full-dex.log').read_text()
 dex_root = Path(re.search(r'QA output: (\S+)', dex_text)[1])
 report['full-dex'] = dict(directory=str(dex_root), scenarios=json.loads((dex_root / 'logs/dex.json').read_text()))
+options_text = (root / 'logs/full-options.log').read_text()
+options_root = Path(re.search(r'QA output: (\S+)', options_text)[1])
+report['full-options'] = dict(directory=str(options_root), scenarios=json.loads((options_root / 'logs/options.json').read_text()))
+trainer_text = (root / 'logs/full-trainer.log').read_text()
+trainer_root = Path(re.search(r'QA output: (\S+)', trainer_text)[1])
+report['full-trainer'] = dict(directory=str(trainer_root), scenarios=json.loads((trainer_root / 'logs/trainer.json').read_text()))
+naming_text = (root / 'logs/full-naming.log').read_text()
+naming_root = Path(re.search(r'QA output: (\S+)', naming_text)[1])
+report['full-naming'] = dict(directory=str(naming_root), scenarios=json.loads((naming_root / 'logs/naming.json').read_text()))
 for camera in ('menu-motion', 'menu-motion-fp'):
     content = (root / camera / 'logs/run.log').read_text()
     assert 'PASS: real Start animation' in content, camera

@@ -137,7 +137,9 @@ inline bool draw(GBContext *ctx, int w, int h, title_state::Phase phase, bool pa
             scene_filter::draw(w, h);
         else
             draw_world_frame(w, h, {.42f, 0}, true, false);
-        lcd_overlay::framed(gb_get_framebuffer(ctx), float(w), float(h));
+        if (menu_style != ui_preferences::Style::Integrated ||
+            !(full_menu::draw_options(ctx, w, h) || full_menu::draw_naming(ctx, w, h)))
+            lcd_overlay::framed(gb_get_framebuffer(ctx), float(w), float(h));
     }
     world_frame = {};
     return true;

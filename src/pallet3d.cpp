@@ -143,7 +143,8 @@ bool can_compose_battle(const GBContext *ctx) {
         return false;
     if (pallet::view(ctx) == pallet::View::Battle ||
         (menu_style == ui_preferences::Style::Integrated &&
-         item_menu::context(ctx) == full_menu::Context::BattleBag))
+         (item_menu::context(ctx) == full_menu::Context::BattleBag ||
+          (battle::normal(ctx) && naming_menu::active(ctx)))))
         return true;
     if ((!world_frame_current || world_frame.map < 0 ||
          world_frame.map != pallet::read(ctx, pallet::Map)) &&
@@ -163,6 +164,12 @@ bool can_compose_menu(const GBContext *ctx) {
         return false;
     const auto state = pallet::view(ctx);
     bool resident = world_frame.map >= 0 && world_frame.map == pallet::read(ctx, pallet::Map);
+    if (!resident && menu_style == ui_preferences::Style::Integrated &&
+        (options_menu::active(ctx) || trainer_card::active(ctx) || naming_menu::active(ctx))) {
+        const auto *scene = pallet::scene(pallet::read(ctx, pallet::Map));
+        if (scene && pallet::valid_live_map(ctx, *scene))
+            return true;
+    }
     if (!resident)
         return state == pallet::View::Dialogue && can_compose_dialogue(ctx);
     return state == pallet::View::Dialogue || state == pallet::View::Pokedex ||
@@ -1298,12 +1305,13 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         battle_sequence = true;
         bool item_list = menu_style == ui_preferences::Style::Integrated &&
                          item_menu::context(ctx) == full_menu::Context::BattleBag;
+        bool naming = menu_style == ui_preferences::Style::Integrated && naming_menu::active(ctx);
         // An opened bag can be loaded without a retained world or battle frame.
         // Its original live call establishes the arena; the full-menu profile
         // still validates every surviving HUD and portrait byte before drawing.
-        battle_arena |= battle_phase.hud || state == pallet::View::Battle || item_list;
+        battle_arena |= battle_phase.hud || state == pallet::View::Battle || item_list || naming;
         battle_fighters |=
-            (state == pallet::View::Battle && !battle::trainer_intro(ctx)) || item_list;
+            (state == pallet::View::Battle && !battle::trainer_intro(ctx)) || item_list || naming;
         battle_dark |= battle_phase.phase == battle_transition::Phase::Loading;
     } else {
         battle_sequence = battle_arena = battle_fighters = battle_dark = false;
@@ -1327,9 +1335,12 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
     menu_overlay = can_compose_menu(ctx);
     menu_blurred = false;
     menu_regions = menu_overlay ? menu_layout::classify(ctx->wram + 0x3a0) : menu_layout::Layout{};
-    menu_full = menu_overlay && (menu_regions.kind == menu_layout::Kind::Full ||
-                                 (menu_style == ui_preferences::Style::Integrated &&
-                                  item_menu::context(ctx) != full_menu::Context::None));
+    menu_full =
+        menu_overlay &&
+        (menu_regions.kind == menu_layout::Kind::Full ||
+         (menu_style == ui_preferences::Style::Integrated &&
+          (item_menu::context(ctx) != full_menu::Context::None || options_menu::active(ctx) ||
+           trainer_card::active(ctx) || naming_menu::active(ctx))));
     dialogue_overlay = menu_overlay && pallet::bottom_dialogue(ctx);
     warp_overlay = !battle_composed && can_compose_warp(ctx);
     if (!fade::field_arrival(ctx))
@@ -1500,7 +1511,10 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
                 draw_world_frame(width, height, {.42f, 0});
             if (!menu_open && !(menu_style == ui_preferences::Style::Integrated &&
                                 (pokemon_menu::draw(ctx, width, height) ||
-                                 full_menu::draw_items(ctx, width, height))))
+                                 full_menu::draw_items(ctx, width, height) ||
+                                 full_menu::draw_options(ctx, width, height) ||
+                                 full_menu::draw_trainer(ctx, width, height) ||
+                                 full_menu::draw_naming(ctx, width, height))))
                 lcd_overlay::framed(gb_get_framebuffer(ctx), float(width), float(height));
         } else if (!menu_open) {
             if (menu_style == ui_preferences::Style::Integrated)

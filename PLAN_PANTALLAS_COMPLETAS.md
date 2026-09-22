@@ -126,11 +126,11 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Bill, jugador y Oak presentan todas las disposiciones inventariadas de esta fase con paneles y glifos del tema sobre sus fondos de PC, y completan sus operaciones originales en ambas cámaras.
-- [ ] Cursor, scroll, cantidades, cambio de caja y confirmaciones coinciden por frame con los tiles y las variables originales verificadas; no hay filas omitidas, reordenadas o duplicadas.
-- [ ] Las disposiciones y gráficos no reconocidos vuelven al LCD completo enmarcado, con pruebas negativas y transiciones sin pérdida de contenido.
-- [ ] Los recorridos PC añadidos a `ui_style_qa.sh` pasan el oráculo glifo a glifo, cursor, OpenGL y memoria intacta por frame en ambas cámaras.
-- [ ] CTest completo, build independiente sin ROM con `ctest -LE rom`, formato y todas las baterías clásicas pasan; sus capturas y las 38 exteriores son idénticas a v0.3.0.
+- [x] Bill, jugador y Oak presentan todas las disposiciones inventariadas de esta fase con paneles y glifos del tema sobre sus fondos de PC, y completan sus operaciones originales en ambas cámaras.
+- [x] Cursor, scroll, cantidades, cambio de caja y confirmaciones coinciden por frame con los tiles y las variables originales verificadas; no hay filas omitidas, reordenadas o duplicadas.
+- [x] Las disposiciones y gráficos no reconocidos vuelven al LCD completo enmarcado, con pruebas negativas y transiciones sin pérdida de contenido.
+- [x] Los recorridos PC añadidos a `ui_style_qa.sh` pasan el oráculo glifo a glifo, cursor, OpenGL y memoria intacta por frame en ambas cámaras.
+- [x] CTest completo, build independiente sin ROM con `ctest -LE rom`, formato y todas las baterías clásicas pasan; sus capturas y las 38 exteriores son idénticas a v0.3.0.
 - [ ] Contactos PC revisados y comandos reproducibles están registrados; la PR de A1 supera CI y se fusiona antes de comenzar A2.
 
 ### Fase A2: equipo y resumen de Pokémon
@@ -389,3 +389,53 @@ env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
 bash build/qa/logs/run-fullscreen-a1-regressions.sh
 python3 build/qa/logs/collect-fullscreen-a1-classic.py
 ```
+
+
+### A1 — batería integrada y CI completos, 2026-09-22
+
+Commit `c4a0be9c3c948b3630bcc21a217011b88ae2cc4a`, publicado en
+`fullscreen-a1`; PR #23 abierta como borrador. CI `35673667245` pasa las cinco
+comprobaciones obligatorias para ese commit: formato, Linux 2D, Linux GCC,
+Linux Clang y Windows MSVC. macOS permanece desactivado explícitamente como
+en la base; no se cuenta como plataforma validada.
+
+`build/qa/ui-style-zhkm0d/logs/glyphs.json` confirma los treinta recorridos
+integrados y ambas pruebas de pausa/carga. El PC aporta los doce recorridos
+previstos, con controles negativos activos. La comparación de sus estados
+completos entre clásico e integrado comprueba 110 pares y 26.950.880 bytes,
+sin diferencias (`fullscreen-a1-style-engine-parity.json`). Las 38 capturas
+exteriores permanecen exactas (`fullscreen-a1-original-exteriors.json`).
+
+Esta evidencia acredita los cuatro primeros criterios de A1. Los dos últimos
+siguen pendientes hasta terminar las veinte regresiones clásicas y fusionar
+la PR. No se ha iniciado A2.
+
+
+### A1 — cierre de validación local, 2026-09-22
+
+Las veinte baterías clásicas terminan con código 0. Las 2.169 capturas,
+incluidas las diez vistas de ajustes antes registradas aparte, y 1.831 estados
+completos son idénticos a v0.3.0. La batería PC nueva añade 110 capturas y
+110 estados exactos contra el renderizador original con el nuevo driver;
+también conserva esos 110 estados entre clásico e integrado. Las 38 vistas
+exteriores originales no cambian. Ninguna comparación excluye capturas de
+ajustes ni acepta diferencias.
+
+El recopilador `build/qa/logs/collect-fullscreen-a1-evidence.py` termina con
+código 0 y genera `fullscreen-a1-evidence.json`. Exige fuentes congeladas,
+binarios coincidentes en cada batería, veinte scripts clásicos más el PC
+nuevo, treinta recorridos integrados, pausa/carga en ambas cámaras, CTest
+39/39, pruebas independientes sin ROM 20/20, formato 18.1.8, renderizado
+llvmpipe, contactos revisados, capturas README exactas y runtime sin cambios.
+
+```sh
+python3 build/qa/logs/collect-fullscreen-a1-evidence.py
+python3 tests/compare_classic_captures.py \
+  build/qa/ui-full-pc-v030-JXA8p8 build/qa/ui-full-pc-D03k7R \
+  --report build/qa/logs/fullscreen-a1-compare-full-pc.json
+gh run view 35673667245 --repo dobbygl/pokeyellow3d \
+  --json headSha,status,conclusion,jobs
+```
+
+Quedan acreditados cinco de los seis criterios de A1. El último se marcará
+al constatar la fusión de la PR #23 con CI verde, antes de implementar A2.

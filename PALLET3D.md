@@ -1016,3 +1016,16 @@ completos del motor con animaciones activadas y desactivadas; las
 62 capturas a fase fija coinciden con B2.
 Los contactos de apertura y cierre, la pausa/carga real en ambas cámaras
 y el informe final se conservan en `build/qa/logs/menu-style-c1-*`.
+
+
+### Pantallas completas: validación A1
+
+Bill, jugador y Oak pasan doce recorridos en ambas cámaras, integrados en la
+batería acumulativa de treinta recorridos. El oráculo PC comprueba 2.504.708
+glifos y 49.454 gráficos con memoria intacta por frame. Sus 110 estados de
+control son exactos entre clásico e integrado. Las veinte baterías clásicas
+conservan 2.169 capturas y 1.831 estados frente a v0.3.0, y la batería PC
+ampliada añade 110 capturas y estados exactos. Las 38 vistas exteriores
+originales siguen intactas. CTest pasa 39/39 y el build independiente sin
+ROM 20/20. Véanse `PLAN_PANTALLAS_COMPLETAS.md` y la evidencia privada
+`build/qa/logs/fullscreen-a1-evidence.json`.

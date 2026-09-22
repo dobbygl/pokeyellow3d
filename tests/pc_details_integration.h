@@ -27,13 +27,16 @@ inline void observe(GBContext *ctx, int frame) {
             }
         fail(shown.seen == counts[0] && shown.caught == counts[1],
              "Oak counters match original bitmaps");
-        fail(pallet3d_pc().monitor, "Oak text is on the monitor");
+        fail(pallet3d_pc().monitor || pallet3d_full_menu().active,
+             "Oak text is on the monitor or its integrated panels");
     }
     fail(pallet3d_input_mask() == 255, "relative controls remain neutral");
 }
 inline void verify_counter(QaWalk &run) {
     auto details = pallet3d_pc_details();
-    run.require(pallet3d_pc().monitor && (details.items || details.oak), "focused PC has counters");
+    run.require((pallet3d_pc().monitor || pallet3d_full_menu().active) &&
+                    (details.items || details.oak),
+                "focused PC has counters");
     char value[32];
     if (details.items)
         std::snprintf(value, sizeof(value), "ITEMS %02d OF 50", run.read(0xd539));
@@ -206,7 +209,7 @@ inline void details(pc_qa::Session &session) {
     verify_menu_overlay(run, "oak-question");
     run.press("A");
     run.wait(150);
-    run.require(pallet3d_pc_details().oak && pallet3d_pc().monitor,
+    run.require(pallet3d_pc_details().oak && (pallet3d_pc().monitor || pallet3d_full_menu().active),
                 "Oak evaluation and counts on monitor");
     verify_menu_overlay(run, "oak-evaluation");
     verify_counter(run);
@@ -225,6 +228,59 @@ inline int items_and_oak(GBContext *ctx, bool fp) {
     pc_qa::Session session(ctx, fp);
     details(session);
     session.close();
+    return 0;
+}
+inline int items_scroll(GBContext *ctx, bool fp) {
+    // Explicit stress fixture in this disposable QA context only. TM01..TM50
+    // are C9..FA in the pinned pret item_constants.asm. After setup, every
+    // selection, scroll, quantity and cancellation is handled by the game.
+    QaWalk prepare{ctx};
+    prepare.wait(30);
+    ctx->wram[0x1539] = 50;
+    for (int i = 0; i < 50; ++i) {
+        ctx->wram[0x153a + i * 2] = uint8_t(0xc9 + i);
+        ctx->wram[0x153b + i * 2] = uint8_t(i + 1);
+    }
+    ctx->wram[0x159e] = 0xff;
+    prepare.require(gb_context_save_state_file(ctx, "logs/items-fifty-world.state"),
+                    "record clearly synthetic fifty-item fixture");
+    pc_qa::Session session(ctx, fp);
+    auto &run = session.run;
+    center(session);
+    choose_center(session, 1);
+    choose_items(session, 0);
+    for (int i = 0; i < 50; ++i) {
+        run.require(run.read(0xcc26) + run.read(0xcc36) == i,
+                    "original cursor and scroll reach every stored item in order");
+        if (pallet3d_menu_style() == ui_preferences::Style::Integrated) {
+            auto shown = pallet3d_full_menu();
+            run.require(shown.active && !shown.fallback && shown.selected == i,
+                        "full PC list shows the original selected item");
+        }
+        if (i == 0 || i == 24 || i == 49)
+            verify_menu_overlay(run, (std::string("items-scroll-") + std::to_string(i)).c_str());
+        if (i < 49)
+            run.press("D");
+    }
+    run.press("A");
+    run.wait(100);
+    verify_menu_overlay(run, "items-scroll-quantity");
+    run.press("U");
+    run.wait(30);
+    run.require(run.read(0xcf95) == 2, "original quantity control increments to two");
+    verify_menu_overlay(run, "items-scroll-quantity-two");
+    run.press("B");
+    run.wait(100);
+    run.require(run.read(0xd539) == 50 && run.read(0xd59d) == 50,
+                "cancelled quantity leaves all original stored items intact");
+    run.press("D");
+    run.wait(30);
+    run.require(run.read(0xcc26) + run.read(0xcc36) == 50, "Cancel follows the last stored item");
+    verify_menu_overlay(run, "items-scroll-cancel");
+    run.press("A");
+    wait_items(session);
+    session.close();
+    std::puts("PASS: fifty original PC items, complete scroll, quantity input and cancellation");
     return 0;
 }
 } // namespace pc_details_qa

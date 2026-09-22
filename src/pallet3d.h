@@ -52,6 +52,12 @@ struct PalletMenuInfo {
     int regions;
 };
 PalletMenuInfo pallet3d_menu();
+struct PalletFullMenuInfo {
+    bool active = false, fallback = false;
+    int context = 0, kind = 0, regions = 0;
+    int current = 0, scroll = 0, selected = 0, cursor_x = -1, cursor_y = -1;
+};
+PalletFullMenuInfo pallet3d_full_menu();
 struct PalletDexInfo {
     bool active, verified;
     int species;

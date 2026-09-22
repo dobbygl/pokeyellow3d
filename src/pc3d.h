@@ -100,7 +100,9 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
     draw_world_frame(w, h, {}, t > 0, false, 0, &matrix);
     bool full = menu_regions.kind == menu_layout::Kind::Full;
     bool main = open && ((pc_sample.main && full) || pc_sample.mode == pc_state::Mode::Oak);
-    if (main) {
+    bool integrated = open && menu_style == ui_preferences::Style::Integrated &&
+                      full_menu::context(pc_sample.mode) != full_menu::Context::None;
+    if (main && !integrated) {
         upload(ctx, gb_get_framebuffer(ctx));
         monitor_image = true;
     } else {
@@ -199,7 +201,10 @@ void draw(GBContext *ctx, int w, int h, bool menu_open) {
     glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);
-    if (open && !main) {
+    if (integrated) {
+        if (!menu_open)
+            full_menu::draw(ctx, pc_sample.mode, w, h, pc_sample.mode != pc_state::Mode::Bill);
+    } else if (open && !main) {
         if (full) {
             scene_filter::capture(w, h);
             menu_blurred = scene_filter::draw(w, h);

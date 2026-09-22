@@ -31,8 +31,8 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 - **Interiors on demand.** Enter houses, shops, Pokémon Centers, laboratories, and caves. The renderer generates all 179 reachable interiors as needed.
 - **Battles in 3D.** Normal battles combine original Pokémon portraits with animated health displays, trainer introductions, four effect categories, and Poké Ball throws and shakes. Complex moves preserve the original animation; menus and text remain faithful to the game.
 - **An integrated HUD with the ROM font.** Recognized menus, battle controls and compatible labels share dark panels and original glyphs. The game still supplies all menu text and selections. Integrated is the default; Esc can persistently restore the classic presentation. Special graphics and unsupported regions retain their original LCD pixels.
-- **Original interfaces over a 3D world.** Dialogues and recognized windows retain the scene behind them; full-screen menus frame the original LCD over a dimmed, blurred background. `F2` crossfades into original 2D presentation. Fly, Teleport and Dig follow the engine's white fade and relocate the camera at the destination; bike and surf remain continuous.
-- **Pokédex and storage.** Browse the original list and data on a 3D device, see encounter areas over Kanto, use Bill’s twelve boxes, and visit the item PC, Oak’s evaluation and Hall of Fame gallery with original portraits and menus.
+- **Original interfaces over a 3D world.** Dialogues and recognized windows retain the scene behind them; unrecognized full-screen menus frame the original LCD over a dimmed, blurred background. `F2` crossfades into original 2D presentation. Fly, Teleport and Dig follow the engine's white fade and relocate the camera at the destination; bike and surf remain continuous.
+- **Pokédex and storage.** Browse the original list and data on a 3D device, see encounter areas over Kanto, and use Bill’s twelve boxes. Bill, player and Oak PC menus use themed panels with the original text, cursor, scrolling and quantities over their shelf or monitor. The Hall of Fame retains its original information windows and portraits.
 - **Bounded rendering work.** Exploration meshes are cached for the current map and its immediate neighbors, with at most five resident maps.
 
 ## Screenshots
@@ -49,7 +49,10 @@ Real captures from the renderer and its QA runs, stored at their original 800 ×
 
 | Integrated Start menu | PC storage |
 | --- | --- |
-| [![Original Start selections drawn with ROM glyphs on a dark panel over Kanto](docs/screenshots/integrated-start.png)](docs/screenshots/integrated-start.png) | [![PC storage with themed ROM-font shelf labels and the original full-screen menu](docs/screenshots/integrated-pc.png)](docs/screenshots/integrated-pc.png) |
+| [![Original Start selections drawn with ROM glyphs on a dark panel over Kanto](docs/screenshots/integrated-start.png)](docs/screenshots/integrated-start.png) | [![Bill's original deposit list and cursor in themed panels over the twelve-box shelf](docs/screenshots/integrated-pc.png)](docs/screenshots/integrated-pc.png) |
+| Player PC in first person | Oak PC |
+| --- | --- |
+| [![Original item list, quantities and dialogue over the PC monitor in first person](docs/screenshots/integrated-player-pc.png)](docs/screenshots/integrated-player-pc.png) | [![Oak's original evaluation prompt and Yes/No choices, with seen and caught counters](docs/screenshots/integrated-oak-pc.png)](docs/screenshots/integrated-oak-pc.png) |
 | **Pokédex** | **Hall of Fame** |
 | [![Pokédex with shared-font counters and options, retaining the original list and portrait](docs/screenshots/integrated-pokedex.png)](docs/screenshots/integrated-pokedex.png) | [![Saved champion team on the Hall of Fame pedestals, with original labels and native information windows](docs/screenshots/integrated-hall.png)](docs/screenshots/integrated-hall.png) |
 
@@ -186,7 +189,7 @@ Integrated panel backgrounds fade and move over about 150 ms using the Game Boy 
 | Interiors | All 179 reachable interiors load; representative house, lab, healing, shopping, stair, elevator, and cave journeys are covered. |
 | Battles | B1/B2 validated: arenas, portraits, HUDs, party changes, trainer battles, captures, four effect categories, and original-animation fallback. All 165 move records are audited; playable tests exercise representative moves. |
 | Menus and transitions | A1/A2/A3, B1/B2 and C1/C2/C3 validated: shared LCD composition, retained 3D menu backgrounds, palette-driven map fades, battle/save-state transitions, original boot into the 3D title, and Fly/Teleport/Dig travel. |
-| Integrated menus and HUD | Original ROM glyphs for recognized world and battle windows, names and compatible labels; shared theme and persistent classic fallback. See `PLAN_ESTILO_MENUS.md` for phase acceptance evidence. |
+| Integrated menus and HUD | Original ROM glyphs for recognized world and battle windows, names and compatible labels; complete Bill, player and Oak PC lists over their 3D backgrounds. Shared theme and persistent classic fallback. See `PLAN_ESTILO_MENUS.md` and `PLAN_PANTALLAS_COMPLETAS.md` for phase acceptance evidence. |
 | Pokédex and PC | 3D list/data device, ROM-verified portraits, AREA overview and Bill’s twelve-box storage are implemented. The item PC and Oak show live counters; the Hall of Fame reads saved teams from cartridge RAM into a pedestal gallery. |
 
 The renderer interprets building heights and furniture visually. Unclassified interior artwork retains its original flat texture, and neighboring-map NPCs are not simulated. The engine may freeze an offscreen NPC; the renderer preserves that live state instead of inventing movement. Water and flowers follow the original tileset animation. Link, tutorial, Safari, and unrecognized battle states retain the original 2D presentation. A complete story playthrough has not been validated.

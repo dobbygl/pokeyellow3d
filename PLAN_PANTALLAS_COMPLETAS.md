@@ -315,3 +315,77 @@ git diff --check
 
 Esta primera PR solo añade el plan. A1 comenzará después de su fusión con
 CI verde; todos los criterios permanecen sin marcar hasta reunir evidencia.
+
+
+### A1 — implementación y primeras verificaciones, 2026-09-22
+
+El plan se fusionó antes de implementar: PR #22, merge
+`22519197a55391c53c74e090bb32020e626a0d83`, cinco comprobaciones obligatorias
+verdes en el run `35670637409`. A1 trabaja en `fullscreen-a1` desde ese merge.
+
+`full_menu_layout.h` reconoce las ventanas originales superpuestas y conserva
+sus coordenadas. `menu_text` añade una cuadrícula completa compartida y valida
+la fuente antes de dibujar; `full_menu_gl.h` conecta Bill, jugador y Oak a sus
+fondos existentes. Un fallo de disposición, selección, fuente o gráfico vuelve
+al LCD completo enmarcado. No cambia el runtime ni el C generado del juego.
+
+El inventario privado contiene cincuenta tilemaps cotejados con sus savestates.
+Los gráficos LV y caja ocupada se contrastaron con los PNG originales de pret,
+la ROM y ambos planos de VRAM antes de incorporarlos. Referencias y SHA:
+`fullscreen-pc-source-inventory.json`, `fullscreen-pc-graphics-proof.json` y
+`fullscreen-pc-cursor-address-proof.json`, bajo `build/qa/logs/`. Los offsets son
+`10AE0` y `3AA28`; TM01–TM50 son `C9`–`FA`, y la cantidad original se lee en
+`CF95`. La lista reutilizable lee selección y scroll en `CC26` y `CC36`.
+
+Las pruebas añaden doce recorridos PC en ambas cámaras a `ui_style_qa.sh`.
+Incluyen veinte Pokémon, cincuenta objetos, cantidades, cancelaciones y controles
+negativos de borde, fuente, gráficos y selección. El oráculo compara todos los
+bits presentados con la ROM y VRAM, cuenta cada celda para detectar omisiones o
+duplicados y verifica el cursor; el guardián por frame conserva WRAM, VRAM,
+ERAM y framebuffer. El retorno de ChangeBox requiere respetar el cursor de doce
+filas que sigue pintado después de que el motor borre su flag de espaciado.
+
+Resultados parciales, que todavía no cierran la fase:
+
+- CTest completo 39/39 y build independiente sin ROM 20/20; formato 18.1.8.
+- Los doce recorridos PC clásicos mantienen 110 capturas y 110 estados exactos
+  frente al renderizador de v0.3.0 con el nuevo driver de entradas. Sus archivos
+  de producción se compararon con el tag; un recorrido previo conserva además
+  11/11 capturas y estados frente al helper original. Evidencia:
+  `fullscreen-v030-new-driver-proof.json`,
+  `fullscreen-v030-driver-equivalence-storage.json` y
+  `fullscreen-a1-compare-full-pc.json`.
+- Contactos de Bill, jugador y Oak revisados en ambas cámaras, con manifiestos
+  `fullscreen-a1-bill-contact-review.json` y
+  `fullscreen-a1-player-oak-contact-review.json`. README incorpora esas capturas.
+- La batería PC integrada pasa 12/12: 46.834 frames, 2.504.708 glifos,
+  49.454 gráficos y 29.862 comprobaciones de cursor. Las 2.305 presentaciones
+  de respaldo conservan el LCD completo; cifras en
+  `fullscreen-a1-full-pc-totals.json`. Los contactos de scroll y respaldo
+  también están revisados.
+- Continúan la batería integrada acumulativa y las veinte regresiones clásicas.
+  No se ha abierto ni fusionado la PR A1; sus casillas siguen pendientes.
+
+Se conservaron los primeros fallos de prueba: fixture general inadecuado para
+el recorrido que exige Pidgey y caja vacía; cursor de ChangeBox tras borrar el
+flag; contador del monitor afectado por desenfoque. La batería PC recibe ahora
+su fixture explícito y el monitor integrado conserva nítidos sus contadores.
+
+Comandos ejecutados (las rutas de savestate son evidencia privada local):
+
+```sh
+cmake --build build --target all pallet_render_smoke --parallel 2
+ctest --test-dir build --output-on-failure
+cmake --build build/qa/no-rom --parallel 2
+LIBGL_ALWAYS_SOFTWARE=1 ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 QA_CAPTURE_STATES=1 \
+  tests/ui_full_pc_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/pc-storage-fJ2Oob/capture/logs/capture-complete.state
+env -u LIBGL_ALWAYS_SOFTWARE QA_CAPTURE_STATES=1 tests/ui_style_qa.sh \
+  build/roms/pokeyellow.gbc build/qa/battles-eovzS8/logs/capture-complete.state \
+  build/qa/firstperson-9cB3FJ/route.state build/qa/battles-LojUdN/logs/route22-trainer.state \
+  build/qa/ui-crossfade-5bOG41/world.state build/qa/ui-crossfade-5bOG41/battle.state \
+  build/qa/pc-storage-fJ2Oob/capture/logs/capture-complete.state
+bash build/qa/logs/run-fullscreen-a1-regressions.sh
+python3 build/qa/logs/collect-fullscreen-a1-classic.py
+```

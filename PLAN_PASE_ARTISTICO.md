@@ -493,3 +493,31 @@ python3 tests/art_qa.py build/pallet_render_smoke build/art_benchmark \
 Los caminos absolutos, hashes y comandos concretos de las fixtures privadas
 figuran en `inputs.json`, los informes de procedencia del benchmark y
 `art-a1-preferences-restart.json`, fuera del repositorio.
+
+### A1 — cobertura reconstruida y defecto previo de la referencia
+
+- Las 27 baterías clásicas reconstruidas alcanzan las 2.765 capturas y los
+  2.427 estados del motor: v0.3.0 y `7955aaa` coinciden byte a byte. Se
+  conservan los archivos anteriores a cada ampliación de evidencia. El
+  inventario está en `build/qa/logs/art-full-regression-summary.json`.
+- La batería de retratos ejecuta ahora por defecto el observador DATA por
+  fotograma y las dos cargas en frío ya documentadas: `dex-screen` y
+  `dex-screen-fp`, incluida la detección de especie/VRAM incoherentes. Estas
+  dos comprobaciones faltaban en el ejecutor reconstruido. Se descartó la
+  hipótesis inicial sobre la preparación del menú: genera 52 capturas y no
+  explicaba el desfase de dos. No se incorporaron esas capturas al recuento.
+- Las 38 vistas exteriores de A1 y sus 38 estados coinciden directamente con
+  el driver original de v0.3.0; `art-a1-original-v030-catalog.json`. Las pruebas
+  adicionales de pausa/carga de paneles integrados también coinciden con
+  `7955aaa` en ambas cámaras; `art-menu-motion/result.json`.
+- La referencia integrada `7955aaa` falla en `ui_transitions`, salida blanca
+  de combate, fotograma 3883: la decoración de cierre deja un panel vacío
+  sobre el blanco. Es un fallo reproducido en la producción original. Una
+  copia privada que suprime esa decoración durante `warp_overlay` pasa el
+  recorrido completo y conserva el estado del motor del mismo fotograma.
+  Evidencia privada: `art-transition-probe/result.json` y capturas antes/después.
+- Aplicar esa corrección al modo desactivado contradice la identidad visual
+  estricta solicitada. La decisión sobre una excepción acotada está pendiente
+  del usuario. La corrección permanece en la copia privada; esta incidencia
+  no se cuenta como una prueba aprobada. Continúan las comprobaciones de A1;
+  la fase y su fusión siguen pendientes.

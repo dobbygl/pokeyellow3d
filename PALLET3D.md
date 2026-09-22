@@ -334,15 +334,17 @@ activa la medición. `PALLET3D_TRACE=1` registra cambios de vista y coordenadas;
   el 3D en ambas cámaras: `lcd_overlay.h` compone las filas 96–143 del
   framebuffer original, con escala entera y caché de las regiones subidas.
   Con una escena residente, Start y las ventanas reconocidas se superponen
-  al mundo. Equipo, mochila, PC, ficha, opciones, Pokédex y disposiciones no
-  reconocidas se enmarcan sobre esa escena atenuada y desenfocada. Cargar
-  directamente un estado de menú completo sin escena previa conserva el LCD.
+  al mundo. El LCD completo sobre la escena atenuada y desenfocada sigue
+  disponible como respaldo. Los perfiles de PC, equipo, mochila y Pokédex
+  descritos más abajo añaden sus presentaciones especializadas; las pantallas
+  no reconocidas conservan todo el contenido original.
   Las teclas son las originales mientras hay texto. Volver al exterior restaura
   la preferencia de cámara, sin pulsaciones relativas retenidas.
 - Pikachu puede ocupar gran parte de la vista al estar justo al lado del jugador.
   Árboles, rocas y laterales tienen geometría sencilla; las alturas son visuales.
   Las cornisas no cambian de nivel real: se representan con un balanceo de cámara.
-- Agua y vegetación son estáticas. Las playas, detalles sin clasificación
+- Agua y flores siguen la animación original, según el apartado 5A. Las playas,
+  detalles sin clasificación
   volumétrica, la cubierta del muelle y el barco conservan sus tiles originales
   sobre el plano; su cobertura se registra en el CSV. No se ocultan gráficos
   desconocidos ni se deducen colisiones de su aspecto.
@@ -436,6 +438,9 @@ pantallas completas. La partida original no se guarda ni sobrescribe.
 El registro de `PLAN_MENUS_TITULO_TRANSICIONES.md` distingue las pruebas de
 desarrollo de la validación final y sus regresiones.
 
+La siguiente tabla describe la composición clásica. Las disposiciones que
+añade el estilo integrado figuran en [Estilo de menús](#estilo-de-menús-clásico-e-integrado).
+
 | Situación | Presentación |
 | --- | --- |
 | Mundo exterior e interiores compatibles | 3D, ortográfica o primera persona |
@@ -469,8 +474,9 @@ del barrido sigue los tiles que escribe el motor, sin un temporizador externo.
 
 La primera arena coincide con el primer cuadro de texto visible del LCD,
 incluido el frame de latencia después de la escritura de BGP. Los dos Pokémon
-no tienen que estar listos para presentar esa arena. La mochila y el equipo
-usan el mismo marco que los menús del mundo, también mientras se desvanecen.
+no tienen que estar listos para presentar esa arena. En estilo clásico, la
+mochila y el equipo usan el mismo marco que los menús del mundo, también
+mientras se desvanecen. Sus perfiles integrados conservan esa arena de fondo.
 
 ```sh
 tests/ui_battles_qa.sh build/roms/pokeyellow.gbc \
@@ -842,7 +848,7 @@ valor inicial; la elección se guarda junto a la iluminación en
 El estilo integrado presenta las regiones reconocidas del mundo con paneles
 oscuros y los glifos originales de la ROM. A 800x720, Start y los cuadros
 superiores usan escala 3; el diálogo inferior usa escala 4. El relleno es
-14 píxeles y el radio 6. Clásico conserva la composición de v0.2.0.
+14 píxeles y el radio 6. La referencia de la composición clásica es v0.3.0.
 El cursor del ratón se oculta al jugar con foco y vuelve en Esc o al perderlo.
 
 Los paneles integrados aparecen y desaparecen en unos 150 ms, con un fundido
@@ -875,10 +881,10 @@ visuales se encuentran en `src/ui_theme.h`.
 | Acciones de equipo | Sin movimientos de campo: (11, 11, 9, 7). Con ellos: borde izquierdo verificado, alto variable y una fila extra sobre la primera opción |
 | Resumen: estadísticas | Retrato (1, 0, 7, 7), caja de estadísticas (0, 8, 10, 10), líneas originales derechas; HP con los tokens del HUD |
 | Resumen: movimientos | Retrato (1, 0, 7, 7), movimientos/PP (0, 8, 20, 10), barra de experiencia en la fila vacía 2; conserva ambos textos de experiencia |
-| Mochila del mundo (A3 en validación) | Start conservado, lista (4, 2, 16, 11), Use/Toss (13, 10, 7, 5), cantidad (15, 9, 5, 3), diálogo y confirmación |
-| Tienda completa (A3 en validación) | Buy, dinero y stock en cuadrícula completa; cantidad, confirmaciones y mensaje de objeto no vendible conservan el orden de ventanas |
-| Lista Pokédex (A3 en validación) | Lista (0, 0, 14, 18), lateral (15, 8, 5, 9), contadores (16, 1, 4, 2) y (16, 4, 4, 2), sobre el dispositivo |
-| Mochila en combate (A3 en validación) | Cuadrícula completa, inferior y lista; texto y fragmentos de HUD/retratos originales fuera de las ventanas, verificados contra ROM y VRAM |
+| Mochila del mundo | Start conservado, lista (4, 2, 16, 11), Use/Toss (13, 10, 7, 5), cantidad (15, 9, 5, 3), diálogo y confirmación |
+| Tienda completa | Buy, dinero y stock en cuadrícula completa; cantidad, confirmaciones y mensaje de objeto no vendible conservan el orden de ventanas |
+| Lista Pokédex | Lista (0, 0, 14, 18), lateral (15, 8, 5, 9), contadores (16, 1, 4, 2) y (16, 4, 4, 2), sobre el dispositivo |
+| Mochila en combate | Cuadrícula completa, inferior y lista; texto y fragmentos de HUD/retratos originales fuera de las ventanas, verificados contra ROM y VRAM |
 | Pantalla desconocida | LCD completo enmarcado |
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
@@ -908,8 +914,8 @@ cantidades ni listas. Los gráficos LV (`6E`) y caja ocupada (`78`) se contrasta
 con ambos planos de VRAM y sus gráficos originales en ROM antes de presentarlos.
 Un borde desconocido, selección inválida o glifo reemplazado conserva **todo**
 el LCD enmarcado. Las páginas de impresión, Hall of Fame y otras disposiciones
-que no figuran en esta tabla mantienen su presentación previa. A3 está en
-validación; opciones, tarjeta y nombres siguen pendientes en A4 de
+que no figuran en esta tabla mantienen su presentación previa. Opciones,
+tarjeta y nombres siguen pendientes en A4 de
 `PLAN_PANTALLAS_COMPLETAS.md`.
 
 La batería específica es `tests/ui_full_pc_qa.sh ROM PC_WORLD`, con
@@ -1068,7 +1074,7 @@ alterados, nivel 100 y movimientos de campo. El mismo recorrido clásico sirve
 para la comparación exacta con v0.3.0. La evidencia y el estado de aceptación
 de esta fase se registran en `PLAN_PANTALLAS_COMPLETAS.md`.
 
-### Mochila, tienda y lista Pokédex (A3 en desarrollo)
+### Mochila, tienda y lista Pokédex (A3)
 
 La mochila del mundo y la tienda comparten la cuadrícula y la lectura de cursor
 /scroll de A1. Conservan las partes visibles de Start y de las ventanas anteriores,
@@ -1097,6 +1103,9 @@ Pruebas específicas: `tests/ui_full_items_qa.sh ROM WORLD_AFTER_PARCEL READY_BA
 vistos, DATA y CRY en ambas cámaras. Comprueba cada glifo y marcador contra ROM,
 VRAM y la superficie final, además de cobertura, cursor, memoria, pausa/carga
 y cinco alteraciones de prueba. Ambos recorridos se incorporan a `ui_style_qa.sh`.
-La fase no está cerrada: están en ejecución la validación clásica acumulada
-contra v0.3.0 y los 56 recorridos integrados. No se fusiona A3 antes de cerrar
-esas comprobaciones y verificar la CI de su PR.
+Los 56 recorridos integrados acumulados y las comprobaciones de pausa/carga
+en ambas cámaras pasan; los contactos y las capturas nuevas del README están
+revisados. Las 24 baterías clásicas conservan 2.497 capturas y 2.159 estados
+exactos frente a v0.3.0, incluidas las 38 vistas exteriores originales.
+CTest pasa 43/43 y el build independiente sin ROM 24/24. La evidencia y el
+estado de CI/fusión están registrados en `PLAN_PANTALLAS_COMPLETAS.md`.

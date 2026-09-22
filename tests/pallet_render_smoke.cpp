@@ -230,11 +230,16 @@ int main(int argc, char **argv) {
         pallet3d_load_preferences(argv[4]);
         auto expected = !std::strcmp(argv[5], "classic") ? ui_preferences::Style::Classic
                                                          : ui_preferences::Style::Integrated;
+        if (argc > 6 && std::strcmp(argv[6], "on") && std::strcmp(argv[6], "off"))
+            return 2;
+        bool expected_art = argc > 6 && !std::strcmp(argv[6], "on");
         bool write = !std::strcmp(argv[3], "preferences-write");
         if (write && (!pallet3d_daylight({daynight::Mode::Fixed, 18.25}, true) ||
-                      !pallet3d_menu_style(expected, true)))
+                      !pallet3d_menu_style(expected, true) ||
+                      (argc > 6 && !pallet3d_artistic(expected_art, true))))
             return 64;
         bool ok = pallet3d_menu_style() == expected &&
+                  (argc <= 6 || pallet3d_artistic() == expected_art) &&
                   pallet3d_daylight_settings().mode == daynight::Mode::Fixed &&
                   pallet3d_daylight_settings().hour == 18.25;
         gb_platform_shutdown();

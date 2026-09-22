@@ -145,8 +145,8 @@ Trabajo:
 Criterios de aceptación:
 
 - [ ] Con el pase desactivado, las 38 capturas exteriores, las 179 de interiores y las baterías de menús, combate, PC, Pokédex y título son idénticas byte a byte a v0.4.1.
-- [ ] Un fichero de preferencias de cualquier versión anterior sigue cargando y el ajuste se conserva tras reiniciar.
-- [ ] El manifiesto cubre todas las familias y `tests/art_qa.sh` produce las capturas y las medidas de rendimiento de ambos modos.
+- [x] Un fichero de preferencias de cualquier versión anterior sigue cargando y el ajuste se conserva tras reiniciar.
+- [x] El manifiesto cubre todas las familias y `tests/art_qa.sh` produce las capturas y las medidas de rendimiento de ambos modos.
 
 ### Fase A2: clasificación completa de interiores
 
@@ -449,3 +449,47 @@ es el registro versionado de alcance, decisiones y evidencia.
 - La batería de horas conserva el ajuste artístico al recargar preferencias.
   El benchmark escribe líneas completas para impedir que los mensajes del
   renderer corrompan su formato; las mediciones incompletas se descartaron.
+
+### A1 — referencias y rendimiento verificados (2/24 criterios)
+
+- `build/qa/art-reference/A1` conserva las 1.736 imágenes de los 38 exteriores
+  y 179 interiores en ambas cámaras, estilos y estados del ajuste. Activado y
+  desactivado son idénticos; los 28 contactos están revisados. También se
+  revisaron las cuatro horas y los dos estados de la casilla de Esc.
+- Los 217 catálogos ortográficos clásicos y sus 217 estados completos
+  coinciden con los archivos recuperados de `7955aaa`; informe
+  `art-a1-recovered-catalog-comparison.json`.
+- Medias en Intel UHD 620, referencia → A1: exteriores 2,057 → 2,090 ms
+  (1,016×), interiores 1,679 → 1,681 ms (1,001×), cinco mapas ortográficos
+  4,322 → 4,137 ms (0,957×), cinco mapas en primera persona 4,987 → 4,958 ms
+  (0,994×). Tres repeticiones con orden alternado, sincronización GPU y
+  controles de memoria/GL fuera del intervalo medido; todas bajo 2×.
+- La prueba de persistencia añade once procesos nuevos: escritura y lectura
+  de las cuatro combinaciones estilo/pase, más migración real de v1 y v2.
+  Se arranca cada lector con el ajuste contrario para comprobar la carga.
+  Evidencia: `art-a1-preferences-restart.json`; la ampliación del driver de QA
+  no cambia el renderer ni los binarios de aplicación/benchmark ya medidos.
+- Aplicación: SHA-256 `6502dbbe0ca27fa8fc9fd7eef9faa8d37861a5f308945eefca6e958145d6f754`.
+  Benchmark: `32fe7ce2fbd7ed491c3d7bb5a06a993e0dc3fe1f3d15107be0cc997fc32ae577`.
+  Informe completo: `build/qa/logs/art-a1-reference-summary.json`; los
+  archivos privados se comprimen y verifican byte a byte antes de retirar
+  únicamente los directorios de ejecuciones sustituidas.
+- El driver ampliado enlazado con la producción inalterada de v0.3.0 conserva
+  las 38 capturas exteriores y las once de PC, junto con todos sus estados,
+  frente al driver original. Las baterías completas clásica/integrada están
+  en curso. El primer criterio de A1, su fusión y las siete fases siguientes
+  permanecen pendientes; la PR #29 sigue en borrador.
+
+Comandos del gate artístico (build y CTest ejecutados por separado):
+
+```sh
+cmake --build build --target all pallet_render_smoke art_benchmark --parallel 4
+ctest --test-dir build --output-on-failure
+ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+python3 tests/art_qa.py build/pallet_render_smoke build/art_benchmark \
+  "$ROM" "$PALLET_STATE" "$FIVE_MAP_STATE" "$V041_BENCHMARK" "$QA_OUTPUT"
+```
+
+Los caminos absolutos, hashes y comandos concretos de las fixtures privadas
+figuran en `inputs.json`, los informes de procedencia del benchmark y
+`art-a1-preferences-restart.json`, fuera del repositorio.

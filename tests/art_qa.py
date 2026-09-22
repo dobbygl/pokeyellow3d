@@ -56,6 +56,13 @@ def main():
         return directory, text
 
     for style in ('classic', 'integrated'):
+        for enabled in ('off', 'on'):
+            config = str(root / f'preferences-{style}-{enabled}.cfg')
+            for operation in ('write', 'read'):
+                _, text = run(f'preferences-{style}-{enabled}-{operation}', 'candidate',
+                              'pallet.state', f'preferences-{operation}', config, style, enabled,
+                              QA_ART_PASS='on' if enabled == 'off' else 'off')
+                assert 'PASS: presentation preferences survive process restart' in text
         for camera in ('ortho', 'fp'):
             for kind, count in (('catalog', 38), ('interior-catalog', 179)):
                 captures = {}

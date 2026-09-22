@@ -309,6 +309,25 @@ inline int battle_bag(GBContext *ctx, bool fp) {
     run.press("A");
     run.wait(60);
     capture(run, "bag-battle-first");
+    pause_and_load(run);
+    if (pallet3d_menu_style() == ui_preferences::Style::Integrated) {
+        for (auto probe : {std::pair<int, const char *>{0x1000, "front-portrait"},
+                           {0x1310, "back-portrait"},
+                           {0x1730, "hud-pattern"}}) {
+            ctx->vram[probe.first] ^= 1;
+            ReadOnlyMemory before{ctx};
+            gb_platform_render_frame(gb_get_framebuffer(ctx));
+            run.require(before.unchanged(ctx) && pallet3d_full_menu().active &&
+                            pallet3d_full_menu().fallback,
+                        "unverified battle bag graphics preserve complete original LCD");
+            std::fprintf(stderr, "[ITEM-BATTLE-NEGATIVE] %s full LCD verified\n", probe.second);
+            ctx->vram[probe.first] ^= 1;
+            ReadOnlyMemory restored{ctx};
+            gb_platform_render_frame(gb_get_framebuffer(ctx));
+            run.require(restored.unchanged(ctx) && !pallet3d_full_menu().fallback,
+                        "restored battle portrait and HUD integrate immediately");
+        }
+    }
     for (int i = 0; i < 20; ++i)
         run.press("D");
     run.require(run.read(0xcc26) + run.read(0xcc36) == 20,
@@ -324,6 +343,10 @@ inline int battle_bag(GBContext *ctx, bool fp) {
     capture_surface((label + ".ppm").c_str());
     run.require(gb_context_save_state_file(ctx, (label + ".state").c_str()),
                 "private original item target state");
+    FILE *target_tiles = std::fopen((label + ".tiles").c_str(), "wb");
+    run.require(target_tiles, "private original item target tilemap");
+    std::fwrite(ctx->wram + 0x3a0, 1, 360, target_tiles);
+    std::fclose(target_tiles);
     if (pallet3d_menu_style() == ui_preferences::Style::Integrated)
         run.require(pallet3d_pokemon_menu().active && !pallet3d_pokemon_menu().fallback,
                     "original Potion target remains an integrated party page");

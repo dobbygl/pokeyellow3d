@@ -878,7 +878,8 @@ visuales se encuentran en `src/ui_theme.h`.
 | Mochila del mundo (A3 en validación) | Start conservado, lista (4, 2, 16, 11), Use/Toss (13, 10, 7, 5), cantidad (15, 9, 5, 3), diálogo y confirmación |
 | Tienda completa (A3 en validación) | Buy, dinero y stock en cuadrícula completa; cantidad, confirmaciones y mensaje de objeto no vendible conservan el orden de ventanas |
 | Lista Pokédex (A3 en validación) | Lista (0, 0, 14, 18), lateral (15, 8, 5, 9), contadores (16, 1, 4, 2) y (16, 4, 4, 2), sobre el dispositivo |
-| Mochila en combate y pantalla desconocida | LCD completo enmarcado; el perfil de mochila en combate está pendiente en A3 |
+| Mochila en combate (A3 en validación) | Cuadrícula completa, inferior y lista; texto y fragmentos de HUD/retratos originales fuera de las ventanas, verificados contra ROM y VRAM |
+| Pantalla desconocida | LCD completo enmarcado |
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
 no se repite texto al separar el diálogo inferior de los cuadros superiores.
@@ -1073,7 +1074,12 @@ La mochila del mundo y la tienda comparten la cuadrícula y la lectura de cursor
 /scroll de A1. Conservan las partes visibles de Start y de las ventanas anteriores,
 incluidos cantidades, mensajes de Use/Toss, compra, venta y objetos no vendibles.
 `item_menu_state.h` exige las llamadas originales activas y rechaza los gráficos
-de otros perfiles. La mochila de combate aún conserva el LCD y está pendiente.
+de otros perfiles. La mochila de combate añade un perfil independiente: conserva
+el HUD y los fragmentos de ambos retratos que deja visibles la lista. Los retratos
+se descomprimen de la ROM y se cotejan completos con VRAM; el gráfico LV de combate
+procede de `BattleHudTiles1`, diferente del que carga el PC. Una partida cargada
+dentro de la mochila establece la escena de combate mediante su llamada original,
+sin necesitar una imagen anterior del mundo.
 
 La lista Pokédex presenta cuatro regiones sobre las pantallas y el cuerpo del
 dispositivo existente. Usa `menu_text` con posiciones proyectadas y escala entera;
@@ -1084,12 +1090,13 @@ el LCD completo; nunca combina media lista integrada con media lista nativa.
 El retrato sigue esperando a que el número y el cursor correspondientes sean
 visibles en el LCD. DATA y AREA conservan sus composiciones previas.
 
-Pruebas específicas: `tests/ui_full_items_qa.sh ROM WORLD_AFTER_PARCEL` y
+Pruebas específicas: `tests/ui_full_items_qa.sh ROM WORLD_AFTER_PARCEL READY_BATTLE` y
 `tests/ui_full_dex_qa.sh ROM WORLD_WITH_POKEDEX`, con
 `QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1`. La Pokédex recorre listas de 5 y
 151 entradas, ambos extremos, saltos de página, registros capturados/vistos/no
 vistos, DATA y CRY en ambas cámaras. Comprueba cada glifo y marcador contra ROM,
 VRAM y la superficie final, además de cobertura, cursor, memoria, pausa/carga
 y cinco alteraciones de prueba. Ambos recorridos se incorporan a `ui_style_qa.sh`.
-La fase no está cerrada: faltan el perfil de mochila en combate y la validación
-clásica acumulada contra v0.3.0 antes de la PR de A3.
+La fase no está cerrada: están en ejecución la validación clásica acumulada
+contra v0.3.0 y los 56 recorridos integrados. No se fusiona A3 antes de cerrar
+esas comprobaciones y verificar la CI de su PR.

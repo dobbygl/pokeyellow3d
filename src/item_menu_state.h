@@ -16,9 +16,12 @@ inline bool live_call(const GBContext *ctx, size_t offset, int target) {
 }
 inline full_menu::Context context(const GBContext *ctx) {
     if (!ctx || !ctx->wram || !ctx->vram || !ctx->io || !ctx->rom || ctx->rom_size != 1048576 ||
-        (ctx->io[0x40] & 0x90) != 0x80 || ctx->io[0x47] != 0xe4 ||
-        battle::read(ctx, battle::IsInBattle))
+        (ctx->io[0x40] & 0x90) != 0x80 || ctx->io[0x47] != 0xe4)
         return full_menu::Context::None;
+    if (battle::read(ctx, battle::IsInBattle))
+        return battle::normal(ctx) && live_call(ctx, 0x3d14e, 0x2ae0)
+                   ? full_menu::Context::BattleBag
+                   : full_menu::Context::None;
     // DisplayPokemartDialogue -> DisplayPokemartDialogue_ (fixed-bank caller).
     if (live_call(ctx, 0x292e, 0x69a5))
         return full_menu::Context::Mart;

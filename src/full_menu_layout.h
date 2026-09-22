@@ -8,7 +8,7 @@
 // still validate each visible glyph/graphic before replacing the original LCD.
 namespace full_menu {
 using menu_layout::Rect;
-enum class Context { None, PcCenter, PcItems, PcBill, PcOak, Bag, Mart };
+enum class Context { None, PcCenter, PcItems, PcBill, PcOak, Bag, Mart, BattleBag };
 enum class Kind {
     Unknown,
     PcMain,
@@ -18,7 +18,8 @@ enum class Kind {
     PcDialogue,
     BagList,
     BagAction,
-    Mart
+    Mart,
+    BattleBag
 };
 struct Layout {
     Kind kind = Kind::Unknown;
@@ -60,6 +61,23 @@ inline Layout classify(const uint8_t *tiles, Context context) {
         return true;
     };
     constexpr auto bottom = menu_layout::Bottom, yes_no = menu_layout::YesNo;
+    if (context == Context::BattleBag) {
+        // The original battle keeps HUD and portrait fragments outside these
+        // windows. Their stricter graphic profile is validated before drawing.
+        std::array<uint8_t, 360> windows{};
+        for (auto r : {bottom, List})
+            for (int y = r.y; y < r.y + r.h; ++y)
+                for (int x = r.x; x < r.x + r.w; ++x)
+                    windows[size_t(y * 20 + x)] = tiles[y * 20 + x];
+        if (!menu_layout::matches(windows.data(), result.text, {bottom, List}))
+            return {};
+        result.kind = Kind::BattleBag;
+        result.text.count = 3;
+        result.text.regions[0] = {0, 0, 20, 18};
+        result.text.regions[1] = bottom;
+        result.text.regions[2] = List;
+        return result;
+    }
     if (context == Context::Bag) {
         constexpr Rect action{13, 10, 7, 5};
         for (int height : {14, 16}) {

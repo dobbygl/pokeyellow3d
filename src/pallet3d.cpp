@@ -141,7 +141,9 @@ battle_transition::Sample battle_phase;
 bool can_compose_battle(const GBContext *ctx) {
     if (preview_map >= 0 || !battle_transition::supported(ctx))
         return false;
-    if (pallet::view(ctx) == pallet::View::Battle)
+    if (pallet::view(ctx) == pallet::View::Battle ||
+        (menu_style == ui_preferences::Style::Integrated &&
+         item_menu::context(ctx) == full_menu::Context::BattleBag))
         return true;
     if ((!world_frame_current || world_frame.map < 0 ||
          world_frame.map != pallet::read(ctx, pallet::Map)) &&
@@ -1294,8 +1296,14 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
             battle3d::reset();
         }
         battle_sequence = true;
-        battle_arena |= battle_phase.hud || state == pallet::View::Battle;
-        battle_fighters |= state == pallet::View::Battle && !battle::trainer_intro(ctx);
+        bool item_list = menu_style == ui_preferences::Style::Integrated &&
+                         item_menu::context(ctx) == full_menu::Context::BattleBag;
+        // An opened bag can be loaded without a retained world or battle frame.
+        // Its original live call establishes the arena; the full-menu profile
+        // still validates every surviving HUD and portrait byte before drawing.
+        battle_arena |= battle_phase.hud || state == pallet::View::Battle || item_list;
+        battle_fighters |=
+            (state == pallet::View::Battle && !battle::trainer_intro(ctx)) || item_list;
         battle_dark |= battle_phase.phase == battle_transition::Phase::Loading;
     } else {
         battle_sequence = battle_arena = battle_fighters = battle_dark = false;
@@ -1642,6 +1650,7 @@ void pallet3d_shutdown() {
     dex_area3d::shutdown();
     pc3d::shutdown();
     pokemon_menu::shutdown();
+    full_menu::shutdown();
     menu_text::shutdown();
     lcd_overlay::shutdown();
     scene_filter::shutdown();

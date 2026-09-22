@@ -707,3 +707,52 @@ pero su presentación integrada requiere un perfil gráfico propio; actualmente
 se conserva el LCD. También quedan las comparaciones clásicas completas con
 v0.3.0, la batería integrada acumulada, los contactos y capturas finales, y la PR
 con CI verde. A3 continúa con 0/6 criterios acreditados; A4 no ha comenzado.
+
+
+### A3 — mochila de combate y comienzo de validación final, 2026-09-22
+
+La mochila de combate ya usa la cuadrícula completa. Se verificó `DisplayBagMenu`
+`0F:514E → 2AE0` contra C generado, bytes de ROM y stack privado. El perfil conserva
+las ventanas inferior/lista y todo texto o gráfico que sigue visible fuera de
+ellas. El HUD usa los assets originales `BattleHudTiles1/2/3` y
+`HpBarAndStatusGraphics`; su LV no comparte el origen del LV del PC.
+
+Los dos retratos se descomprimen de la ROM y se comparan completos con VRAM antes
+de presentar sus fragmentos. La espalda sigue `ScaleSpriteByTwo`: recorta los
+cuatro píxeles sobrantes del borde derecho e inferior de 32 × 32 y escala el
+resto a 56 × 56. Los 473.536 píxeles de las 151 espaldas coinciden con los PNG
+originales: `fullscreen-a3-back-png-proof.json`. El fixture de combate también
+coincide byte a byte con ambas imágenes completas en VRAM.
+
+El recorrido integrado de combate pasa scroll de veinte objetos, Poción hacia
+la selección de equipo, cancelación sin consumir objeto ni turno, pausa/carga,
+y negativos de fuente, selección, borde, LV, ambos retratos y otro gráfico del
+HUD. La prueba de carga reveló la ausencia de una escena previa; la llamada
+original ahora permite establecer directamente la arena y presentar la mochila
+completa, sin avanzar el juego. Evidencia inicial:
+`build/qa/ui-battle-bag-load-7tocmv3f/logs/run.log`.
+
+La batería de objetos recibe ahora tres argumentos y suma catorce recorridos.
+Este comando sustituye los comandos de dos argumentos anteriores:
+
+```sh
+env -u LIBGL_ALWAYS_SOFTWARE QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1 \
+  tests/ui_full_items_qa.sh build/roms/pokeyellow.gbc \
+  build/qa/ui-menus-KfpanN/pallet.state build/qa/ui-crossfade-5bOG41/battle.state
+build/battle_bag_test build/roms/pokeyellow.gbc \
+  build/qa/ui-full-items-inventory-ihkhkd_d/items-battle/logs/bag-battle-first.state
+build/battle_bag_test build/roms/pokeyellow.gbc export-backs \
+  build/qa/logs/fullscreen-a3-backs.bin
+```
+
+CTest pasa 43/43, el build independiente sin ROM 24/24 y clang-format 18.1.8
+los 19 C++ cambiados. Las fuentes de implementación y pruebas están registradas
+en `fullscreen-a3-source-freeze.json`. Se ejecutan las 24 baterías clásicas y
+los 56 recorridos integrados acumulados. El helper nuevo se compiló contra
+v0.3.0 sin cambiar ninguno de sus archivos de producción; solo se añadieron
+interfaces de diagnóstico vacías al target de pruebas. El manifiesto es
+`fullscreen-a3-baseline-build-proof.json` y los dieciocho recorridos de referencia
+nuevos se ejecutan mediante `run-fullscreen-a3-v030.py`.
+
+No se acreditan aún criterios: quedan resultados finales, comparaciones,
+contactos/documentación de entrega y CI/fusión de la PR. A4 sigue pendiente.

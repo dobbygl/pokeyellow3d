@@ -12,7 +12,7 @@
 namespace ui_full_menu_qa {
 inline size_t frames = 0, glyphs = 0, bits = 0, graphics = 0, fallbacks = 0, cursors = 0;
 inline size_t pending_cursors = 0;
-inline std::array<size_t, 9> kinds{};
+inline std::array<size_t, 10> kinds{};
 inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
     std::fprintf(stderr, "[UI-FULL] FAIL frame=%zu %s tile=%02x at=%d,%d\n", frames, message, tile,
                  x, y);
@@ -21,9 +21,10 @@ inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
 inline void report() {
     std::fprintf(stderr,
                  "[UI-FULL] frames=%zu glyphs=%zu bits=%zu graphics=%zu fallback=%zu "
-                 "cursor=%zu pending_cursor=%zu kinds=%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu\n",
+                 "cursor=%zu pending_cursor=%zu kinds=%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu\n",
                  frames, glyphs, bits, graphics, fallbacks, cursors, pending_cursors, kinds[0],
-                 kinds[1], kinds[2], kinds[3], kinds[4], kinds[5], kinds[6], kinds[7], kinds[8]);
+                 kinds[1], kinds[2], kinds[3], kinds[4], kinds[5], kinds[6], kinds[7], kinds[8],
+                 kinds[9]);
 }
 inline void observe(GBContext *ctx, int width, int height) {
     auto shown = pallet3d_full_menu();
@@ -109,30 +110,56 @@ inline void observe(GBContext *ctx, int width, int height) {
                 continue;
             if (tile >= 0x80 && coverage[size_t(ty * 20 + tx)] != 1)
                 fail("original font cell omitted or submitted more than once", tile, tx, ty);
-            // Two exceptions independently tied to the original cartridge
-            // graphics; compare both bitplanes and all four presented indices.
+            bool battle_bag = shown.context == int(full_menu::Context::BattleBag);
+            bool portrait = battle_bag && ((tx >= 12 && tx <= 18 && ty <= 1) ||
+                                           (tx >= 1 && tx <= 3 && ty >= 5 && ty <= 11));
             size_t source = tile == 0x6e ? 0x10ae0 : tile == 0x78 ? 0x3aa28 : 0;
-            if (tile < 0x80 && !source)
+            bool one_bit = false;
+            if (battle_bag && !portrait && tile < 128) {
+                if (tile == 0x6e) {
+                    source = 0x10c08;
+                    one_bit = true;
+                } else if (tile == 0x73 || tile == 0x74 || tile == 0x76) {
+                    source = 0x10c18 + (tile - 0x73) * 8;
+                    one_bit = true;
+                } else if (tile == 0x62 || tile == 0x71)
+                    source = 0x10a20 + (tile - 0x62) * 16;
+            }
+            if (portrait) {
+                int expected = tx >= 12 ? (tx - 12) * 7 + ty : 0x31 + (tx - 1) * 7 + ty - 5;
+                if (tile != expected)
+                    fail("portrait fragment uses an unexpected original tile", tile, tx, ty);
+            }
+            if (tile < 0x80 && !source && !portrait)
                 fail("unsupported graphic did not retain LCD", tile, tx, ty);
+            auto original_byte = [&](int row, int plane) -> uint8_t {
+                // ROM picture decompression is independently checked against all
+                // 151 pret back PNGs and private full VRAM pictures. Here compare the
+                // actually presented fragment to the original live 2bpp bytes.
+                if (portrait)
+                    return ctx->vram[0x1000 + tile * 16 + row * 2 + plane];
+                if (source)
+                    return ctx->rom[source + row * (one_bit ? 1 : 2) + (one_bit ? 0 : plane)];
+                return ctx->rom[0x10600 + (tile - 128) * 8 + row];
+            };
             for (int y = 0; y < 8; ++y)
                 for (int plane = 0; plane < 2; ++plane) {
-                    uint8_t expected = source ? ctx->rom[source + y * 2 + plane]
-                                              : ctx->rom[0x10600 + (tile - 128) * 8 + y];
                     size_t address = tile < 128 ? 0x1000 + tile * 16 : 0x800 + (tile - 128) * 16;
-                    if (ctx->vram[address + y * 2 + plane] != expected)
+                    if (ctx->vram[address + y * 2 + plane] != original_byte(y, plane))
                         fail("VRAM replacement did not trigger LCD fallback", tile, tx, ty);
                 }
+            auto palette = battle::palette(ctx, ctx->wram[tx >= 12 ? 0xfd7 : 0xfd8]);
             for (int y = 0; y < 8; ++y)
                 for (int x = 0; x < 8; ++x) {
-                    int index =
-                        source ? ((ctx->rom[source + y * 2] >> (7 - x)) & 1) |
-                                     (((ctx->rom[source + y * 2 + 1] >> (7 - x)) & 1) << 1)
-                               : ((ctx->rom[0x10600 + (tile - 128) * 8 + y] >> (7 - x)) & 1) * 3;
+                    int index = ((original_byte(y, 0) >> (7 - x)) & 1) |
+                                (((original_byte(y, 1) >> (7 - x)) & 1) << 1);
                     constexpr ImU32 colors[]{0, ui_theme::DimInk,
                                              ui_theme::FrameEdge | IM_COL32_A_MASK, ui_theme::Ink};
                     const auto *actual = pixel(tx * 8 + x, ty * 8 + y);
                     if (index) {
-                        ImU32 color = colors[index];
+                        ImU32 color = portrait ? IM_COL32(palette[index][0], palette[index][1],
+                                                          palette[index][2], 255)
+                                               : colors[index];
                         if (actual[0] != uint8_t(color >> IM_COL32_R_SHIFT) ||
                             actual[1] != uint8_t(color >> IM_COL32_G_SHIFT) ||
                             actual[2] != uint8_t(color >> IM_COL32_B_SHIFT))
@@ -143,7 +170,7 @@ inline void observe(GBContext *ctx, int width, int height) {
                              ty * 8 + y);
                     ++bits;
                 }
-            source ? ++graphics : ++glyphs;
+            (source || portrait) ? ++graphics : ++glyphs;
             int pointer = ctx->wram[0xc30] | (ctx->wram[0xc31] << 8);
             if (tile == 0xed && pointer == 0xc3a0 + ty * 20 + tx) {
                 int step = ctx->hram[0x7a] & 2 ? 1 : 2;

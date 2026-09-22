@@ -6,6 +6,7 @@
 #include "rom_font.h"
 #include "dex_area_state.h"
 #include "imgui.h"
+#include "ui_full_menu_oracle.h"
 #include <SDL_opengles2.h>
 #include <vector>
 
@@ -26,6 +27,7 @@ inline void fail(const char *message, int tile = -1, int x = -1, int y = -1) {
 }
 inline void report() {
     if (enabled) {
+        ui_full_menu_qa::report();
         std::fprintf(stderr,
                      "[UI-STYLE] frames=%zu glyphs=%zu bits=%zu classic_fallback_tiles=%zu\n",
                      frames, glyphs, bits, fallback_tiles);
@@ -211,6 +213,7 @@ inline void observe(GBContext *ctx, int w, int h, bool menu_open) {
             fail("default ImGui glyph drawn during integrated gameplay");
         }
         observe_atlas(ctx, w, h);
+        ui_full_menu_qa::observe(ctx, w, h);
     }
     auto info = pallet3d_menu();
     auto arena = pallet3d_battle();

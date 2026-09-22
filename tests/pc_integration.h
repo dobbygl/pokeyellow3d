@@ -71,11 +71,14 @@ inline int focus(GBContext *ctx, bool fp) {
     run.press("A");
     run.wait(180);
     verify_menu_overlay(run, "pc-power-on", 1);
-    for (int i = 0; i < 8 && (!pallet3d_pc().monitor || run.read(0xcc28) != 3); i++) {
+    for (int i = 0; i < 8 && (!(pallet3d_pc().monitor || pallet3d_full_menu().active) ||
+                              run.read(0xcc28) != 3);
+         i++) {
         run.press("A");
         run.wait(80);
     }
-    run.require(pallet3d_pc().active && pallet3d_pc().monitor && pallet3d_pc().progress == 1,
+    run.require(pallet3d_pc().active && (pallet3d_pc().monitor || pallet3d_full_menu().active) &&
+                    pallet3d_pc().progress == 1,
                 "main menu on focused monitor");
     run.require(approaching >= 23 && approaching <= 25, "approach lasts about 400ms");
     verify_menu_overlay(run, "pc-focused-main", 2);

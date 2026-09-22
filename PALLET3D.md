@@ -866,6 +866,11 @@ visuales se encuentran en `src/ui_theme.h`.
 | Tienda | Buy (0, 0, 11, 7), dinero (11, 0, 9, 3), stock (4, 2, 16, 11), cantidad (7, 9, 13, 3) |
 | Combate: mensajes y FIGHT | Inferior (0, 12, 20, 6), con controles (8, 12, 12, 6) superpuestos |
 | Combate: movimientos | Inferior, lista (4, 12, 16, 6) y PP/tipo (0, 8, 11, 5), en ese orden |
+| PC: selección de terminal | Principal (0, 0, 16, 8/10/12), con cuadro inferior y Sí / No según el original |
+| PC de Bill | Principal (0, 0, 14, 14), caja actual (9, 14, 11, 4), lista (4, 2, 16, 11), acción (9, 10, 11, 8) |
+| PC: cambio de caja | Número (0, 0, 11, 4), doce cajas (11, 0, 9, 14), sobre el menú y diálogo originales |
+| PC del jugador | Principal (0, 0, 16, 10), lista (4, 2, 16, 11), cantidad (15, 9, 5, 3), cuadro inferior y confirmación |
+| PC de Oak | Menú del terminal, cuadro inferior y Sí / No; conserva los diálogos y la evaluación originales |
 | Equipo, mochila y pantalla desconocida | LCD completo enmarcado |
 
 Cada celda pertenece a la última ventana que la cubre en el mapa original;
@@ -877,13 +882,35 @@ ni selección se reconstruye desde nombres o estados del menú.
 
 El orden de las regiones conserva los solapamientos originales. Las nuevas
 pruebas se ejecutan con `tests/ui_style_qa.sh ROM WORLD ROUTE1 ROUTE22 PALLET
-READY_BATTLE`. El helper acepta `menus-styled`, `menus-fp-styled`,
+READY_BATTLE PC_WORLD`. `PC_WORLD` debe contener a Pikachu, un Pidgey capturado
+y una caja vacía; los recorridos de almacenamiento verifican ese requisito.
+El helper acepta `menus-styled`, `menus-fp-styled`,
 `battle3d-styled` y `crossfade-styled`, además de las variantes de los
 recorridos. Los modos clásicos existentes siguen siendo la referencia.
 La comparación byte a byte se hace con
 `tests/compare_classic_captures.py BASE CANDIDATE --report REPORTE.json`;
 `--settings-ui-changed` registra aparte las dos capturas del panel Esc
 que contienen el control nuevo, sin excluir capturas del juego.
+
+Los PC completos usan una cuadrícula común de 20 × 18 tiles a escala entera.
+La estantería de Bill y el monitor del jugador/Oak conservan sus retratos y
+contadores. Cada carácter procede de `wTileMap`; selección y desplazamiento
+se leen de `wCurrentMenuItem` y `wListScrollOffset`. No se reconstruyen nombres,
+cantidades ni listas. Los gráficos LV (`6E`) y caja ocupada (`78`) se contrastan
+con ambos planos de VRAM y sus gráficos originales en ROM antes de presentarlos.
+Un borde desconocido, selección inválida o glifo reemplazado conserva **todo**
+el LCD enmarcado. Las páginas de impresión, Hall of Fame y otras disposiciones
+que no figuran en esta tabla mantienen su presentación previa. Equipo y resumen,
+mochila, lista de Pokédex, opciones, tarjeta y nombres se abordan en A2–A4 de
+`PLAN_PANTALLAS_COMPLETAS.md`.
+
+La batería específica es `tests/ui_full_pc_qa.sh ROM PC_WORLD`, con
+`QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1` para el estilo integrado.
+Recorre ambas cámaras, veinte Pokémon, cincuenta objetos, cantidades,
+confirmaciones y cancelaciones. Verifica por frame los píxeles de los glifos,
+su cobertura sin omisiones ni duplicados, el cursor y la memoria; además altera
+fuente, gráficos, borde y selección en un contexto de prueba desechable para
+comprobar el respaldo LCD completo. Los savestates y ROM quedan fuera de Git.
 
 
 La base A1 está validada: veinte baterías clásicas, 2.159 capturas de juego
@@ -989,3 +1016,16 @@ completos del motor con animaciones activadas y desactivadas; las
 62 capturas a fase fija coinciden con B2.
 Los contactos de apertura y cierre, la pausa/carga real en ambas cámaras
 y el informe final se conservan en `build/qa/logs/menu-style-c1-*`.
+
+
+### Pantallas completas: validación A1
+
+Bill, jugador y Oak pasan doce recorridos en ambas cámaras, integrados en la
+batería acumulativa de treinta recorridos. El oráculo PC comprueba 2.504.708
+glifos y 49.454 gráficos con memoria intacta por frame. Sus 110 estados de
+control son exactos entre clásico e integrado. Las veinte baterías clásicas
+conservan 2.169 capturas y 1.831 estados frente a v0.3.0, y la batería PC
+ampliada añade 110 capturas y estados exactos. Las 38 vistas exteriores
+originales siguen intactas. CTest pasa 39/39 y el build independiente sin
+ROM 20/20. Véanse `PLAN_PANTALLAS_COMPLETAS.md` y la evidencia privada
+`build/qa/logs/fullscreen-a1-evidence.json`.

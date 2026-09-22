@@ -2,8 +2,8 @@
 # Reuse the engine-driven journeys in both cameras; enable the independent
 # per-frame glyph observer in the smoke executable. No fixture is committed.
 set -euo pipefail
-if (( $# != 6 )); then
-    echo "Usage: $0 ROM TWO_POKEMON_WORLD ROUTE1 ROUTE22 PALLET_9_7 READY_BATTLE" >&2
+if (( $# != 7 )); then
+    echo "Usage: $0 ROM TWO_POKEMON_WORLD ROUTE1 ROUTE22 PALLET_9_7 READY_BATTLE NATURAL_PIDGEY_WORLD_WITH_EMPTY_BOX" >&2
     exit 2
 fi
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -13,6 +13,7 @@ wild=$(realpath -- "$3")
 trainer=$(realpath -- "$4")
 pallet=$(realpath -- "$5")
 battle=$(realpath -- "$6")
+pc_world=$(realpath -- "$7")
 qa_dir=$(mktemp -d "$project/build/qa/ui-style-XXXXXX")
 mkdir -p "$qa_dir/logs"
 # Inherit the renderer used by the other journey suites. Call with
@@ -22,6 +23,7 @@ echo "QA output: $qa_dir"
 "$project/tests/ui_menus_qa.sh" "$rom" "$world" > "$qa_dir/logs/menus.log" 2>&1
 "$project/tests/ui_battles_qa.sh" "$rom" "$wild" "$trainer" > "$qa_dir/logs/battles.log" 2>&1
 "$project/tests/ui_crossfade_qa.sh" "$rom" "$pallet" "$battle" > "$qa_dir/logs/crossfade.log" 2>&1
+"$project/tests/ui_full_pc_qa.sh" "$rom" "$pc_world" > "$qa_dir/logs/full-pc.log" 2>&1
 for style in classic integrated; do
     for operation in write read; do
         SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
@@ -62,6 +64,9 @@ for suite in ('menus', 'battles', 'crossfade'):
     assert samples, suite
     report[suite] = dict(directory=str(directory), scenarios=samples)
 assert sum(s['glyphs'] for s in report['menus']['scenarios']) > 0
+full_pc_text = (root / 'logs/full-pc.log').read_text()
+full_pc_root = Path(re.search(r'QA output: (\S+)', full_pc_text)[1])
+report['full-pc'] = dict(directory=str(full_pc_root), scenarios=json.loads((full_pc_root / 'logs/full-pc.json').read_text()))
 for camera in ('menu-motion', 'menu-motion-fp'):
     content = (root / camera / 'logs/run.log').read_text()
     assert 'PASS: real Start animation' in content, camera

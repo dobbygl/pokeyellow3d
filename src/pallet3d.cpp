@@ -11,6 +11,7 @@
 #include "rom_font.h"
 #include "lcd_overlay.h"
 #include "menu_text_gl.h"
+#include "full_menu_gl.h"
 #include "hud_text_gl.h"
 #include "rom_text_region.h"
 #include "battle_menu_layout.h"
@@ -1226,6 +1227,7 @@ void hud(GBContext *ctx) {
 } // namespace
 
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
+    full_menu::shown = {};
     menu_text::FrameEnd menu_frame_end{active, failed};
     battle3d::integrated_menu = false;
     battle3d::menu_panels = 0;
@@ -1853,6 +1855,9 @@ PalletWorldFrameInfo pallet3d_world_frame() {
 PalletMenuInfo pallet3d_menu() {
     return {menu_overlay && active && !dex3d::presented && !pc3d::presented, menu_full,
             menu_blurred, int(menu_regions.count)};
+}
+PalletFullMenuInfo pallet3d_full_menu() {
+    return full_menu::shown;
 }
 PalletPCInfo pallet3d_pc() {
     return {pc3d::presented && active,

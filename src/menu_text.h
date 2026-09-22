@@ -1,5 +1,6 @@
 #pragma once
 #include "menu_layout.h"
+#include "menu_graphics.h"
 #include "rom_font.h"
 #include <algorithm>
 #include <array>
@@ -9,10 +10,11 @@
 // reconstructed. Verified against pret/pokeyellow constants/charmap.asm at
 // e89ead154b9968aa50eed9328ff2b38b6c194382: cursor ED, down EE, money F0,
 // e-acute BA, contractions BB/BD, PK/MN E1/E2, digits F6-FF. LV=6E is extra
-// graphics, not FontGraphics, and deliberately falls back to the LCD.
+// graphics, not FontGraphics. Only complete screens admit the separately
+// verified graphics in menu_graphics.h; other placements retain the LCD.
 namespace menu_text {
 constexpr uint8_t Cursor = 0xed;
-enum class Placement { World, Battle };
+enum class Placement { World, Battle, Full };
 struct Panel {
     bool fallback = false, visible = false;
     int rejected_tile = -1;
@@ -42,7 +44,8 @@ inline bool is_bottom(menu_layout::Rect r) {
 }
 inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::Atlas &font,
                     const menu_layout::Layout &layout, float width, float height, float padding,
-                    int menu_scale, int bottom_scale, Placement placement = Placement::World) {
+                    int menu_scale, int bottom_scale, Placement placement = Placement::World,
+                    const uint8_t *graphics_rom = nullptr, size_t graphics_rom_size = 0) {
     Plan plan;
     if (!tiles || layout.kind != menu_layout::Kind::Partial || layout.count > 8)
         return plan;
@@ -67,6 +70,11 @@ inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::A
         p.origin_x = bottom ? std::floor((width - 20 * cell) / 2)
                             : std::floor(width - 2 * padding - 19 * cell);
         p.origin_y = bottom ? std::floor(height - 2 * padding - 17 * cell) : 2 * padding;
+        if (placement == Placement::Full) {
+            p.scale = std::max(1, int(std::min(width * .75f / 160, height * .75f / 144)));
+            p.origin_x = std::floor((width - 160 * p.scale) / 2);
+            p.origin_y = std::floor((height - 144 * p.scale) / 2);
+        }
         for (int y = r.y; y < r.y + r.h; ++y)
             for (int x = r.x; x < r.x + r.w; ++x)
                 plan.owner[y * 20 + x] = int(i);
@@ -82,7 +90,10 @@ inline Plan prepare(const uint8_t *tiles, const uint8_t *vram, const rom_font::A
                 if (plan.owner[y * 20 + x] != int(i))
                     continue;
                 uint8_t tile = tiles[y * 20 + x];
-                if (tile < 0x79 || (tile >= 0x80 && !font_matches(font, vram, tile))) {
+                bool graphic = placement == Placement::Full &&
+                               menu_graphics::matches(tile, vram, graphics_rom, graphics_rom_size);
+                if ((tile < 0x79 && !graphic) ||
+                    (tile >= 0x80 && !font_matches(font, vram, tile))) {
                     p.fallback = true;
                     p.rejected_tile = tile;
                 }

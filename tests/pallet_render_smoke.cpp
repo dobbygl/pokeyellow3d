@@ -287,6 +287,12 @@ int main(int argc, char **argv) {
         return result;
     }
     if (argc > 3 &&
+        (!std::strcmp(argv[3], "pc-items-scroll") || !std::strcmp(argv[3], "pc-items-scroll-fp"))) {
+        int result = pc_details_qa::items_scroll(ctx, !std::strcmp(argv[3], "pc-items-scroll-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
         (!std::strcmp(argv[3], "pc-details") || !std::strcmp(argv[3], "pc-details-fp"))) {
         int result = pc_details_qa::items_and_oak(ctx, !std::strcmp(argv[3], "pc-details-fp"));
         gb_platform_shutdown();

@@ -47,10 +47,67 @@ inline void exercise_integrated_cursor(QaWalk &run) {
     run.require(run.read(0xcc26) == initial, "original cursor returns to its entry");
 }
 
+inline void full_menu_negative_controls(QaWalk &run) {
+    if (!std::getenv("QA_FULL_NEGATIVES") ||
+        pallet3d_menu_style() != ui_preferences::Style::Integrated ||
+        !pallet3d_full_menu().active || pallet3d_full_menu().fallback)
+        return;
+    static unsigned exercised = 0;
+    auto *ctx = run.ctx;
+    auto *tiles = ctx->wram + 0x3a0;
+    auto probe = [&](uint8_t &byte, uint8_t replacement, unsigned bit, const char *label) {
+        if (exercised & bit)
+            return;
+        // Deliberately corrupt only the disposable QA context, then snapshot
+        // it. Rendering must preserve even this malformed input byte-for-byte.
+        uint8_t original = byte;
+        byte = replacement;
+        ReadOnlyMemory corrupt{ctx};
+        gb_platform_render_frame(gb_get_framebuffer(ctx));
+        run.require(corrupt.unchanged(ctx) && pallet3d_full_menu().fallback,
+                    "malformed complete menu keeps full original LCD and all source memory");
+        capture_surface((std::string("logs/full-negative-") + label + ".ppm").c_str());
+        byte = original;
+        ReadOnlyMemory restored{ctx};
+        gb_platform_render_frame(gb_get_framebuffer(ctx));
+        run.require(restored.unchanged(ctx) && !pallet3d_full_menu().fallback,
+                    "restored original source returns to integrated menu");
+        exercised |= bit;
+        std::fprintf(stderr, "[UI-FULL-NEGATIVE] %s full LCD verified and source restored\n",
+                     label);
+    };
+    if (ctx->wram[0xc28] < 255)
+        probe(ctx->wram[0xc26], uint8_t(ctx->wram[0xc28] + 1), 32, "selection");
+    for (int cell = 0; cell < 360; ++cell) {
+        int tile = tiles[cell];
+        if (tile == 0x79)
+            probe(tiles[cell], 0x7f, 1, "border");
+        if (tile >= 0x80) {
+            probe(tiles[cell], 0x61, 2, "unknown-tile");
+            auto &pattern = ctx->vram[0x800 + (tile - 128) * 16];
+            probe(pattern, uint8_t(pattern ^ 1), 4, "font");
+        }
+        if (tile == 0x6e || tile == 0x78) {
+            auto &pattern = ctx->vram[0x1000 + tile * 16];
+            probe(pattern, uint8_t(pattern ^ 1), tile == 0x6e ? 8 : 16,
+                  tile == 0x6e ? "level" : "occupied-box");
+        }
+    }
+}
+
 inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -1) {
     auto *ctx = run.ctx;
     auto info = pallet3d_menu();
     auto pc = pallet3d_pc();
+    auto complete = pallet3d_full_menu();
+    if (pallet3d_menu_style() == ui_preferences::Style::Integrated && pc.active &&
+        pc.mode >= int(pc_state::Mode::Center) && pc.mode <= int(pc_state::Mode::Oak)) {
+        bool corrupt_storage = pc.mode == int(pc_state::Mode::Bill) && !pc_storage::read(ctx).valid;
+        run.require(complete.active && (corrupt_storage ? complete.fallback : !complete.fallback),
+                    "supported PC capture is integrated; corrupt storage retains full LCD");
+        std::fprintf(stderr, "[UI-FULL-CAPTURE] %s kind=%d fallback=%d current=%d scroll=%d\n",
+                     label, complete.kind, complete.fallback, complete.current, complete.scroll);
+    }
     auto layout = menu_layout::classify(ctx->wram + 0x3a0);
     std::string path = std::string("logs/") + label;
     capture_surface((path + ".ppm").c_str());
@@ -64,7 +121,7 @@ inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -
         "[MENU] %s view=%d kind=%d regions=%d full=%d blur=%d live=%d sp=%04x cursor=%d max=%d\n",
         label, int(pallet::view(ctx)), int(layout.kind), info.regions, info.full, info.blurred,
         menu_state::running(ctx), ctx->sp, run.read(0xcc26), run.read(0xcc28));
-    if (info.full && !info.blurred && !pc.monitor) {
+    if (info.full && !info.blurred && !pc.monitor && !complete.active) {
         std::fprintf(stderr, "[MENU] unexpected fade=%d bgp=%02x lcdc=%02x live warp=%d\n",
                      pallet3d_warp_overlay(), ctx->io[0x47], ctx->io[0x40], fade::warp(ctx));
         for (int a = ctx->sp; a < 0xdfff; a += 2)
@@ -75,7 +132,8 @@ inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -
                 "menu retains a 3D background");
     if (expected >= 0)
         run.require(int(layout.kind) == expected, "expected original menu layout");
-    run.require(!info.full || info.blurred || (pc.active && pc.monitor && pc.progress == 1),
+    run.require(!info.full || info.blurred || complete.active ||
+                    (pc.active && pc.monitor && pc.progress == 1),
                 "full screen has blur or is on the focused PC monitor");
     run.require(pallet3d_input_mask() == 255, "menus neutralize relative movement");
     auto camera = pallet3d_world_frame();
@@ -102,20 +160,23 @@ inline void verify_menu_overlay(QaWalk &run, const char *label, int expected = -
         run.require(storage.rebuilds == pallet3d_storage().rebuilds &&
                         storage.uploads == pallet3d_storage().uploads,
                     "unchanged box/party bytes reuse shelf geometry and portraits");
-    if (pallet3d_menu_style() == ui_preferences::Style::Integrated && !info.full && !pc.active) {
+    if (pallet3d_menu_style() == ui_preferences::Style::Integrated &&
+        ((!info.full && !pc.active) || (complete.active && !complete.fallback))) {
         run.require(ui_style_qa::enabled, "integrated capture requires per-frame glyph oracle");
         ui_style_qa::observe(ctx, w, h, false);
+        full_menu_negative_controls(run);
         std::fprintf(stderr, "[MENU] %s integrated glyphs verified against ROM and wTileMap\n",
                      label);
         return;
     }
-    int scale = info.full ? std::max(1, int(std::min(w * .75f / 160, h * .75f / 144)))
-                          : std::max(1, std::min(w / 160, h / 144));
-    int left = (w - 160 * scale) / 2, top = info.full ? (h - 144 * scale) / 2 : h - 144 * scale;
+    bool full_lcd = info.full || complete.active;
+    int scale = full_lcd ? std::max(1, int(std::min(w * .75f / 160, h * .75f / 144)))
+                         : std::max(1, std::min(w / 160, h / 144));
+    int left = (w - 160 * scale) / 2, top = full_lcd ? (h - 144 * scale) / 2 : h - 144 * scale;
     int checked = 0, differences = 0;
     for (int y = 0; y < 144; y++)
         for (int x = 0; x < 160; x++) {
-            bool ui = info.full;
+            bool ui = full_lcd;
             for (size_t i = 0; i < layout.count; i++)
                 ui |= menu_layout::contains(layout.regions[i], x / 8, y / 8);
             if (!ui)

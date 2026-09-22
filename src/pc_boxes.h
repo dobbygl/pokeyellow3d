@@ -234,8 +234,12 @@ bool draw(GBContext *ctx, int w, int h, bool menu_open) {
     menu_full = true;
     scene_filter::capture(w, h);
     menu_blurred = scene_filter::draw(w, h, .78f, .25f);
-    if (!menu_open)
-        lcd_overlay::framed(gb_get_framebuffer(ctx), float(w), float(h));
+    if (!menu_open) {
+        if (menu_style == ui_preferences::Style::Integrated)
+            full_menu::draw(ctx, pc_state::Mode::Bill, w, h);
+        else
+            lcd_overlay::framed(gb_get_framebuffer(ctx), float(w), float(h));
+    }
     scene_filter::invalidate();
     presented = true;
     return true;

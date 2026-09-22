@@ -75,6 +75,32 @@ int main(int argc, char **argv) {
     vram[0x800 + (0xba - 128) * 16] ^= 1;
     require(!menu_text::prepare(nullptr, vram.data(), font, layout, 800, 720, 14, 3, 4).count,
             "missing tilemap cannot synthesize a panel");
+    // Full-screen placement shares the source ownership, with a uniform grid.
+    // Exceptions are two specifically verified ROM graphics, never arbitrary
+    // tiles admitted just because a PC is open.
+    rom.resize(1048576);
+    for (uint8_t tile : {menu_graphics::Level, menu_graphics::OccupiedBox}) {
+        size_t source = menu_graphics::offset(tile);
+        for (int i = 0; i < 16; ++i)
+            rom[source + i] = vram[0x1000 + tile * 16 + i] = uint8_t(13 * i + tile);
+        tiles[13 * 20 + 1] = tile;
+        plan = menu_text::prepare(tiles.data(), vram.data(), font, layout, 800, 720, 14, 3, 4,
+                                  menu_text::Placement::Full, rom.data(), rom.size());
+        require(!plan.panels[1].fallback && plan.panels[1].scale == 3 &&
+                    plan.panels[1].origin_x == 160 && plan.panels[1].origin_y == 144,
+                "complete screen uses a centered uniform integer grid");
+        require(check(tiles, layout).panels[1].fallback,
+                "special graphics do not change legacy partial-screen validation");
+        vram[0x1000 + tile * 16 + 7] ^= 1;
+        plan = menu_text::prepare(tiles.data(), vram.data(), font, layout, 800, 720, 14, 3, 4,
+                                  menu_text::Placement::Full, rom.data(), rom.size());
+        require(plan.panels[1].fallback, "changed graphic bitplane rejects the full-screen plan");
+        vram[0x1000 + tile * 16 + 7] ^= 1;
+    }
+    tiles[13 * 20 + 1] = 0x6d;
+    plan = menu_text::prepare(tiles.data(), vram.data(), font, layout, 800, 720, 14, 3, 4,
+                              menu_text::Placement::Full, rom.data(), rom.size());
+    require(plan.panels[1].fallback, "unverified extra font tile remains unsupported");
     // Real private shop/save fixtures exercise every original overlap. Graphics
     // are synthetic here; the GL observer independently checks the actual ROM.
     for (int i = 1; i < argc; ++i) {

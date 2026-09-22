@@ -1,6 +1,53 @@
 #pragma once
 
 namespace pokemon_qa {
+inline int battle(GBContext *ctx, bool fp) {
+    QaWalk walk{ctx};
+    walk.wait(30);
+    walk.require(battle_menu_visible(ctx) && battle::normal(ctx), "original ready battle fixture");
+    if (fp) {
+        SDL_Event event{};
+        event.type = SDL_KEYDOWN;
+        event.key.keysym.scancode = SDL_SCANCODE_F3;
+        pallet3d_event(&event, false);
+        walk.wait(30);
+    }
+    auto capture = [&](const char *page, int kind) {
+        std::string label = std::string("logs/pokemon-battle-") + page;
+        if (pallet3d_menu_style() == ui_preferences::Style::Integrated) {
+            auto shown = pallet3d_pokemon_menu();
+            walk.require(shown.active && !shown.fallback && shown.kind == kind,
+                         "party, actions and summary integrate over the retained battle arena");
+        }
+        capture_surface((label + ".ppm").c_str());
+        walk.require(gb_context_save_state_file(ctx, (label + ".state").c_str()),
+                     "private original battle menu fixture");
+    };
+    walk.press("U");
+    walk.press("R");
+    walk.press("A");
+    walk.wait(60);
+    capture("party", 1);
+    walk.press("A");
+    walk.wait(40);
+    capture("actions", 2);
+    walk.press("D");
+    walk.press("A");
+    walk.wait(80);
+    capture("stats", 3);
+    walk.press("A");
+    walk.wait(60);
+    capture("moves", 4);
+    walk.press("B");
+    walk.wait(90);
+    walk.press("B");
+    walk.wait(60);
+    walk.require(battle_menu_visible(ctx) && pallet3d_battle().active,
+                 "original summary exit restores the battle command menu");
+    std::puts(
+        "PASS: original battle party/actions and both summary pages without changing the turn");
+    return 0;
+}
 inline int pc(GBContext *ctx, bool fp) {
     pc_qa::Session session(ctx, fp);
     auto &walk = session.run;

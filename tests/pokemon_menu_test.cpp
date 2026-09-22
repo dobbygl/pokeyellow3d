@@ -46,6 +46,16 @@ int main() {
             check(pokemon_menu::context(ctx) == Kind::None, "changed CALL target rejected");
             rom[call.address + 1] ^= 1;
         }
+        machine.write(battle::IsInBattle, 1);
+        rom[0x3d236] = 0xcd;
+        rom[0x3d237] = 0xab;
+        rom[0x3d238] = 0x3a;
+        machine.write(0xdffd, 0x39);
+        machine.write(0xdffe, 0x52);
+        check(pokemon_menu::context(ctx) == Kind::Actions, "original battle action menu call");
+        machine.write(battle::IsInBattle, 0);
+        check(pokemon_menu::context(ctx) == Kind::None,
+              "battle action return requires battle context");
         // 78 is a PC box pictogram but a vertical line on the summary; 6E
         // changes source too. Neither source may leak into the other profile.
         for (int row = 0; row < 8; ++row) {

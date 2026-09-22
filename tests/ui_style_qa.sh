@@ -24,7 +24,7 @@ echo "QA output: $qa_dir"
 "$project/tests/ui_battles_qa.sh" "$rom" "$wild" "$trainer" > "$qa_dir/logs/battles.log" 2>&1
 "$project/tests/ui_crossfade_qa.sh" "$rom" "$pallet" "$battle" > "$qa_dir/logs/crossfade.log" 2>&1
 "$project/tests/ui_full_pc_qa.sh" "$rom" "$pc_world" > "$qa_dir/logs/full-pc.log" 2>&1
-"$project/tests/ui_full_pokemon_qa.sh" "$rom" "$world" > "$qa_dir/logs/full-pokemon.log" 2>&1
+"$project/tests/ui_full_pokemon_qa.sh" "$rom" "$world" "$battle" > "$qa_dir/logs/full-pokemon.log" 2>&1
 for style in classic integrated; do
     for operation in write read; do
         SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \

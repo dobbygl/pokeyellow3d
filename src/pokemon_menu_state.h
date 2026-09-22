@@ -50,7 +50,10 @@ inline Kind context(const GBContext *ctx) {
         return Kind::Stats;
     if (battle::live_return(ctx, 0x11814, 0x3852))
         return Kind::Moves;
-    if (battle::live_return(ctx, 0x11c95, 0x3aab))
+    // StartMenu_Pokemon and PartyMenuOrRockOrRun share the three-option
+    // action geometry; their original strings retain their different order.
+    if (battle::live_return(ctx, 0x11c95, 0x3aab) ||
+        (battle::normal(ctx) && battle::live_return(ctx, 0x3d236, 0x3aab)))
         return Kind::Actions;
     return party_return(ctx) ? Kind::Party : Kind::None;
 }

@@ -1053,9 +1053,10 @@ originales visibles. La barra de experiencia lee el registro permanente del
 Pokémon: `CalcExpToLevelUp` sustituye temporalmente `wLoadedMonExp` por la
 cantidad que falta para subir de nivel. Ninguna etiqueta ni cifra se reconstruye.
 
-`tests/ui_full_pokemon_qa.sh ROM TWO_POKEMON_WORLD` recorre equipo, acciones,
+`tests/ui_full_pokemon_qa.sh ROM TWO_POKEMON_WORLD READY_BATTLE` recorre equipo, acciones,
 ambas páginas del resumen y los resúmenes de equipo/caja desde el PC, en ambas
-cámaras. Con `QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1` comprueba glifos,
+cámaras, y las mismas pantallas desde un combate. Con
+`QA_MENU_STYLE=integrated QA_GLYPH_ORACLE=1` comprueba glifos,
 cursores, gráficos especiales y barras por frame, además de memoria intacta,
 pausa/carga y cinco alteraciones que deben conservar el LCD completo.
 La copia privada de seis miembros incluye HP cero y mínimo, todos los estados

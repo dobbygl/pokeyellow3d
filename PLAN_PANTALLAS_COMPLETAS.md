@@ -505,3 +505,16 @@ python3 tests/compare_classic_captures.py \
 
 Quedan pendientes la batería integrada acumulada, todas las regresiones
 clásicas y exteriores, el cierre de evidencia y la PR con CI verde.
+
+
+La revisión de cobertura posterior añadió `PartyMenuOrRockOrRun`: su llamada
+`0F:5236 → HandleMenuInput` abre las mismas acciones con el orden Switch,
+Stats, Cancel. Se comprobó contra `engine/battle/core.asm`, el C generado,
+los bytes `CD AB 3A` y un savestate privado. Equipo, acciones y ambas páginas
+del resumen también se recorren desde un combate en ambas cámaras. La nueva
+presentación no espera al fundido decorativo para mostrar texto validado.
+La batería específica pasa a ocho recorridos y recibe un tercer argumento:
+`tests/ui_full_pokemon_qa.sh ROM TWO_POKEMON_WORLD READY_BATTLE`.
+La primera CI de #24 (`35677979317`) terminó con las cinco comprobaciones
+obligatorias verdes sobre `8f74f5f`; las regresiones en curso se detuvieron
+al ampliar este caso y se reinician sobre la revisión final.

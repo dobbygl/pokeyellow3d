@@ -131,6 +131,12 @@ int main(int argc, char **argv) {
     if (!gb_context_load_state_file(ctx, argv[2]))
         return 5;
     if (argc > 3 &&
+        (!std::strcmp(argv[3], "pokemon-battle") || !std::strcmp(argv[3], "pokemon-battle-fp"))) {
+        int result = pokemon_qa::battle(ctx, std::strstr(argv[3], "-fp") != nullptr);
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 &&
         (!std::strcmp(argv[3], "pokemon-pc") || !std::strcmp(argv[3], "pokemon-pc-fp"))) {
         int result = pokemon_qa::pc(ctx, std::strstr(argv[3], "-fp") != nullptr);
         gb_platform_shutdown();

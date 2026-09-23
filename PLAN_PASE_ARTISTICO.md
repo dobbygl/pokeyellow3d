@@ -1,8 +1,7 @@
 # Plan: pase artístico e iluminación
 
-Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1 validada y C1
-en aceptación (7/24 criterios); B1 fusionada con rendimiento pendiente.
-Las demás fases siguen pendientes. Desarrolla el punto 3 de
+Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1, B1 y C1
+validadas (9/24 criterios). B2, A2, D1, C2 y E1 siguen pendientes. Desarrolla el punto 3 de
 `PLAN_MEJORAS.md`.
 
 ## Análisis del estado actual
@@ -196,7 +195,7 @@ Criterios de aceptación:
 
 - [x] Árboles, casas, rocas, vallas y actores proyectan sombra coherente con la hora en Paleta, Ruta 1 y Ciudad Verde, revisada en amanecer, mediodía y atardecer en ambas cámaras.
 - [x] Sin sol, de noche o con el pase desactivado no se ejecuta el paso de sombras y la imagen coincide con la referencia correspondiente.
-- [ ] Presentación media de catálogo y de primera persona por debajo de 2,0× respecto a v0.4.1 en el mismo equipo.
+- [x] Presentación media de catálogo y de primera persona por debajo de 2,0× respecto a v0.4.1 en el mismo equipo.
 
 ### Fase B2: oclusión ambiental y sombra de contacto
 
@@ -241,7 +240,7 @@ Criterios de aceptación:
 
 - [x] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
 - [x] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
-- [ ] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
+- [x] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
 
 ### Fase C2: materiales
 
@@ -1015,3 +1014,61 @@ la CI del commit definitivo y el cierre de PR #32. No reiniciar las 54 baterías
 históricas ya terminadas salvo que cambien las fuentes o aparezca una regresión.
 El resto de las ocho fases sigue pendiente; esta pausa no autoriza publicar
 ni etiquetar v0.5.0.
+
+### C1 y B1 — rendimiento con CPU libre — 2026-09-23 (9/24 criterios)
+
+Al reanudar, `quiet_window.py` trataba como activos los procesos detenidos
+(T/t): las auditorías suspendidas por el usuario habrían bloqueado la cola
+para siempre. El arnés privado ahora clasifica cada proceso vigilado según
+todos sus hilos y solo deja de bloquear si todos están detenidos. Los
+umbrales no cambian: carga ≤ 8, presión de CPU < 5 % y ninguna auditoría o
+proceso gráfico ejecutable. Las capturas de procesos de C1 y B1 incluyen
+STAT y una clasificación por hilos. El revisor lee STAT si existe; los
+registros antiguos sin STAT se evalúan como antes, así que la tanda bajo
+carga sigue rechazada con sus 120 incidencias. Los controles negativos
+confirman que un proceso de auditoría ejecutable bloquea, que al detenerlo
+deja de bloquear y que al reanudarlo vuelve a bloquear. La muestra alterada
+se sigue rechazando. Copias, hashes y nota: `harness-suspension-adaptation.json`.
+
+La causa real de la carga era un `grep` de otra sesión bloqueado en disco
+sobre un montaje de red. Con autorización del usuario se terminó solo ese
+proceso, tras revalidar su identidad. Las auditorías suspendidas no
+recibieron ninguna señal.
+
+C1 combinado (`c1-pr33-quiet-performance.json`): mismos binarios, fixtures,
+comandos y estadística sin filtrar; tres pares alternados por escenario.
+El revisor reconstruye las 60 ejecuciones desde sus logs y revisa las 120
+observaciones: `PASS_RAW_AND_ENVIRONMENT`, carga máxima 3,73 y presión
+máxima 1,85 %, sin procesos competidores (`c1-pr33-quiet-final-review.json`).
+
+| Escenario | 06:30 | 12:00 | 17:30 |
+| --- | ---: | ---: | ---: |
+| Catálogo exterior | 1,356× | 1,391× | 1,380× |
+| Catálogo interior | — | 1,031× | — |
+| Ortográfica animada | 1,606× | 1,693× | 1,746× |
+| Primera persona animada | 1,668× | 1,623× | 1,701× |
+
+Vértices por mapa: máximo 1,487× en los catálogos exteriores, 1,237× en las
+vistas vivas y 1,000× en interiores. El peor mapa individual queda en 1,746×.
+Se marca el tercer criterio de C1.
+
+B1 (`b1-performance-resumed.json`) reutiliza sin cambios las 18 ejecuciones
+de los tres catálogos exteriores (1,361×, 1,363× y 1,373×). Repite entero el
+catálogo interior y mide las seis vistas vivas: 42 ejecuciones nuevas y 84
+observaciones, todas limpias (carga máxima 1,07). El revisor
+`review-b1-resumed-performance.py` recalcula las muestras y da
+`PASS_RAW_AND_ENVIRONMENT` (`b1-performance-resumed-review.json`). Su primera
+versión esperaba un orden de marcas de tiempo que el script no produce, se
+detuvo sin escribir resultado y quedó conservada; el orden corregido es
+recibo ≤ antes ≤ inicio < después ≤ fin.
+
+| Escenario B1 | 06:30 | 12:00 | 17:30 |
+| --- | ---: | ---: | ---: |
+| Catálogo interior | — | 1,063× | — |
+| Ortográfica animada | 1,691× | 1,688× | 1,713× |
+| Primera persona animada | 1,543× | 1,542× | 1,616× |
+
+Se marca el criterio de rendimiento de B1. Las revisiones quedan en
+`build/qa/logs`; las ejecuciones, en el directorio privado de evidencia.
+Son medidas numéricas y de entorno: la aceptación de cada fase se apoya
+además en las pruebas y revisiones descritas en los apartados anteriores.

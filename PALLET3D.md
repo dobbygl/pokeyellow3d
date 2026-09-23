@@ -319,6 +319,11 @@ sin avanzar el motor, con `glFinish`. Mediana **3,639 ms** en primera persona y
 **3,377 ms** en ortográfica. Son tiempos del renderer, no FPS de la partida.
 Logs: `build/qa/firstperson-CWqk6R/logs/benchmark-*.log`.
 
+Pase artístico activado frente al benchmark congelado de v0.4.1 (`7955aaa`),
+mismo equipo, tres pares alternados por escenario, sin filtrar muestras:
+C1 queda entre 1,031× (catálogo interior) y 1,746× (ortográfica animada a las
+17:30); B1 entre 1,063× y 1,713×. Detalle en `PLAN_PASE_ARTISTICO.md`.
+
 Comparación con el ejecutable anterior a primera persona: cuatro pares alternados
 de 200 presentaciones por cada una de las 38 escenas, sin otras pruebas gráficas
 ejecutándose a la vez. La media ortográfica pasa de **2,104 a 1,423 ms**; todas

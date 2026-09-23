@@ -989,3 +989,29 @@ entero junto con los seis escenarios vivos pendientes. Los tres catálogos
 exteriores conservan sus 18 ejecuciones, sin procesos de juego o auditoría
 concurrentes en sus registros. Informe: `b1-prior-timing-environment-review.json`.
 No se seleccionan muestras individuales ni se borra la tanda anterior.
+
+
+### Pausa solicitada — 2026-09-23
+
+El usuario pausa el goal y solicita guardar el trabajo mediante commit y push.
+Se detiene la cola de medición antes de que arranque la segunda tanda de C1;
+no hay resultados nuevos de esa tanda ni se marca su rendimiento como aceptado.
+C1 conserva las validaciones documentadas arriba y la CI de `8cccbbb`
+(`35857321486`) en verde. Las fases pendientes y los 7/24 criterios aceptados
+no cambian. La PR #32 continúa en borrador, sin fusionar; `main` permanece
+reservado hasta cerrar C1.
+
+Se conservan fuera de git los informes, fixtures y capturas existentes, el
+borrador técnico de B2 (`b2-design-preparation.md`) y el revisor de las 60
+mediciones (`review-c1-quiet-performance.py`). Este último reconstruye los
+resultados desde los logs, comprueba hashes y revisa las 120 observaciones
+de entorno; rechaza la tanda bajo carga y una muestra alterada deliberadamente.
+Es preparación de revisión, no aceptación del rendimiento.
+
+Para reanudar: recuperar el checkpoint privado, crear una nueva cola de
+medición con registro separado y revisar la tanda completa con CPU libre.
+Después quedan las siete mediciones pendientes de B1, la documentación final,
+la CI del commit definitivo y el cierre de PR #32. No reiniciar las 54 baterías
+históricas ya terminadas salvo que cambien las fuentes o aparezca una regresión.
+El resto de las ocho fases sigue pendiente; esta pausa no autoriza publicar
+ni etiquetar v0.5.0.

@@ -131,14 +131,17 @@ int main(int argc, char **argv) {
             pallet3d_menu_style(!std::strcmp(style, "integrated")
                                     ? ui_preferences::Style::Integrated
                                     : ui_preferences::Style::Classic);
-    if (const char *art = std::getenv("QA_ART_PASS")) {
+    const char *art = std::getenv("QA_ART_PASS");
+    if (art) {
         if (std::strcmp(art, "on") && std::strcmp(art, "off")) {
             std::fprintf(stderr, "Invalid QA_ART_PASS: expected on or off\n");
             gb_platform_shutdown();
             return 2;
         }
-        pallet3d_artistic(!std::strcmp(art, "on"));
     }
+    // Initialization can load a user's preferences; restore the test policy
+    // after that load, too. Explicit -art suites still enable the pass below.
+    pallet3d_artistic(art && !std::strcmp(art, "on"));
     if (artistic)
         pallet3d_artistic(true);
     if (const char *value = std::getenv("QA_FIXED_HOUR")) {

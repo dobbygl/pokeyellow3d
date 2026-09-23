@@ -349,8 +349,96 @@ void shadow(std::vector<Vertex> &v, float x, float z, float rx, float rz) {
     }
 }
 
+void facet(std::vector<Vertex> &vertices, const art::geometry::Face &face, Color color,
+           UV detail = Solid) {
+    auto point = [](art::geometry::Point p) { return Vec{p.x, p.y, p.z}; };
+    detailed_quad(vertices, point(face[0]), point(face[1]), point(face[2]), point(face[3]), color,
+                  detail);
+    // Caps really submit one triangle; do not upload degenerate triangles.
+    if (face[2].x == face[3].x && face[2].y == face[3].y && face[2].z == face[3].z)
+        vertices.resize(vertices.size() - 3);
+}
+
+void artistic_house(const pallet::Scene &scene, const pallet::House &h,
+                    const std::vector<uint8_t> &blocks) {
+    const float x = h.x + scene.origin_x, z = h.z + scene.origin_z;
+    const float left = x + .06f, back = z + .06f, w = h.w - .12f, d = h.d - .12f;
+    const float eave = h.eave, front = back + d;
+    const Color wall{.88f, .83f, .66f};
+    const Color roof_color = h.lab ? Color{.28f, .48f, .53f} : Color{.69f, .31f, .23f};
+    const auto style = art::roof(scene, h);
+    shadow(scenery, x + h.w * .5f, z + h.d * .5f, h.w * .5f, h.d * .5f);
+    box(scenery, left + .05f, back + .05f, w - .1f, d - .1f, 0, eave, wall,
+        tile_uv(scene, scene.tileset == 23 ? 0x30 : 0x1a, 1));
+    const int rows = int((h.z + h.d) * 2) - h.facade_row;
+    for (int row = 0; row < rows; ++row)
+        for (int col = 0; col < int(h.w) * 2; ++col) {
+            const int tile = pallet::map_tile(pallet::catalog_rom, scene, int(h.x) * 2 + col,
+                                              h.facade_row + row, &blocks);
+            const float a = left + .05f + col * (w - .1f) / (h.w * 2);
+            const float b = left + .05f + (col + 1) * (w - .1f) / (h.w * 2);
+            const float top = eave - row * (eave - .03f) / rows;
+            const float bottom = eave - (row + 1) * (eave - .03f) / rows;
+            const bool window = scene.tileset == 0 && tile == 0x0a;
+            const float surface = front - .04f;
+            if (window) {
+                // Four bevels surround an open aperture. A solid box here
+                // would cover the ROM's glass with its front face.
+                const float inset = .025f;
+                const Color frame{.48f, .40f, .29f};
+                quad(scenery, {a, top, front}, {b, top, front}, {b - inset, top - inset, surface},
+                     {a + inset, top - inset, surface}, frame);
+                quad(scenery, {a + inset, bottom + inset, surface},
+                     {b - inset, bottom + inset, surface}, {b, bottom, front}, {a, bottom, front},
+                     shade(frame, .8f));
+                quad(scenery, {a, top, front}, {a + inset, top - inset, surface},
+                     {a + inset, bottom + inset, surface}, {a, bottom, front}, shade(frame, .9f));
+                quad(scenery, {b - inset, top - inset, surface}, {b, top, front},
+                     {b, bottom, front}, {b - inset, bottom + inset, surface}, shade(frame, .7f));
+            }
+            quad(scenery, {a, top, surface}, {b, top, surface}, {b, bottom, surface},
+                 {a, bottom, surface}, White, tile_uv(scene, tile, 1), window ? 1.f : 0.f);
+        }
+    // Eaves and frames stay inside the ROM footprint, including at doors.
+    box(scenery, left, back, w, d, eave - .08f, eave, shade(roof_color, .72f));
+    for (const auto &warp : scene.warps) {
+        if (warp.x < h.x || warp.x >= h.x + h.w || warp.z < h.z || warp.z >= h.z + h.d)
+            continue;
+        const float door = std::clamp(float(warp.x + scene.origin_x), left + .12f, left + w - .92f);
+        for (float offset : {0.f, .76f})
+            box(scenery, door + offset, front - .04f, .07f, .04f, 0, eave * .64f,
+                {.43f, .36f, .27f});
+        box(scenery, door, front - .04f, .83f, .04f, eave * .64f, eave * .69f, {.53f, .44f, .31f});
+    }
+    art::geometry::roof(left, back, w, d, eave, h.ridge, style,
+                        [&](const art::geometry::Face &face, float light) {
+                            facet(scenery, face, shade(roof_color, light));
+                        });
+    if (style != art::geometry::Roof::Flat) {
+        const float ridge_inset =
+            style == art::geometry::Roof::Hip ? std::min(w * .28f, d * .5f) : 0;
+        for (int row = 1; row <= 5; ++row) {
+            const float t = row / 6.f, next = t + .02f;
+            const float a = left + ridge_inset * (1 - t), b = left + w - ridge_inset * (1 - t);
+            const float c = left + w - ridge_inset * (1 - next),
+                        e = left + ridge_inset * (1 - next);
+            const float zz = back + d * .5f * (1 + t), znext = back + d * .5f * (1 + next);
+            const float yy = eave + h.ridge * (1 - t) + .006f;
+            const float ynext = eave + h.ridge * (1 - next) + .006f;
+            quad(scenery, {a, yy, zz}, {b, yy, zz}, {c, ynext, znext}, {e, ynext, znext},
+                 shade(roof_color, .89f));
+        }
+    }
+    // No verified chimney/lamp family exists in these four exterior sheets.
+    // In particular 07/17 repeats across a roof: it is roofing, not a chimney.
+}
+
 void make_house(const pallet::Scene &scene, const pallet::House &h,
                 const std::vector<uint8_t> &blocks) {
+    if (artistic_scene) {
+        artistic_house(scene, h, blocks);
+        return;
+    }
     const float x = h.x + scene.origin_x + .05f, z = h.z + scene.origin_z + .1f, w = h.w - .1f,
                 d = h.d - .15f;
     const float eave = h.eave, ridge = eave + h.ridge;
@@ -554,7 +642,31 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                 type = art::find(type)->reference_mesh;
             UV foliage = tile_uv(scene, scene.tileset == 3 ? 0x16 : 0x41);
             UV stone = tile_uv(scene, scene.tileset == 23 ? 0x28 : 0x3a);
-            if (type == pallet::Terrain::TallTree) {
+            const auto recipe = artistic_scene ? art::find(type)->mesh : art::Mesh::Reference;
+            if (recipe == art::Mesh::Crown || recipe == art::Mesh::TallCrown) {
+                const bool tall = recipe == art::Mesh::TallCrown;
+                const float width = tall ? 2.f : 1.f;
+                const float variation = art::geometry::scale(scene.id, ix, iz);
+                shadow(scenery, x + width * .5f, z + width * .5f, width * .44f, width * .4f);
+                box(scenery, x + width * .4f, z + width * .4f, width * .2f, width * .2f, 0,
+                    tall ? .95f : .65f, {.40f, .31f, .20f});
+                art::geometry::crown(x, z, width, width, variation, tall,
+                                     [&](const art::geometry::Face &face, float light, int layer) {
+                                         facet(
+                                             scenery, face,
+                                             shade(Color{.29f + layer * .045f, .48f + layer * .04f,
+                                                         .30f + layer * .025f},
+                                                   light),
+                                             foliage);
+                                     });
+            } else if (recipe == art::Mesh::FacetedRock) {
+                art::geometry::frustum({x + .5f, 0, z + .5f}, .38f, .34f, 0,
+                                       .58f * art::geometry::scale(scene.id, ix, iz), .58f, 8, .18f,
+                                       [&](const art::geometry::Face &face, float light) {
+                                           facet(scenery, face,
+                                                 shade(Color{.56f, .58f, .46f}, light), stone);
+                                       });
+            } else if (type == pallet::Terrain::TallTree) {
                 shadow(scenery, x + 1, z + 1.2f, 1.f, .75f);
                 box(scenery, x + .8f, z + 1.f, .4f, .4f, 0, 1.f, {.40f, .31f, .20f});
                 box(scenery, x + .1f, z + .15f, 1.8f, 1.7f, .8f, 1.8f, {.22f, .40f, .27f}, foliage);
@@ -598,24 +710,32 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                 else if (bottom == 0x0d || bottom == 0x1d)
                     box(scenery, x + .76f, z, .24f, 1, 0, .3f, {.57f, .47f, .30f});
                 else {
-                    box(scenery, x, z + .72f, 1, .25f, 0, .27f, {.57f, .47f, .30f});
-                    box(scenery, x, z + .70f, 1, .24f, .27f, .32f, {.56f, .65f, .39f});
+                    const float step = recipe == art::Mesh::SteppedLedge ? .5f : .27f;
+                    box(scenery, x, z + .72f, 1, .25f, 0, step, {.57f, .47f, .30f});
+                    box(scenery, x, z + .70f, 1, .24f, step,
+                        recipe == art::Mesh::SteppedLedge ? .55f : .32f, {.56f, .65f, .39f});
                 }
             } else if (type == pallet::Terrain::Grass) {
                 size_t first = scenery.size();
                 for (int i = 0; i < 4; i++) {
                     float px = x + .18f + (i % 2) * .48f, pz = z + .22f + (i / 2) * .46f;
-                    quad(scenery, {px - .08f, .02f, pz}, {px, .26f, pz}, {px + .09f, .02f, pz},
-                         {px + .09f, .02f, pz}, {.32f, .51f, .26f});
-                    quad(scenery, {px, .02f, pz - .08f}, {px, .21f, pz}, {px, .02f, pz + .09f},
-                         {px, .02f, pz + .09f}, {.42f, .60f, .30f});
+                    quad(scenery, {px - .08f, .02f, pz},
+                         {px, recipe == art::Mesh::ShortGrass ? .18f : .26f, pz},
+                         {px + .09f, .02f, pz}, {px + .09f, .02f, pz}, {.32f, .51f, .26f});
+                    quad(scenery, {px, .02f, pz - .08f},
+                         {px, recipe == art::Mesh::ShortGrass ? .15f : .21f, pz},
+                         {px, .02f, pz + .09f}, {px, .02f, pz + .09f}, {.42f, .60f, .30f});
                 }
                 for (size_t i = first; i < scenery.size(); ++i)
-                    scenery[i].wind = scenery[i].p.y > .03f ? 1.f : 0.f;
+                    scenery[i].wind = scenery[i].p.y > .03f
+                                          ? (recipe == art::Mesh::ShortGrass ? .55f : 1.f)
+                                          : 0.f;
             } else if (type == pallet::Terrain::Fence) {
                 for (float off : {.16f, .66f})
                     box(scenery, x + off, z + .55f, .12f, .14f, 0, .65f, {.90f, .87f, .70f});
                 box(scenery, x, z + .57f, 1, .10f, .25f, .36f, {.75f, .73f, .58f});
+                if (recipe == art::Mesh::RailedFence)
+                    box(scenery, x, z + .57f, 1, .10f, .48f, .56f, {.75f, .73f, .58f});
             } else if (type == pallet::Terrain::Sign) {
                 box(scenery, x + .43f, z + .45f, .14f, .12f, 0, .5f, {.48f, .35f, .21f});
                 box(scenery, x + .1f, z + .4f, .8f, .16f, .45f, .98f, {.58f, .42f, .27f});
@@ -627,6 +747,41 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                         quad(scenery, {left, top, z + .566f}, {left + .4f, top, z + .566f},
                              {left + .4f, top - .265f, z + .566f}, {left, top - .265f, z + .566f},
                              White, tile_uv(scene, tile, 1));
+                    }
+            } else if (recipe == art::Mesh::GroundBorder) {
+                // A cut tree leaves a flush stump mark. It has no raised
+                // sides and does not occupy the newly walkable cell volume.
+                if (pallet::terrain(ctx->rom, scene, ix, iz) == pallet::Terrain::CutTree) {
+                    for (int i = 0; i < 6; ++i) {
+                        const float a = i * 6.28318530718f / 6;
+                        const float b = (i + 1) * 6.28318530718f / 6;
+                        const art::geometry::Point p{x + .5f + std::cos(b) * .17f, .004f,
+                                                     z + .5f + std::sin(b) * .17f};
+                        facet(scenery,
+                              {art::geometry::Point{x + .5f, .004f, z + .5f},
+                               art::geometry::Point{x + .5f + std::cos(a) * .17f, .004f,
+                                                    z + .5f + std::sin(a) * .17f},
+                               p, p},
+                              {.58f, .43f, .27f});
+                    }
+                }
+                // Narrow ground-colour bands soften grass/path boundaries.
+                // They stay flush on the path; game coordinates remain y=0.
+                const int bottom = pallet::map_tile(ctx->rom, scene, ix * 2, iz * 2 + 1, &blocks);
+                if (scene.tileset == 0 && (bottom == 0x00 || bottom == 0x2c))
+                    for (const auto &delta : std::array<std::array<int, 2>, 4>{
+                             {{{-1, 0}}, {{1, 0}}, {{0, -1}}, {{0, 1}}}}) {
+                        const int nx = ix + delta[0], nz = iz + delta[1];
+                        if (nx < 0 || nz < 0 || nx >= scene.width || nz >= scene.height ||
+                            pallet::terrain(ctx->rom, scene, nx, nz, &blocks) !=
+                                pallet::Terrain::Grass)
+                            continue;
+                        const float left = x + (delta[0] > 0 ? .92f : 0);
+                        const float back = z + (delta[1] > 0 ? .92f : 0);
+                        const float w = delta[0] ? .08f : 1.f, d = delta[1] ? .08f : 1.f;
+                        quad(scenery, {left, .003f, back}, {left + w, .003f, back},
+                             {left + w, .003f, back + d}, {left, .003f, back + d},
+                             {.61f, .70f, .43f, .35f});
                     }
             }
         }

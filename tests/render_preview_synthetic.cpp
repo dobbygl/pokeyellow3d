@@ -160,19 +160,42 @@ int main() {
             check(shades > 4, "the surface carries no shaded geometry");
         };
 
+        pallet3d_artistic(false);
         preview(plan.home, "outdoor");
-        const auto disabled = rgba;
-        // A1 changes policy/settings, not meshes. Exercise cache invalidation
-        // on the actual GPU, in both directions, rather than checking a flag.
-        for (bool artistic : {false, true, false}) {
+        auto disabled = rgba;
+        const auto reference_vertices = pallet3d_stats().vertices;
+        // C1 changes silhouettes. OFF must recover the image, and each toggle
+        // must rebuild once, then reuse the mesh on an unchanged frame.
+        for (bool artistic : {true, false, true, false}) {
+            const auto builds = pallet3d_stats().mesh_builds;
             check(pallet3d_artistic(artistic), "toggle artistic presentation");
             Snapshot unchanged{machine};
             frame();
             glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
-            check(rgba == disabled, "A1 reference geometry survives an art toggle byte for byte");
+            check(artistic ? rgba != disabled : rgba == disabled,
+                  "C1 silhouettes change only when enabled and OFF restores every pixel");
+            check(pallet3d_stats().mesh_builds == builds + 1,
+                  "an art toggle rebuilds the resident mesh exactly once");
+            check(pallet3d_stats().vertices <= 2 * reference_vertices,
+                  "procedural geometry stays inside the 2x vertex budget");
+            frame();
+            check(pallet3d_stats().mesh_builds == builds + 1, "an unchanged frame reuses its mesh");
             check(unchanged.unchanged(machine), "art toggle wrote to the emulated machine");
             check(glGetError() == GL_NO_ERROR, "art toggle raised an OpenGL error");
         }
+        // Independent B1 lighting oracle: the same synthetic sign geometry in
+        // both modes. C1 tree/rock silhouettes must not invalidate its pixel
+        // bounds or allow a shadow bug to hide behind changed geometry.
+        pallet3d_shutdown();
+        for (int block : {1, 2, 3, 4, 6, 8})
+            for (int tile = 0; tile < 16; ++tile)
+                machine.image[plan.outdoor_block_table + size_t(block) * 16 + tile] =
+                    (tile / 4) % 2 ? 0x56 : 0x46;
+        pallet::load_catalog(machine.image.data(), machine.image.size());
+        pallet::catalog->tilesets.emplace(
+            23, kanto::read_tileset(kanto::Rom(ctx->rom, ctx->rom_size), 23));
+        preview(plan.home, "shadow oracle signs");
+        disabled = rgba;
         auto lit = [&](double hour) {
             check(pallet3d_daylight({daynight::Mode::Fixed, hour}), "set fixed presentation hour");
             Snapshot before{machine};

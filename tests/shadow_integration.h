@@ -171,8 +171,11 @@ inline int captures(GBContext *ctx, bool fp) {
                 hero_alpha(run, world_animation_qa::vram_image(ctx, hero.image));
             }
         } else {
-            run.require(info.passes == old_passes && image == reference,
-                        "no sun: zero shadow passes and byte-exact reference image");
+            // C1 changes geometry even without sunlight. Pixel bounds for
+            // shadows alone remain covered by the unchanged-sign synthetic
+            // oracle; this real scene tests the shadow submission contract.
+            run.require(info.passes == old_passes,
+                        "no sun: zero shadow passes, independently of C1 silhouettes");
         }
         for (int repeat = 0; repeat < 3; ++repeat) {
             run.require(render(ctx) == image, "frozen shadow image is deterministic");
@@ -184,7 +187,7 @@ inline int captures(GBContext *ctx, bool fp) {
         run.require(pallet3d_artistic(false), "restore reference presentation");
         run.require(render(ctx) == reference, "toggle restores every reference byte for this hour");
     }
-    run.require(changed_hours > 0, "sunlight must create visible shadows in the real scene");
+    run.require(changed_hours > 0, "artistic daylight must change the real scene");
     run.require(pallet3d_artistic(true) && pallet3d_daylight({daynight::Mode::Fixed, 12}),
                 "lit pause fixture");
     auto stable = render(ctx);

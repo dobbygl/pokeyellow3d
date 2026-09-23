@@ -756,3 +756,59 @@ añade catálogos exteriores de mediodía y mide amanecer, mediodía y atardecer
 frente al renderer congelado. El driver nuevo de referencia se enlaza con
 las bibliotecas originales; no reemplaza el benchmark archivado de A1.
 Las medidas completas y las regresiones históricas siguen pendientes.
+
+### C1 — ejecución adelantada por petición del usuario (2026-09-23)
+
+Base: `4ccdaf4` (incluye PR #31 de combate integrado y PR #30 de sombras).
+Rama: `art-c1`. La petición de ejecutar C1 adelanta esta fase respecto al orden
+inicial; no da por terminadas B2, A2, D1 ni los pendientes de rendimiento de B1.
+
+Implementación en revisión:
+
+- Recetas por familia en el manifiesto: copas cerradas de seis caras, tres
+  capas (cuatro en árboles altos), variación determinista entre 0,9 y 1,1;
+  rocas de ocho caras. Las tapas triangulares suben tres vértices reales.
+- Árboles de Corte con la misma copa mientras existen y marca rasa del tocón
+  cuando cambia el bloque original. No añade colisiones ni modifica el motor.
+- Tejados a dos/cuatro aguas, aleros dentro del footprint, marcos abiertos en
+  ventanas, relieve de puertas y excepciones planas por coordenadas de la ROM
+  para Silph, el centro comercial y el gimnasio de Plateada.
+- Vallas con dos travesaños, carteles con su soporte existente, cornisas sur
+  de medio tile, hierba más corta con el reloj de viento existente y franjas
+  rasas en límites entre camino y hierba.
+
+Ajuste del alcance por inspección de la ROM: no hay una familia exterior de
+farola o chimenea verificada en las cuatro hojas exteriores. No se convierten
+postes ni tejas en esos objetos por conjetura. En particular, `07/17` es una
+columna repetida del tejado: la primera revisión visual rechazó esa inferencia.
+Se conserva la emisión de las ventanas existentes. Si una futura clasificación
+identifica esas familias, se incorporarán con evidencia de sus tiles.
+
+Pruebas añadidas: volumen analítico y cierre de frusta (control negativo con
+una cara ausente), límites y presupuesto de copas, recetas inválidas y
+excepciones de tejado; auditoría ROM registrada en CTest (`rom`, ausencia 77).
+Esta última verifica 5.584 footprints sólidos, incluidos 159 árboles altos y
+32 de Corte, y rechaza árboles en 20.349 casillas transitables. Comprueba también
+la presencia de los tres edificios singulares y que la ROM queda intacta.
+
+Correcciones de QA necesarias desde C1:
+
+- `QA_ART_PASS` queda desactivado por defecto en el adaptador y se reafirma
+  después de cargar preferencias. Los modos `-art` lo activan explícitamente.
+- La comparación ON/OFF exige igualdad del estado del motor, pero permite las
+  nuevas siluetas exteriores. La prueba GPU exige reconstrucción única de malla,
+  caché en frames estables y restauración exacta de OFF.
+- La prueba independiente de iluminación usa geometría sintética de carteles
+  idéntica en ambos modos, conservando sus límites de luz y el control de acné.
+  La prueba ROM nocturna exige cero pases de sombra; ya no exige siluetas ON y
+  OFF iguales, algo incompatible con C1.
+- `art_qa.py ... C1 --reference-smoke BINARIO_7955aaa` ejecuta el gate externo
+  de catálogos ortográficos y recorridos en ambas cámaras. v0.4.1 no tenía API
+  de catálogo diagnóstico FP: se usa su recorrido FP real, sin presentar un
+  renderer posterior como esa referencia. `--captures-only` declara que falta
+  medir rendimiento; `--compress-captures` conserva los bytes en gzip y verifica
+  su hash antes de retirar únicamente el fichero crudo recién generado.
+
+Estado: implementación y pruebas locales en curso; no se marca ningún criterio
+C1 completo hasta revisar los contactos, recorridos, rendimiento y CI del commit
+final. Las evidencias de la primera revisión rechazada se conservan en privado.

@@ -238,7 +238,7 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
+- [x] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
 - [ ] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
 - [ ] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
 
@@ -810,6 +810,26 @@ Correcciones de QA necesarias desde C1:
   medir rendimiento; `--compress-captures` conserva los bytes en gzip y verifica
   su hash antes de retirar únicamente el fichero crudo recién generado.
 
-Estado: implementación y pruebas locales en curso; no se marca ningún criterio
-C1 completo hasta revisar los contactos, recorridos, rendimiento y CI del commit
-final. Las evidencias de la primera revisión rechazada se conservan en privado.
+Validación visual completada en `57f3f42`: 42 contactos de los siete lugares,
+ambas cámaras y horas 6,5/12/21, con inspección adicional a tamaño completo del
+Bosque Verde y Silph. `art_qa.py` conserva 2.696 imágenes y 2.704 estados en
+sus catálogos; el resultado `CAPTURES_PASS` no certifica rendimiento. Safari
+añade 16 casos mapa/cámara/estilo: OFF idéntico al renderer congelado de
+v0.4.1 y estado del motor idéntico con ON. El mayor incremento de vértices es
+1,4875× en Bosque Verde (200.250 frente a 134.622).
+
+Las 55 pruebas locales pasan con las fixtures privadas presentes, sin saltos.
+La ampliación posterior de la auditoría a Safari y la prueba de caída completa
+del FBO se verificaron por separado. CI `35823440104` pasa Linux GCC/Clang/2D,
+Windows MSVC/ANGLE y formato en `57f3f42`.
+
+Informes privados en `build/qa/logs/`: `c1-visual-review.json`,
+`c1-safari.json`, `c1-ctest-final-candidate.log`, `c1-all-exterior-audit.log`,
+`c1-fallback-test.log` y `c1-ci-57f3f42.json`. Las capturas están archivadas con
+lectura y SHA-256 verificados (`c1-captures-backup.json`); no se publican.
+Las evidencias de la primera revisión rechazada se conservan en privado.
+
+Estado: PR #32 en borrador. Siguen pendientes las regresiones históricas
+completas, los recorridos con el pase activado y los diez escenarios de
+rendimiento frente a v0.4.1. Los dos criterios correspondientes permanecen
+abiertos; la fase no está cerrada.

@@ -42,6 +42,13 @@ struct Pallet3DStats {
     size_t resident_maps, mesh_builds, vertices, bytes;
 };
 Pallet3DStats pallet3d_stats();
+struct PalletShadowInfo {
+    bool ready, active, artistic_scene, player_caster;
+    size_t passes;
+    unsigned texture;
+};
+// Read-only diagnostics for the actual RGBA depth target and pass submission.
+PalletShadowInfo pallet3d_shadows();
 // Diagnostic preview uses the same geometry pipeline without changing game RAM.
 // Pass -1 to return to the live game. No actors are invented for preview maps.
 void pallet3d_preview(int map_id);

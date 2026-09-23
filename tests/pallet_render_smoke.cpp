@@ -67,6 +67,7 @@ static void capture_surface(const char *path) {
 #include "boot_integration.h"
 #include "world_animation_integration.h"
 #include "daylight_integration.h"
+#include "shadow_integration.h"
 #include "hud_text_integration.h"
 
 int main(int argc, char **argv) {
@@ -90,6 +91,11 @@ int main(int argc, char **argv) {
             stderr,
             "       pallet_render_smoke ROM boot [menu|new|continue] [MAX_FRAMES] [BATTERY]\n");
         return 1;
+    }
+    if ((requested_mode == "shadows" || requested_mode == "shadows-fp") &&
+        (!std::ifstream(argv[1], std::ios::binary) || !std::ifstream(argv[2], std::ios::binary))) {
+        std::fprintf(stderr, "SKIP: private ROM or shadow savestate missing\n");
+        return 77;
     }
     FILE *f = std::fopen(argv[1], "rb");
     if (!f)
@@ -285,6 +291,11 @@ int main(int argc, char **argv) {
         pallet::read(ctx, 0xd5f0), pallet::read(ctx, 0xd5ef), pallet::read(ctx, pallet::Font));
     if (argc > 3 && (!std::strcmp(argv[3], "daylight") || !std::strcmp(argv[3], "daylight-fp"))) {
         int result = daylight_qa::captures(ctx, !std::strcmp(argv[3], "daylight-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && (!std::strcmp(argv[3], "shadows") || !std::strcmp(argv[3], "shadows-fp"))) {
+        int result = shadow_qa::captures(ctx, !std::strcmp(argv[3], "shadows-fp"));
         gb_platform_shutdown();
         return result;
     }

@@ -56,6 +56,14 @@ inline bool frame(GBContext *ctx, int width, int height, bool menu_open) {
     return active;
 }
 inline bool install() {
+#ifndef ART_REFERENCE_RENDERER
+    const char *art = std::getenv("QA_ART_PASS");
+    if (art && std::strcmp(art, "on") && std::strcmp(art, "off")) {
+        std::fprintf(stderr, "QA_ART_PASS must be on or off\n");
+        return false;
+    }
+    pallet3d_artistic(art && !std::strcmp(art, "on"));
+#endif
     const char *motion = std::getenv("QA_MENU_MOTION");
     if (motion && std::strcmp(motion, "on") && std::strcmp(motion, "off")) {
         std::fprintf(stderr, "QA_MENU_MOTION must be on or off\n");

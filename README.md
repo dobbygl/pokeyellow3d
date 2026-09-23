@@ -13,7 +13,7 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 
 ![Pallet Town in 3D, with its red-roofed houses, Professor Oak's laboratory, and the path to Route 1](docs/screenshots/pallet-town.png)
 
-**38 outdoor maps · 179 reachable interiors · Two camera modes**
+**42 reachable outdoor maps · 179 reachable interiors · Two camera modes**
 
 </div>
 
@@ -24,7 +24,8 @@ A 3D presentation layer for statically recompiled Pokémon Yellow, with an overh
 
 ## Highlights
 
-- **A connected Kanto.** Explore 36 connected outdoor maps, plus Viridian Forest and Vermilion Dock, with terrain, buildings, and textures derived from the ROM.
+- **A connected Kanto.** Explore 36 connected outdoor maps, Viridian Forest, Vermilion Dock, and the four Safari Zone areas reached through warps, with terrain, buildings, and textures derived from the ROM.
+- **Artistic exteriors.** The Esc setting **Pase artistico** enables layered tree crowns, faceted rocks, varied roofs, window frames and terrain details, together with directional sunlight shadows. Tree variation is deterministic; the original engine still owns movement and collisions.
 - **An animated world.** Water and flowers follow the live Game Boy animation phase. Distant NPCs use their original ROM walking frames; grass sways and movement leaves small grass or surf trails. Effects pause with the game and reset on loads and map changes.
 - **Pallet Town at the title screen.** The original copyright, Game Freak logo and Pikachu intro lead through a fade into an actor-free sunset scene, with the original logo and a VRAM-decoded Pikachu billboard. Continue, New Game and naming retain the original menus over the dimmed scene.
 - **Two perspectives.** Switch between an adjustable overhead camera and first person. Original tile-based movement and four-way interaction are preserved.
@@ -88,7 +89,7 @@ Each ZIP has a companion `.sha256` checksum. The launcher is included in `pokeye
 ### Requirements
 
 ROM-backed journeys and capture comparisons run on Linux with Mesa. Native
-Windows/MSVC builds and all twenty-four ROM-independent tests, including the
+Windows/MSVC builds and all thirty-two ROM-independent tests, including the
 Windows/ANGLE renderer, pass in CI. macOS has not been validated.
 
 - Git and CMake **3.18 or newer**.
@@ -229,7 +230,7 @@ The 3D layer reads the game state to draw the scene; it does not run a second ga
 
 ### Tests
 
-CMake registers eighteen ROM-independent checks, including original-font decoding, HUD encoding, menu layouts, title lifetimes, first-person controls, presentation blending, tile animation, daylight/settings and synthetic rendering/data tests. With the ROM in `build/roms/pokeyellow.gbc` **at configure time**, nineteen additional tests cover game data and presentation, for 37 in total. Original-engine portrait, nest and SRAM comparisons require private QA evidence and explicitly skip when it is absent. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` to run the ROM-independent set.
+CMake registers 32 ROM-independent checks, including font decoding, layouts, controls, animation, synthetic rendering, shadow fallback and procedural geometry. With the ROM in `build/roms/pokeyellow.gbc` at configure time, 28 ROM-backed checks bring the total to 60. Some also need private savestates, VRAM or SRAM evidence; missing fixtures return 77 and are reported as skipped. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` for the ROM-independent set.
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON

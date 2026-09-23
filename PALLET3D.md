@@ -18,7 +18,8 @@ Cierra otra instancia del juego antes de jugar para evitar escrituras simultáne
 sobre la misma partida.
 
 El 3D aparece automáticamente en los **36 mapas exteriores conectados** de Kanto,
-**Bosque Verde** y **muelle de Carmín**. Las conexiones de borde mantienen una
+**Bosque Verde**, **muelle de Carmín** y las **cuatro zonas exteriores de Safari**
+accesibles por warp. Las conexiones de borde mantienen una
 posición mundial continua; los exteriores separados tienen su propia escena.
 F3 alterna entre la cámara ortográfica y la primera persona. Los interiores se
 cargan bajo demanda: se generan los 179 interiores alcanzables. Están verificados
@@ -60,6 +61,21 @@ y las transiciones especiales están verificados y registrados en
 | Enter | Menú original |
 | Esc | Ajustes de la aplicación |
 
+## Pase artístico
+
+Esc → **Pase artistico** activa las copas facetadas de tres capas (cuatro en
+árboles altos), rocas, tejados a dos o cuatro aguas, marcos de ventanas, vallas
+de dos travesaños y bordes de terreno. Silph, el centro comercial de Azulona y
+el gimnasio de Plateada conservan tejados planos. Los árboles varían hasta un
+10 % según su posición; cargar una partida reproduce la misma forma. Corte
+retira la copa y deja una marca rasa del tocón.
+
+El ajuste también habilita las sombras direccionales cuando hay luz solar.
+Al desactivarlo se recupera la geometría de referencia. No modifica el estado
+del motor, sus colisiones ni la altura del suelo transitable. Las mejoras de
+interiores y materiales de las siguientes fases se describen en
+[PLAN_PASE_ARTISTICO.md](PLAN_PASE_ARTISTICO.md).
+
 ## Compilar y probar
 
 ```sh
@@ -80,7 +96,7 @@ generar primero la evidencia privada con `tests/dex_portraits_qa.sh`.
 `ctest --test-dir build -LE rom --output-on-failure` ejecuta el grupo sin ROM;
 no se distribuye esa ROM.
 
-Windows/MSVC también compila y pasa los trece tests sin ROM, incluido el renderer
+Windows/MSVC también compila y pasa los 32 tests sin ROM, incluido el renderer
 sintético con el controlador Windows de SDL2 y ANGLE. Los comandos de compilación
 con las dependencias fijadas están en [README.md](README.md#building-on-windows).
 Los recorridos con ROM y las comparaciones de capturas se validan en Linux/Mesa;
@@ -302,6 +318,11 @@ Primera persona, versión final: cinco mapas residentes (Azafrán y vecinos),
 sin avanzar el motor, con `glFinish`. Mediana **3,639 ms** en primera persona y
 **3,377 ms** en ortográfica. Son tiempos del renderer, no FPS de la partida.
 Logs: `build/qa/firstperson-CWqk6R/logs/benchmark-*.log`.
+
+Pase artístico activado frente al benchmark congelado de v0.4.1 (`7955aaa`),
+mismo equipo, tres pares alternados por escenario, sin filtrar muestras:
+C1 queda entre 1,031× (catálogo interior) y 1,746× (ortográfica animada a las
+17:30); B1 entre 1,063× y 1,713×. Detalle en `PLAN_PASE_ARTISTICO.md`.
 
 Comparación con el ejecutable anterior a primera persona: cuatro pares alternados
 de 200 presentaciones por cada una de las 38 escenas, sin otras pruebas gráficas
@@ -1182,3 +1203,56 @@ sin ROM con ANGLE. Las 27 baterías clásicas conservan 2.765 capturas y
 La evidencia final está en `fullscreen-a4-evidence.json`. La PR #26 está
 fusionada en main; `PLAN_PANTALLAS_COMPLETAS.md` registra los 24 criterios
 completos y el contrato de publicación de v0.4.0.
+
+### Fixtures y comprobaciones del pase artístico
+
+Con una partida privada de Paleta en (9,7), con un equipo preparado para los
+recorridos existentes, se puede generar la fixture del benchmark de cinco mapas
+mediante el warp de pruebas que ejecuta el motor original:
+
+```sh
+mkdir -p build/qa/art-fixtures
+cp "$PALLET_STATE" build/qa/art-fixtures/pallet.state
+SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
+  build/pallet_render_smoke "$ROM" build/qa/art-fixtures/pallet.state \
+  warp 10 0 build/qa/art-fixtures/five-maps.state
+ctest --test-dir build --output-on-failure -R 'art_benchmark_fixture|exterior_geometry_rom'
+```
+
+`QA_ART_PASS` queda desactivado por defecto en las herramientas de QA; usa
+`QA_ART_PASS=on` para probar las nuevas mallas. El juego conserva su preferencia
+independiente. `exterior_geometry_rom` audita también los exteriores de Safari
+que no pertenecen al catálogo inicial de 38 mapas.
+
+El gate visual se ejecuta contra un helper de referencia construido con el
+renderer congelado de `7955aaa`, adaptado al mismo reloj determinista de QA:
+
+```sh
+python3 tests/art_qa.py \
+  build/pallet_render_smoke build/art_benchmark "$ROM" \
+  build/qa/art-fixtures/pallet.state build/qa/art-fixtures/five-maps.state \
+  "$BENCHMARK_7955AAA" build/qa C1 \
+  --reference-smoke "$SMOKE_7955AAA" --captures-only --compress-captures
+```
+
+Ese comando declara `CAPTURES_PASS`, no aceptación de rendimiento. Sin
+`--captures-only` mide también diez escenarios contra el benchmark congelado,
+sin otras baterías ni juegos utilizando la GPU. El catálogo FP diagnóstico no
+existía en v0.4.1: el gate utiliza sus cuatro orientaciones reales de cámara y
+el recorrido original, además de los catálogos ortográficos. ROM, partidas y
+capturas permanecen fuera de git y de los paquetes.
+
+Las pruebas de fases de combate incorporadas en PR #33 necesitan estados ya
+dentro del encuentro. Las fixtures históricas de `tests/battles_qa.sh` sirven
+para reproducirlas; `BATTLE_QA_DIR` es el directorio privado que imprime esa
+batería:
+
+```sh
+mkdir -p build/qa/battle-phases
+cp "$BATTLE_QA_DIR/logs/battle-fight.state" build/qa/battle-phases/wild.state
+cp "$BATTLE_QA_DIR/logs/trainer-intro.state" build/qa/battle-phases/trainer.state
+ctest --test-dir build --output-on-failure -R '^battle_phases_'
+```
+
+`route22-trainer.state` es una aproximación anterior al diálogo del rival y
+no sustituye a `trainer-intro.state` en esta prueba de fases y tiempos.

@@ -1,7 +1,7 @@
 # Plan: pase artístico e iluminación
 
-Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1 validada
-(3/24 criterios); siguientes fases pendientes. Desarrolla el punto 3 de
+Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1, B1 y C1
+validadas (9/24 criterios). B2, A2, D1, C2 y E1 siguen pendientes. Desarrolla el punto 3 de
 `PLAN_MEJORAS.md`.
 
 ## Análisis del estado actual
@@ -193,9 +193,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Árboles, casas, rocas, vallas y actores proyectan sombra coherente con la hora en Paleta, Ruta 1 y Ciudad Verde, revisada en amanecer, mediodía y atardecer en ambas cámaras.
-- [ ] Sin sol, de noche o con el pase desactivado no se ejecuta el paso de sombras y la imagen coincide con la referencia correspondiente.
-- [ ] Presentación media de catálogo y de primera persona por debajo de 2,0× respecto a v0.4.1 en el mismo equipo.
+- [x] Árboles, casas, rocas, vallas y actores proyectan sombra coherente con la hora en Paleta, Ruta 1 y Ciudad Verde, revisada en amanecer, mediodía y atardecer en ambas cámaras.
+- [x] Sin sol, de noche o con el pase desactivado no se ejecuta el paso de sombras y la imagen coincide con la referencia correspondiente.
+- [x] Presentación media de catálogo y de primera persona por debajo de 2,0× respecto a v0.4.1 en el mismo equipo.
 
 ### Fase B2: oclusión ambiental y sombra de contacto
 
@@ -238,9 +238,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
-- [ ] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
-- [ ] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
+- [x] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
+- [x] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
+- [x] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
 
 ### Fase C2: materiales
 
@@ -756,3 +756,319 @@ añade catálogos exteriores de mediodía y mide amanecer, mediodía y atardecer
 frente al renderer congelado. El driver nuevo de referencia se enlaza con
 las bibliotecas originales; no reemplaza el benchmark archivado de A1.
 Las medidas completas y las regresiones históricas siguen pendientes.
+
+### C1 — ejecución adelantada por petición del usuario (2026-09-23)
+
+Base: `4ccdaf4` (incluye PR #31 de combate integrado y PR #30 de sombras).
+Rama: `art-c1`. La petición de ejecutar C1 adelanta esta fase respecto al orden
+inicial; no da por terminadas B2, A2, D1 ni los pendientes de rendimiento de B1.
+
+Implementación en revisión:
+
+- Recetas por familia en el manifiesto: copas cerradas de seis caras, tres
+  capas (cuatro en árboles altos), variación determinista entre 0,9 y 1,1;
+  rocas de ocho caras. Las tapas triangulares suben tres vértices reales.
+- Árboles de Corte con la misma copa mientras existen y marca rasa del tocón
+  cuando cambia el bloque original. No añade colisiones ni modifica el motor.
+- Tejados a dos/cuatro aguas, aleros dentro del footprint, marcos abiertos en
+  ventanas, relieve de puertas y excepciones planas por coordenadas de la ROM
+  para Silph, el centro comercial y el gimnasio de Plateada.
+- Vallas con dos travesaños, carteles con su soporte existente, cornisas sur
+  de medio tile, hierba más corta con el reloj de viento existente y franjas
+  rasas en límites entre camino y hierba.
+
+Ajuste del alcance por inspección de la ROM: no hay una familia exterior de
+farola o chimenea verificada en las cuatro hojas exteriores. No se convierten
+postes ni tejas en esos objetos por conjetura. En particular, `07/17` es una
+columna repetida del tejado: la primera revisión visual rechazó esa inferencia.
+Se conserva la emisión de las ventanas existentes. Si una futura clasificación
+identifica esas familias, se incorporarán con evidencia de sus tiles.
+
+Pruebas añadidas: volumen analítico y cierre de frusta (control negativo con
+una cara ausente), límites y presupuesto de copas, recetas inválidas y
+excepciones de tejado; auditoría ROM registrada en CTest (`rom`, ausencia 77).
+Esta última descubre también los exteriores accesibles por warp (Safari): verifica
+5.722 footprints sólidos, incluidos 182 árboles altos y 32 de Corte, y rechaza
+árboles en 23.044 casillas transitables. Comprueba también
+la presencia de los tres edificios singulares y que la ROM queda intacta.
+
+Correcciones de QA necesarias desde C1:
+
+- `QA_ART_PASS` queda desactivado por defecto en el adaptador y se reafirma
+  después de cargar preferencias. Los modos `-art` lo activan explícitamente.
+- La comparación ON/OFF exige igualdad del estado del motor, pero permite las
+  nuevas siluetas exteriores. La prueba GPU exige reconstrucción única de malla,
+  caché en frames estables y restauración exacta de OFF.
+- La prueba independiente de iluminación usa geometría sintética de carteles
+  idéntica en ambos modos, conservando sus límites de luz y el control de acné.
+  La prueba ROM nocturna exige cero pases de sombra; ya no exige siluetas ON y
+  OFF iguales, algo incompatible con C1.
+- `art_qa.py ... C1 --reference-smoke BINARIO_7955aaa` ejecuta el gate externo
+  de catálogos ortográficos y recorridos en ambas cámaras. v0.4.1 no tenía API
+  de catálogo diagnóstico FP: se usa su recorrido FP real, sin presentar un
+  renderer posterior como esa referencia. `--captures-only` declara que falta
+  medir rendimiento; `--compress-captures` conserva los bytes en gzip y verifica
+  su hash antes de retirar únicamente el fichero crudo recién generado.
+
+Validación visual completada en `57f3f42`: 42 contactos de los siete lugares,
+ambas cámaras y horas 6,5/12/21, con inspección adicional a tamaño completo del
+Bosque Verde y Silph. `art_qa.py` conserva 2.696 imágenes y 2.704 estados en
+sus catálogos; el resultado `CAPTURES_PASS` no certifica rendimiento. Safari
+añade 16 casos mapa/cámara/estilo: OFF idéntico al renderer congelado de
+v0.4.1 y estado del motor idéntico con ON. El mayor incremento de vértices es
+1,4875× en Bosque Verde (200.250 frente a 134.622).
+
+Las 55 pruebas locales pasan con las fixtures privadas presentes, sin saltos.
+La ampliación posterior de la auditoría a Safari y la prueba de caída completa
+del FBO se verificaron por separado. CI `35823440104` pasa Linux GCC/Clang/2D,
+Windows MSVC/ANGLE y formato en `57f3f42`.
+
+Informes privados en `build/qa/logs/`: `c1-visual-review.json`,
+`c1-safari.json`, `c1-ctest-final-candidate.log`, `c1-all-exterior-audit.log`,
+`c1-fallback-test.log` y `c1-ci-57f3f42.json`. Las capturas están archivadas con
+lectura y SHA-256 verificados (`c1-captures-backup.json`); no se publican.
+Las evidencias de la primera revisión rechazada se conservan en privado.
+
+Los recorridos de Kanto y primera persona con el pase activado pasan en ambos
+estilos: 168 estados completos coinciden con OFF (`c1-on-world.json`), incluidos
+Corte, Surf, bicicleta, cargas y entradas a interiores. Se revisaron también las
+vistas posteriores a Corte y durante Surf (`c1-journey-visual-review.json`).
+Las 27 baterías clásicas conservan las 2.765 imágenes y 2.427 estados frente a
+v0.3.0/v0.4.1, con la excepción de interfaz de Esc documentada previamente.
+
+### C1 — aceptación local y entrega
+
+Las 54 baterías históricas pasan: 27 clásicas con 2.765 imágenes y 2.427
+estados, y 27 integradas con 3.022 imágenes y 2.684 estados. Se conservan
+las excepciones autorizadas del panel Esc y del único panel residual sobre
+blanco. Las 34 diferencias integradas heredadas de PR #31 se reproducen con
+el renderer exacto de `4ccdaf4`: 10 en iluminación, 10 en combate, 10 en
+interfaz de combate, 3 en almacenamiento y 1 en transiciones. En esos cinco
+recorridos, todas las imágenes y estados de C1 coinciden con esa base; no hay
+excepciones de memoria ni diferencias nuevas aceptadas por tolerancia.
+
+Los diez escenarios de presentación pasan en la misma Mesa Intel UHD 620
+(KBL GT2). Cada escenario conserva tres pares alternados de referencia/C1 y
+todas sus muestras, con `glFinish` por frame; los guards de ROM/memoria quedan
+fuera del intervalo cronometrado. Los casos vivos ejecutan el motor original
+y actualizan las sombras en cada frame. Se conservaron carga, presión de
+CPU/memoria/E/S y procesos antes/después de cada ejecución. No hubo otras
+baterías de juego durante esta medida ni se eliminaron muestras.
+
+| Escenario | Hora | v0.4.1 (ms) | C1 (ms) | Factor |
+|---|---:|---:|---:|---:|
+| Catálogo exterior | 6.5 | 3.031 | 4.282 | 1.413× |
+| Catálogo exterior | 12 | 2.975 | 4.204 | 1.413× |
+| Catálogo exterior | 17.5 | 3.068 | 4.374 | 1.426× |
+| Catálogo interior | 12 | 1.852 | 1.871 | 1.010× |
+| Ortográfica en movimiento | 6.5 | 4.843 | 6.891 | 1.423× |
+| Ortográfica en movimiento | 12 | 4.869 | 7.380 | 1.516× |
+| Ortográfica en movimiento | 17.5 | 4.841 | 7.535 | 1.557× |
+| Primera persona en movimiento | 6.5 | 4.707 | 6.980 | 1.483× |
+| Primera persona en movimiento | 12 | 4.696 | 7.003 | 1.491× |
+| Primera persona en movimiento | 17.5 | 4.822 | 7.938 | 1.646× |
+
+El máximo es 1,6462×, inferior a 2×. Las medias individuales por mapa del
+catálogo también quedan por debajo de 2×; la peor es 1,6118×. Los vértices
+máximos son 1,4875×. Estos son tiempos de presentación sincronizada, no una
+promesa de FPS del juego completo.
+
+SHA-256 de los binarios validados:
+
+- `pokeyellow3d`: `c4c2232482a71f325c6dade1c4d53b3743dbd41da704ff504a5f9a76a43f9d24`.
+- `pallet_render_smoke`: `7cb9cfc73541106e188098891bfbf6ff11dd11b7cdab566d36c15ae276d6cf11`.
+- `art_benchmark`: `58377a206f4d6bbe4842eac00710716604cc05266490982f45ac685faf02a366`.
+
+El cambio de nombre de un parámetro exigido por MSVC genera el mismo objeto
+binario que el utilizado por las capturas (`c1-portability-equivalence.json`).
+Runtime intacto: `00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e`.
+
+Reproducción con las fixtures privadas y helpers congelados descritos arriba:
+
+```sh
+ctest --test-dir build --output-on-failure
+python3 tests/art_qa.py build/pallet_render_smoke build/art_benchmark \
+  "$ROM" "$PALLET_STATE" "$FIVE_MAP_STATE" "$BENCHMARK_7955AAA" build/qa C1 \
+  --reference-smoke "$SMOKE_7955AAA" --compress-captures
+for style in classic integrated; do
+  QA_ART_PASS=on QA_MENU_STYLE="$style" QA_CAPTURE_STATES=1 \
+    bash tests/world_qa.sh "$ROM" "$PALLET_STATE" "$HOUSE_STATE"
+  QA_ART_PASS=on QA_MENU_STYLE="$style" QA_CAPTURE_STATES=1 \
+    bash tests/firstperson_qa.sh "$ROM" "$PALLET_STATE" "$HOUSE_STATE" "$ROUTE_STATE"
+done
+```
+
+La ejecución registrada separó capturas y tiempos para medir después de las
+regresiones. Sus comandos exactos, adaptaciones de scripts, hashes y salidas
+están en el directorio privado `pokeyellow-art-evidence-j_x0389o` de `/var/tmp`:
+`run-final-c1-regressions.py c1 classic`, `run-final-c1-regressions.py c1 integrated`,
+`c1-on-world.py` y `c1-performance.py`. Los scripts históricos eliminan solo las
+compilaciones/CTest redundantes; las acciones de juego y las comparaciones
+siguen siendo las congeladas. Las dos salidas interrumpidas por SIGTERM se
+conservaron y se repitieron únicamente sus baterías incompletas.
+
+Resumen y medidas en `build/qa/logs/c1-acceptance-summary.json`,
+`c1-historical-summary.json`, `c1-performance.json` y
+`c1-timing-environment-review.json`. Evidencia visual adicional:
+`c1-journey-visual-review.json`. No se han incorporado ROM, partidas, capturas
+ni assets derivados a git. C1 supera sus tres criterios; la PR #32 requiere
+CI verde en el commit final antes de fusionarse. Esto no cierra las fases
+pendientes del plan ni autoriza publicar v0.5.0.
+
+### C1 — integración de la PR #33 de combate
+
+Mientras se cerraba C1, `main` incorporó `57e357e` (B1 de combate). El único
+conflicto manual estaba en la lista de pruebas de `SyntheticTests.cmake`:
+se conservan `exterior_geometry_test` y `battle_phase_synthetic`. Los cambios
+de producción se integran sin conflicto; C1 conserva sus recetas y la PR #33
+aporta sus fases de combate y los dos campos nuevos de diagnóstico.
+
+La aceptación y los tiempos del apartado anterior corresponden a C1 sobre
+`4ccdaf4`. Se conservan como referencia inmutable, pero no se presentan como
+resultados del binario combinado. Se reabren los dos criterios automáticos
+hasta comprobar la integración, ejecutar las 60 pruebas con sus fixtures y
+repetir las comparaciones afectadas y la medición en el nuevo binario. La
+revisión artística sigue siendo válida para las recetas sin cambios.
+
+Integración local en `f5fbf46`: compilación correcta y CI `35843909542` en
+verde en Linux GCC/Clang/2D, Windows MSVC/ANGLE y formato. Las 60 pruebas
+locales quedan resueltas sin omisiones: 58 pasaron inicialmente y las dos de
+entrenador se repitieron con éxito al recuperar `trainer-intro.state` del
+archivo histórico verificado. La primera fixture usada estaba antes del
+diálogo del rival y no alcanzaba la secuencia en los frames previstos; los
+intentos y sus resultados se conservan. No se alteró ninguna aserción ni la
+memoria del motor. `c1-pr33-local-tests.json` registra esa composición y los
+hashes de los informes. El nuevo catálogo conserva exactamente las 2.696
+imágenes, los 2.704 estados y los registros de mallas de los 48 grupos de la
+versión ya revisada. Esa igualdad mantiene la revisión visual de sus 42
+contactos; no se presenta como una segunda inspección manual. Informe:
+`c1-pr33-visual-equivalence.json`. Los 16 casos de Safari también pasan en
+`c1-pr33-safari.json`. Los cuatro recorridos de mundo/primera persona con el
+pase activado, en ambos estilos, conservan exactamente los 168 estados
+completos de sus recorridos OFF (`c1-pr33-on-world.json`).
+
+Las 54 baterías históricas del binario combinado pasan: clásico conserva
+2.765 imágenes y 2.427 estados; integrado, 3.022 imágenes y 2.684 estados.
+Todos coinciden exactamente con el C1 anterior a PR #33, incluido el panel
+de Esc. No aparece ninguna diferencia nueva atribuible a esa integración.
+Se conserva así la comparación histórica aprobada contra v0.3.0/v0.4.1 y
+sus excepciones acotadas. Informe: `c1-pr33-historical-summary.json`; los
+manifiestos y archivos privados están en `regressions/c1-pr33-{classic,integrated}`.
+La nueva medición de rendimiento está en curso y sigue siendo necesaria
+para cerrar C1; no se sustituye por la CI ni por los tiempos de la base anterior.
+
+La primera tanda combinada completa sus diez escenarios por debajo de 2×
+(máximo 1,9741×), pero coincide con auditorías intensivas de otras sesiones:
+carga de 26,40–45,07 en ocho hilos y presión de CPU entre 67,74 % y 90,55 %.
+Se conservan las 60 ejecuciones y sus 120 observaciones de entorno en
+`c1-pr33-performance.json` y `c1-pr33-contention-review.json`. El usuario
+elige mantener esas auditorías y esperar a que terminen. Queda programada
+una segunda tanda completa con los mismos binarios, fixtures y estadística,
+en un directorio independiente; estos resultados bajo carga no se borran
+ni se sustituyen por una selección de muestras. C1 sigue pendiente de
+la medición con CPU libre y su revisión.
+
+### B1 — cierre de criterios funcionales con evidencia conservada
+
+La revisión de `b1-functional-criteria.json` verifica de nuevo los hashes de
+408 imágenes/estados de los doce casos de `af3fcbd`: Paleta, Ruta 1 y Ciudad
+Verde, dos cámaras y dos estilos. Los contactos conservan la revisión manual
+registrada mediante igualdad exacta, sin atribuirles una inspección nueva.
+Los 60 pares sin sol coinciden byte a byte; los logs y el test de ese commit
+comprueban también que no se ejecuta el paso de sombras en esos casos ni
+con el pase desactivado. Se marcan los dos criterios funcionales de B1.
+
+Esto documenta la evidencia de B1 que ya existía antes de C1. No cierra su
+criterio de rendimiento ni sustituye la validación del binario combinado.
+La repetición de tiempos de B1 conserva los cuatro escenarios completos y
+sus 24 ejecuciones. La revisión posterior del entorno encuentra otra
+instancia del juego (`882366`) en el registro posterior a la última ejecución
+de interiores: no se usa ese escenario para cerrar el criterio. Se repite
+entero junto con los seis escenarios vivos pendientes. Los tres catálogos
+exteriores conservan sus 18 ejecuciones, sin procesos de juego o auditoría
+concurrentes en sus registros. Informe: `b1-prior-timing-environment-review.json`.
+No se seleccionan muestras individuales ni se borra la tanda anterior.
+
+
+### Pausa solicitada — 2026-09-23
+
+El usuario pausa el goal y solicita guardar el trabajo mediante commit y push.
+Se detiene la cola de medición antes de que arranque la segunda tanda de C1;
+no hay resultados nuevos de esa tanda ni se marca su rendimiento como aceptado.
+C1 conserva las validaciones documentadas arriba y la CI de `8cccbbb`
+(`35857321486`) en verde. Las fases pendientes y los 7/24 criterios aceptados
+no cambian. La PR #32 continúa en borrador, sin fusionar; `main` permanece
+reservado hasta cerrar C1.
+
+Se conservan fuera de git los informes, fixtures y capturas existentes, el
+borrador técnico de B2 (`b2-design-preparation.md`) y el revisor de las 60
+mediciones (`review-c1-quiet-performance.py`). Este último reconstruye los
+resultados desde los logs, comprueba hashes y revisa las 120 observaciones
+de entorno; rechaza la tanda bajo carga y una muestra alterada deliberadamente.
+Es preparación de revisión, no aceptación del rendimiento.
+
+Para reanudar: recuperar el checkpoint privado, crear una nueva cola de
+medición con registro separado y revisar la tanda completa con CPU libre.
+Después quedan las siete mediciones pendientes de B1, la documentación final,
+la CI del commit definitivo y el cierre de PR #32. No reiniciar las 54 baterías
+históricas ya terminadas salvo que cambien las fuentes o aparezca una regresión.
+El resto de las ocho fases sigue pendiente; esta pausa no autoriza publicar
+ni etiquetar v0.5.0.
+
+### C1 y B1 — rendimiento con CPU libre — 2026-09-23 (9/24 criterios)
+
+Al reanudar, `quiet_window.py` trataba como activos los procesos detenidos
+(T/t): las auditorías suspendidas por el usuario habrían bloqueado la cola
+para siempre. El arnés privado ahora clasifica cada proceso vigilado según
+todos sus hilos y solo deja de bloquear si todos están detenidos. Los
+umbrales no cambian: carga ≤ 8, presión de CPU < 5 % y ninguna auditoría o
+proceso gráfico ejecutable. Las capturas de procesos de C1 y B1 incluyen
+STAT y una clasificación por hilos. El revisor lee STAT si existe; los
+registros antiguos sin STAT se evalúan como antes, así que la tanda bajo
+carga sigue rechazada con sus 120 incidencias. Los controles negativos
+confirman que un proceso de auditoría ejecutable bloquea, que al detenerlo
+deja de bloquear y que al reanudarlo vuelve a bloquear. La muestra alterada
+se sigue rechazando. Copias, hashes y nota: `harness-suspension-adaptation.json`.
+
+La causa real de la carga era un `grep` de otra sesión bloqueado en disco
+sobre un montaje de red. Con autorización del usuario se terminó solo ese
+proceso, tras revalidar su identidad. Las auditorías suspendidas no
+recibieron ninguna señal.
+
+C1 combinado (`c1-pr33-quiet-performance.json`): mismos binarios, fixtures,
+comandos y estadística sin filtrar; tres pares alternados por escenario.
+El revisor reconstruye las 60 ejecuciones desde sus logs y revisa las 120
+observaciones: `PASS_RAW_AND_ENVIRONMENT`, carga máxima 3,73 y presión
+máxima 1,85 %, sin procesos competidores (`c1-pr33-quiet-final-review.json`).
+
+| Escenario | 06:30 | 12:00 | 17:30 |
+| --- | ---: | ---: | ---: |
+| Catálogo exterior | 1,356× | 1,391× | 1,380× |
+| Catálogo interior | — | 1,031× | — |
+| Ortográfica animada | 1,606× | 1,693× | 1,746× |
+| Primera persona animada | 1,668× | 1,623× | 1,701× |
+
+Vértices por mapa: máximo 1,487× en los catálogos exteriores, 1,237× en las
+vistas vivas y 1,000× en interiores. El peor mapa individual queda en 1,746×.
+Se marca el tercer criterio de C1.
+
+B1 (`b1-performance-resumed.json`) reutiliza sin cambios las 18 ejecuciones
+de los tres catálogos exteriores (1,361×, 1,363× y 1,373×). Repite entero el
+catálogo interior y mide las seis vistas vivas: 42 ejecuciones nuevas y 84
+observaciones, todas limpias (carga máxima 1,07). El revisor
+`review-b1-resumed-performance.py` recalcula las muestras y da
+`PASS_RAW_AND_ENVIRONMENT` (`b1-performance-resumed-review.json`). Su primera
+versión esperaba un orden de marcas de tiempo que el script no produce, se
+detuvo sin escribir resultado y quedó conservada; el orden corregido es
+recibo ≤ antes ≤ inicio < después ≤ fin.
+
+| Escenario B1 | 06:30 | 12:00 | 17:30 |
+| --- | ---: | ---: | ---: |
+| Catálogo interior | — | 1,063× | — |
+| Ortográfica animada | 1,691× | 1,688× | 1,713× |
+| Primera persona animada | 1,543× | 1,542× | 1,616× |
+
+Se marca el criterio de rendimiento de B1. Las revisiones quedan en
+`build/qa/logs`; las ejecuciones, en el directorio privado de evidencia.
+Son medidas numéricas y de entorno: la aceptación de cada fase se apoya
+además en las pruebas y revisiones descritas en los apartados anteriores.

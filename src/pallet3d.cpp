@@ -349,14 +349,14 @@ void shadow(std::vector<Vertex> &v, float x, float z, float rx, float rz) {
     }
 }
 
-void facet(std::vector<Vertex> &vertices, const art::geometry::Face &face, Color color,
+void facet(std::vector<Vertex> &mesh_vertices, const art::geometry::Face &face, Color color,
            UV detail = Solid) {
     auto point = [](art::geometry::Point p) { return Vec{p.x, p.y, p.z}; };
-    detailed_quad(vertices, point(face[0]), point(face[1]), point(face[2]), point(face[3]), color,
-                  detail);
+    detailed_quad(mesh_vertices, point(face[0]), point(face[1]), point(face[2]), point(face[3]),
+                  color, detail);
     // Caps really submit one triangle; do not upload degenerate triangles.
     if (face[2].x == face[3].x && face[2].y == face[3].y && face[2].z == face[3].z)
-        vertices.resize(vertices.size() - 3);
+        mesh_vertices.resize(mesh_vertices.size() - 3);
 }
 
 void artistic_house(const pallet::Scene &scene, const pallet::House &h,

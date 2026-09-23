@@ -362,3 +362,23 @@ Pendiente de validar al compilar:
   atómico, aceptable), a comprobar con captura.
 - Lista de movimientos sin solape a 800x720 y en ventanas pequeñas.
 - Regenerar la auditoría de partida en `build/qa/battle-audit-baseline/`.
+
+### A1: primera validación local, 2026-09-23
+
+- Build Linux propio fuera de `build/` (runtime local
+  `gb-recompiled-windows`, `nice -n 19`), sin avisos nuevos en `src/`.
+  CTest 46/46 con ROM, incluido `rom_font_vram`.
+- Referencia: `main` en `589620e` (código de `7955aaa`) compilado aparte.
+  Mismos fixtures para ambos binarios: `battles_qa.sh` (town, route) y
+  `ui_battles_qa.sh` (route de primera persona, rival de la Ruta 22).
+- Clásico: 59 + 474 ficheros de salida (capturas, estados, volcados)
+  idénticos byte a byte a la referencia, en ambas cámaras.
+- Integrado: ambas baterías en PASS, con `check_battle_timing.py` y memoria
+  de solo lectura. Estados y volcados idénticos; solo cambian las 20
+  capturas esperadas (efectos físico, proyectil y estado, lanzamiento,
+  trayectoria y sacudidas de Poké Ball, y lista de movimientos) más los
+  vídeos compuestos. Revisadas: el mensaje se dibuja en el panel integrado
+  durante el efecto y la Poké Ball, y el cuadro TIPO/PP queda separado.
+- Sin cubrir todavía: "is already out!" y "There's no will to fight!"
+  (ningún fixture actual llega a ellos), MSVC, `clang-format` (no
+  instalado) y `ctest -LE rom` sin ROM. Sin casillas marcadas.

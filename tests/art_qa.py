@@ -158,20 +158,30 @@ def main():
                 mode = 'firstperson' if camera == 'fp' else 'journey'
                 if enabled == 'on':
                     mode += '-art'
-                directory, text = run(f'{style}-{camera}-journey-{enabled}', 'candidate', 'pallet.state', mode,
+                _, text = run(f'{style}-{camera}-journey-{enabled}', 'candidate', 'pallet.state', mode,
                               QA_MENU_STYLE=style, QA_ART_PASS=enabled)
                 assert 'PASS' in text
+                digest = re.findall(r'\[JOURNEY\] final_wram=([0-9a-f]+)', text)
+                assert len(digest) == 1, 'journey must complete and emit its engine digest'
                 if enabled == 'off':
-                    journey_off = {str(p.relative_to(directory)): sha(p)
-                                   for p in directory.rglob('*')
-                                   if p.suffix in ('.ppm', '.machine')}
+                    journey_off = digest
+                else:
+                    assert digest == journey_off, 'ON journey changed final engine RAM'
             if args.reference_smoke:
                 mode = 'firstperson' if camera == 'fp' else 'journey'
-                directory, _ = run(f'{style}-{camera}-journey-reference', 'reference-smoke',
+                _, text = run(f'{style}-{camera}-journey-reference', 'reference-smoke',
                                    'pallet.state', mode, QA_MENU_STYLE=style, QA_ART_PASS='off')
-                reference = {str(p.relative_to(directory)): sha(p)
-                             for p in directory.rglob('*') if p.suffix in ('.ppm', '.machine')}
-                assert reference and reference == journey_off, (style, camera, 'OFF journey differs from v0.4.1')
+                assert re.findall(r'\[JOURNEY\] final_wram=([0-9a-f]+)', text) == journey_off, (style, camera, 'OFF journey engine differs from v0.4.1')
+                if camera == 'fp':
+                    views = {}
+                    for binary in ('candidate', 'reference-smoke'):
+                        directory, _ = run(f'{style}-fp-views-{binary}', binary, 'pallet.state',
+                                           'fp-views', QA_MENU_STYLE=style, QA_ART_PASS='off',
+                                           FP_CAPTURE_DIR='captures')
+                        views[binary] = {p.name: sha(p) for p in (directory / 'captures').iterdir()
+                                         if p.suffix in ('.ppm', '.machine')}
+                        assert len(views[binary]) == 8, 'four FP orientations plus full snapshots'
+                    assert views['candidate'] == views['reference-smoke'], 'OFF FP pixels or machine state differ from v0.4.1'
             hours = {}
             for enabled in ('off', 'on'):
                 mode = 'daylight' + ('-fp' if camera == 'fp' else '')

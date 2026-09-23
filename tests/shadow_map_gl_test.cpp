@@ -68,6 +68,8 @@ int main() {
         return 77;
     }
     int result = 0;
+    std::fprintf(stderr, "[SHADOW-GL] renderer=%s version=%s\n", glGetString(GL_RENDERER),
+                 glGetString(GL_VERSION));
     GLuint atlas = 0, vertices = 0, readback = 0;
     try {
         omit_attachments = true;
@@ -139,10 +141,14 @@ int main() {
         for (int y = 0; y < 1024; ++y)
             for (int x = 0; x < 1024; ++x) {
                 const auto *pixel = &depth[size_t(y * 1024 + x) * 4];
-                if (x < 512 && y < 512)
+                if (x < 512 && y < 512) {
+                    if (pixel[0] != 255 || pixel[1] != 255 || pixel[2] != 255)
+                        std::fprintf(stderr, "[ALPHA] xy=%d,%d rgba=%u,%u,%u,%u\n", x, y,
+                                     unsigned(pixel[0]), unsigned(pixel[1]), unsigned(pixel[2]),
+                                     unsigned(pixel[3]));
                     check(pixel[0] == 255 && pixel[1] == 255 && pixel[2] == 255,
                           "transparent sprite padding must not cast");
-                else {
+                } else {
                     double z = pixel[0] / 255. + pixel[1] / 65025. + pixel[2] / 16581375.;
                     if (std::abs(z - (.1 + .8 * (x + .5) / 1024)) >= 2. / 65535.)
                         std::fprintf(stderr,

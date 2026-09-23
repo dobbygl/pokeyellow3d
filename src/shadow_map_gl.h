@@ -58,7 +58,7 @@ template <class Compile> bool initialize(Compile compile) {
         const char *vs = R"(
             attribute vec3 position; attribute vec2 texcoord; attribute vec4 color;
             attribute float wind; uniform mat4 view_projection; uniform float wind_time;
-            varying mediump vec2 uv; varying mediump float opacity;
+            varying highp vec2 uv; varying mediump float opacity;
             varying highp float shadow_depth;
             void main() {
                 vec3 moved=position;
@@ -77,7 +77,7 @@ template <class Compile> bool initialize(Compile compile) {
         const char *fs = R"(
             precision highp float;
             uniform sampler2D image;
-            varying mediump vec2 uv; varying mediump float opacity;
+            varying highp vec2 uv; varying mediump float opacity;
             varying highp float shadow_depth;
             void main() {
                 // Alpha silhouettes cast; the old translucent ground blobs

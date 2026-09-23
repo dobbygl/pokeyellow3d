@@ -105,9 +105,9 @@ int main(int argc, char **argv) {
     if (!f)
         return 2;
     std::vector<uint8_t> rom(1048576);
-    size_t count = std::fread(rom.data(), 1, rom.size(), f);
+    size_t rom_bytes_read = std::fread(rom.data(), 1, rom.size(), f);
     std::fclose(f);
-    if (count != 1048576)
+    if (rom_bytes_read != 1048576)
         return 3;
     // Match gb_load_assets: only the manifest sections are resident at runtime.
     std::memset(pokeyellow__rom_data, 0xff, 1048576);
@@ -639,7 +639,7 @@ int main(int argc, char **argv) {
         }
         std::fprintf(stderr, "[STACK]");
         for (int a = ctx->sp; a < 0xe000; a++)
-            std::fprintf(stderr, " %02x", pallet::read(ctx, a));
+            std::fprintf(stderr, " %02x", pallet::read(ctx, uint16_t(a)));
         std::fprintf(stderr, "\n");
         gb_platform_shutdown();
         return 0;
@@ -794,7 +794,7 @@ int main(int argc, char **argv) {
             int n = 0, bw = scene->width / 2;
             for (int z = 0; z < scene->height / 2; z++)
                 for (int x = 0; x < bw; x++) {
-                    int live = pallet::read(ctx, 0xc6e8 + (z + 3) * (bw + 6) + x + 3),
+                    int live = pallet::read(ctx, uint16_t(0xc6e8 + (z + 3) * (bw + 6) + x + 3)),
                         base = scene->block_data[z * bw + x];
                     if (live != base && n++ < 15)
                         std::fprintf(stderr, "[BLOCK] xy=%d,%d rom=%02x live=%02x\n", x, z, base,

@@ -293,8 +293,7 @@ int main() {
         // The battle normally presents the window at WX=7, WY=0 from 9C00.
         machine.io[0x40] |= 0x60;
         machine.vram[0x1800 + 14 * 32 + 2] ^= 1;
-        check(battle::displayed(ctx, 0, 12, 20, 6),
-              "the full-screen window hides a stale BG map");
+        check(battle::displayed(ctx, 0, 12, 20, 6), "the full-screen window hides a stale BG map");
         machine.io[0x4b] = 11;
         machine.io[0x4a] = 3;
         check(battle::displayed(ctx, 0, 12, 20, 6), "a shaken window still shows the same box");

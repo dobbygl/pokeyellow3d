@@ -519,11 +519,10 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
         if (menu.kind == battle_menu::Kind::Moves) {
             // Same plan regions() would prepare, with the TYPE/PP panel lifted
             // clear of the four move rows. Validation and ownership unchanged.
-            plan = menu_text::prepare(ctx->wram + 0x3a0, ctx->vram,
-                                      rom_font::get(ctx->rom, ctx->rom_size), menu.regions,
-                                      float(w), float(h), ui_theme::Padding,
-                                      ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale,
-                                      menu_text::Placement::Battle, ctx->rom, ctx->rom_size);
+            plan = menu_text::prepare(
+                ctx->wram + 0x3a0, ctx->vram, rom_font::get(ctx->rom, ctx->rom_size), menu.regions,
+                float(w), float(h), ui_theme::Padding, ui_theme::StartGlyphScale,
+                ui_theme::BottomGlyphScale, menu_text::Placement::Battle, ctx->rom, ctx->rom_size);
             menu_text::separate(plan, battle_menu::MovesInfo, battle_menu::MovesList,
                                 ui_theme::Padding);
             positioned = &plan;

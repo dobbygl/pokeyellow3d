@@ -1236,3 +1236,18 @@ sin otras baterías ni juegos utilizando la GPU. El catálogo FP diagnóstico no
 existía en v0.4.1: el gate utiliza sus cuatro orientaciones reales de cámara y
 el recorrido original, además de los catálogos ortográficos. ROM, partidas y
 capturas permanecen fuera de git y de los paquetes.
+
+Las pruebas de fases de combate incorporadas en PR #33 necesitan estados ya
+dentro del encuentro. Las fixtures históricas de `tests/battles_qa.sh` sirven
+para reproducirlas; `BATTLE_QA_DIR` es el directorio privado que imprime esa
+batería:
+
+```sh
+mkdir -p build/qa/battle-phases
+cp "$BATTLE_QA_DIR/logs/battle-fight.state" build/qa/battle-phases/wild.state
+cp "$BATTLE_QA_DIR/logs/trainer-intro.state" build/qa/battle-phases/trainer.state
+ctest --test-dir build --output-on-failure -R '^battle_phases_'
+```
+
+`route22-trainer.state` es una aproximación anterior al diálogo del rival y
+no sustituye a `trainer-intro.state` en esta prueba de fases y tiempos.

@@ -1,7 +1,8 @@
 # Plan: pase artístico e iluminación
 
-Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1 validada
-(3/24 criterios); siguientes fases pendientes. Desarrolla el punto 3 de
+Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1 validada y C1
+en aceptación (7/24 criterios); B1 fusionada con rendimiento pendiente.
+Las demás fases siguen pendientes. Desarrolla el punto 3 de
 `PLAN_MEJORAS.md`.
 
 ## Análisis del estado actual
@@ -193,8 +194,8 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Árboles, casas, rocas, vallas y actores proyectan sombra coherente con la hora en Paleta, Ruta 1 y Ciudad Verde, revisada en amanecer, mediodía y atardecer en ambas cámaras.
-- [ ] Sin sol, de noche o con el pase desactivado no se ejecuta el paso de sombras y la imagen coincide con la referencia correspondiente.
+- [x] Árboles, casas, rocas, vallas y actores proyectan sombra coherente con la hora en Paleta, Ruta 1 y Ciudad Verde, revisada en amanecer, mediodía y atardecer en ambas cámaras.
+- [x] Sin sol, de noche o con el pase desactivado no se ejecuta el paso de sombras y la imagen coincide con la referencia correspondiente.
 - [ ] Presentación media de catálogo y de primera persona por debajo de 2,0× respecto a v0.4.1 en el mismo equipo.
 
 ### Fase B2: oclusión ambiental y sombra de contacto
@@ -239,7 +240,7 @@ Trabajo:
 Criterios de aceptación:
 
 - [x] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
-- [ ] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
+- [x] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
 - [ ] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
 
 ### Fase C2: materiales
@@ -857,7 +858,6 @@ baterías de juego durante esta medida ni se eliminaron muestras.
 
 | Escenario | Hora | v0.4.1 (ms) | C1 (ms) | Factor |
 |---|---:|---:|---:|---:|
-
 | Catálogo exterior | 6.5 | 3.031 | 4.282 | 1.413× |
 | Catálogo exterior | 12 | 2.975 | 4.204 | 1.413× |
 | Catálogo exterior | 17.5 | 3.068 | 4.374 | 1.426× |
@@ -930,3 +930,62 @@ resultados del binario combinado. Se reabren los dos criterios automáticos
 hasta comprobar la integración, ejecutar las 60 pruebas con sus fixtures y
 repetir las comparaciones afectadas y la medición en el nuevo binario. La
 revisión artística sigue siendo válida para las recetas sin cambios.
+
+Integración local en `f5fbf46`: compilación correcta y CI `35843909542` en
+verde en Linux GCC/Clang/2D, Windows MSVC/ANGLE y formato. Las 60 pruebas
+locales quedan resueltas sin omisiones: 58 pasaron inicialmente y las dos de
+entrenador se repitieron con éxito al recuperar `trainer-intro.state` del
+archivo histórico verificado. La primera fixture usada estaba antes del
+diálogo del rival y no alcanzaba la secuencia en los frames previstos; los
+intentos y sus resultados se conservan. No se alteró ninguna aserción ni la
+memoria del motor. `c1-pr33-local-tests.json` registra esa composición y los
+hashes de los informes. El nuevo catálogo conserva exactamente las 2.696
+imágenes, los 2.704 estados y los registros de mallas de los 48 grupos de la
+versión ya revisada. Esa igualdad mantiene la revisión visual de sus 42
+contactos; no se presenta como una segunda inspección manual. Informe:
+`c1-pr33-visual-equivalence.json`. Los 16 casos de Safari también pasan en
+`c1-pr33-safari.json`. Los cuatro recorridos de mundo/primera persona con el
+pase activado, en ambos estilos, conservan exactamente los 168 estados
+completos de sus recorridos OFF (`c1-pr33-on-world.json`).
+
+Las 54 baterías históricas del binario combinado pasan: clásico conserva
+2.765 imágenes y 2.427 estados; integrado, 3.022 imágenes y 2.684 estados.
+Todos coinciden exactamente con el C1 anterior a PR #33, incluido el panel
+de Esc. No aparece ninguna diferencia nueva atribuible a esa integración.
+Se conserva así la comparación histórica aprobada contra v0.3.0/v0.4.1 y
+sus excepciones acotadas. Informe: `c1-pr33-historical-summary.json`; los
+manifiestos y archivos privados están en `regressions/c1-pr33-{classic,integrated}`.
+La nueva medición de rendimiento está en curso y sigue siendo necesaria
+para cerrar C1; no se sustituye por la CI ni por los tiempos de la base anterior.
+
+La primera tanda combinada completa sus diez escenarios por debajo de 2×
+(máximo 1,9741×), pero coincide con auditorías intensivas de otras sesiones:
+carga de 26,40–45,07 en ocho hilos y presión de CPU entre 67,74 % y 90,55 %.
+Se conservan las 60 ejecuciones y sus 120 observaciones de entorno en
+`c1-pr33-performance.json` y `c1-pr33-contention-review.json`. El usuario
+elige mantener esas auditorías y esperar a que terminen. Queda programada
+una segunda tanda completa con los mismos binarios, fixtures y estadística,
+en un directorio independiente; estos resultados bajo carga no se borran
+ni se sustituyen por una selección de muestras. C1 sigue pendiente de
+la medición con CPU libre y su revisión.
+
+### B1 — cierre de criterios funcionales con evidencia conservada
+
+La revisión de `b1-functional-criteria.json` verifica de nuevo los hashes de
+408 imágenes/estados de los doce casos de `af3fcbd`: Paleta, Ruta 1 y Ciudad
+Verde, dos cámaras y dos estilos. Los contactos conservan la revisión manual
+registrada mediante igualdad exacta, sin atribuirles una inspección nueva.
+Los 60 pares sin sol coinciden byte a byte; los logs y el test de ese commit
+comprueban también que no se ejecuta el paso de sombras en esos casos ni
+con el pase desactivado. Se marcan los dos criterios funcionales de B1.
+
+Esto documenta la evidencia de B1 que ya existía antes de C1. No cierra su
+criterio de rendimiento ni sustituye la validación del binario combinado.
+La repetición de tiempos de B1 conserva los cuatro escenarios completos y
+sus 24 ejecuciones. La revisión posterior del entorno encuentra otra
+instancia del juego (`882366`) en el registro posterior a la última ejecución
+de interiores: no se usa ese escenario para cerrar el criterio. Se repite
+entero junto con los seis escenarios vivos pendientes. Los tres catálogos
+exteriores conservan sus 18 ejecuciones, sin procesos de juego o auditoría
+concurrentes en sus registros. Informe: `b1-prior-timing-environment-review.json`.
+No se seleccionan muestras individuales ni se borra la tanda anterior.

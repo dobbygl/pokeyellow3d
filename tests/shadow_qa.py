@@ -52,6 +52,7 @@ def main():
                                        stdout=log, stderr=subprocess.STDOUT, check=True)
                     text = (directory / 'run.log').read_text()
                     assert 'PASS: B1 shadows, eight sun states' in text
+                    assert 'PASS: shadow mid-animation and cold loads; 25 exact frames/depths' in text
                     assert 'FAIL' not in text and 'SKIP' not in text
                     images = {p.name: sha(p) for p in (directory / 'logs').glob('*.ppm')}
                     states = {p.name: sha(p) for p in (directory / 'logs').glob('*.machine')}
@@ -62,6 +63,7 @@ def main():
                         prefix = f'hour-{hour:.6f}'
                         assert images[prefix + '-on.ppm'] == images[prefix + '-off.ppm']
                     report['cases'].append(dict(name=name, images=images, states=states,
+                                                load_frames=25, load_engine_comparisons=75,
                                                 log_sha256=sha(directory / 'run.log')))
                     record.write_text(json.dumps(report, indent=2) + '\n')
                     print(f'PASS: {name}', flush=True)

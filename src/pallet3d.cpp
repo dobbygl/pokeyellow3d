@@ -1444,6 +1444,7 @@ void hud(GBContext *ctx) {
 } // namespace
 
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
+    shadows_presented = false;
     full_menu::shown = {};
     pokemon_menu::shown = {};
     menu_text::FrameEnd menu_frame_end{active, failed};

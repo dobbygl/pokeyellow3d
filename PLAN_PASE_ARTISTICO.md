@@ -721,3 +721,38 @@ Informes privados: `b1-corrected-ctest.log`, `b1-public-ctest.log`,
 de carga, caída visual del renderer, rendimiento frente a v0.4.1, regresión
 histórica y CI Linux/Windows antes de cerrar y fusionar B1. Sus casillas
 permanecen abiertas.
+
+#### B1 — cargas, fallo de recursos y portabilidad (validación parcial)
+
+La prueba del renderer completo provoca un FBO realmente incompleto antes
+de la inicialización diferida. En ambas cámaras y estilos, el pase solicitado
+permanece activado en preferencias, pero la escena vuelve íntegramente a la
+referencia: coinciden todos los bytes RGBA y los vértices del HUD. Se comprueba
+la liberación de los recursos parciales, el estado completo del contexto,
+la ROM y todas las memorias, sin errores GL.
+
+La prueba alfa utiliza ahora un atlas sintético de 512×512, como el renderer.
+El anterior, de 2×2 ampliado 512 veces, colocaba muestras a 1/1024 de texel
+del borde; esa separación está por debajo de la precisión mínima de ocho
+bits fraccionales del muestreo de Direct3D. Véase la sección 7.18.7 de la
+[especificación D3D11](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm).
+El test conserva la comparación exacta de **todos** los píxeles, incluidos
+los bordes; no excluye una franja ni amplía tolerancias. Los cinco trabajos
+requeridos de CI pasan en `caf6de2`, ejecución `35807980433`. Los cambios
+posteriores de este apartado deben superar también la CI antes de fusionar.
+
+Las cargas en frío y a mitad de animación comparan 25 imágenes y texturas
+de profundidad completas, y 75 estados del motor entre las repeticiones
+activadas y desactivadas. El reloj se contrasta con los ciclos reales de la
+CPU; se mantiene la política existente de reiniciar el viento al cargar.
+La cámara puede no ver ningún emisor móvil, pero cada avance de la fase
+invalida y vuelve a dibujar el destino de profundidad. Pasan las dos pruebas
+con ROM y la batería local completa, 53/53, en esta revisión.
+
+El benchmark admite `animate` para los escenarios vivos: ejecuta el motor
+original fuera del intervalo medido y exige un paso real de sombras por
+frame con luz solar. `tests/art_qa.py` acepta `B1` como último argumento,
+añade catálogos exteriores de mediodía y mide amanecer, mediodía y atardecer
+frente al renderer congelado. El driver nuevo de referencia se enlaza con
+las bibliotecas originales; no reemplaza el benchmark archivado de A1.
+Las medidas completas y las regresiones históricas siguen pendientes.

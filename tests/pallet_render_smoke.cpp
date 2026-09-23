@@ -141,6 +141,16 @@ int main(int argc, char **argv) {
     }
     if (artistic)
         pallet3d_artistic(true);
+    if (const char *value = std::getenv("QA_FIXED_HOUR")) {
+        char *end = nullptr;
+        const double hour = std::strtod(value, &end);
+        if (end == value || *end || !std::isfinite(hour) || hour < 0 || hour >= 24 ||
+            !pallet3d_daylight({daynight::Mode::Fixed, hour})) {
+            std::fprintf(stderr, "Invalid QA_FIXED_HOUR: expected a number in [0,24)\n");
+            gb_platform_shutdown();
+            return 2;
+        }
+    }
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
     if (argc > 5 && (!std::strcmp(argv[2], "--title-audit") || !std::strcmp(argv[2], "boot"))) {

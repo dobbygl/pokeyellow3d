@@ -249,6 +249,21 @@ if(CMAKE_PROJECT_NAME STREQUAL "pokeyellow")
                 WORKING_DIRECTORY "${shadow_directory}"
                 ENVIRONMENT "${preview_environment};QA_CAPTURE_STATES=1;QA_MENU_STYLE=integrated")
         endforeach()
+        # B1: engine phase sequence over private battle savestates, both styles.
+        foreach(scenario wild trainer)
+            foreach(style classic integrated)
+                set(phase_directory "${CMAKE_CURRENT_BINARY_DIR}/qa/battle-phases/${scenario}-${style}")
+                file(MAKE_DIRECTORY "${phase_directory}")
+                add_test(NAME battle_phases_${scenario}_${style} COMMAND pallet_render_smoke
+                    "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc"
+                    "${CMAKE_CURRENT_BINARY_DIR}/qa/battle-phases/${scenario}.state"
+                    battle-phases ${scenario})
+                set_tests_properties(battle_phases_${scenario}_${style} PROPERTIES
+                    LABELS rom SKIP_RETURN_CODE 77 RUN_SERIAL TRUE
+                    WORKING_DIRECTORY "${phase_directory}"
+                    ENVIRONMENT "${preview_environment};QA_MENU_STYLE=${style}")
+            endforeach()
+        endforeach()
         add_test(NAME art_benchmark_fixture COMMAND art_benchmark
             "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc"
             "${CMAKE_CURRENT_BINARY_DIR}/qa/art-fixtures/five-maps.state" ortho off -1)

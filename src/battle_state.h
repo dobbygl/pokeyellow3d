@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
+#include <utility>
 
 // Canonical UE Yellow. Addresses checked against pokeyellow_internal.h and
 // pret/pokeyellow's symbols, engine/battle/{core,init_battle,animations}.asm.
@@ -123,8 +125,11 @@ inline bool ready(const GBContext *ctx) {
            name_matches(ctx, 0xcfd9, 1, 0) && name_matches(ctx, 0xd008, 10, 7);
 }
 inline bool live_return(const GBContext *ctx, size_t call, int target) {
-    if (ctx->rom[call] != 0xcd || ctx->rom[call + 1] != (target & 255) ||
-        ctx->rom[call + 2] != (target >> 8))
+    // CALL and its conditional forms (C4/CC/D4/DC) push the same return
+    // address; a taken conditional call is as live as an unconditional one.
+    int op = ctx->rom[call];
+    if ((op != 0xcd && op != 0xc4 && op != 0xcc && op != 0xd4 && op != 0xdc) ||
+        ctx->rom[call + 1] != (target & 255) || ctx->rom[call + 2] != (target >> 8))
         return false;
     if (ctx->sp < 0xd000 || ctx->sp >= 0xe000)
         return false;
@@ -146,6 +151,220 @@ inline bool animation_running(const GBContext *ctx) {
     return live_return(ctx, 0x3f09b, 0x3eb4) || live_return(ctx, 0x3f0a3, 0x3e84) ||
            live_return(ctx, 0x78dbc, 0x4124) || live_return(ctx, 0x78dc6, 0x4df6) ||
            capture_running(ctx);
+}
+// A far routine entered through Bankswitch (0x3e84) runs above the frame
+// [0x3e90][F][caller bank][caller return]: Bankswitch pushes AF with A = the
+// caller's bank, then CALLs JumpToAddress, whose return is 0x3e90. This also
+// identifies a far routine reached by `jp Bankswitch`, which leaves no CALL of
+// its own; the caller bank removes the 16-bit ambiguity of live_return.
+inline bool far_frame(const GBContext *ctx, int bank, int ret) {
+    if (ctx->sp < 0xd000 || ctx->sp >= 0xe000)
+        return false;
+    for (int a = ctx->sp; a + 5 <= 0xdfff; a += 2)
+        if (read(ctx, a) == 0x90 && read(ctx, a + 1) == 0x3e && read(ctx, a + 3) == bank &&
+            read(ctx, a + 4) == (ret & 255) && read(ctx, a + 5) == (ret >> 8))
+            return true;
+    return false;
+}
+// Engine phase of a normal battle, identified only by live engine frames
+// (engine/battle/core.asm, experience.asm, pokemon/learn_move.asm,
+// items/item_effects.asm, movie/evolution.asm). Subphases whose original
+// layout is not presented yet (stats box, yes/no, lists, party balls) are
+// separate values so presentation can keep them on the complete LCD.
+enum class Phase {
+    None,         // not in a normal battle, or outside StartBattle/EndOfBattle
+    TrainerIntro, // StartBattle -> EnemySendOutFirstMon, first send-out
+    Turn,         // MainInBattleLoop and anything more specific not listed
+    Fainted,      // FaintEnemyPokemon / RemoveFaintedPlayerMon
+    Experience,   // GainExperience: "gained N EXP. Points!"
+    LevelUp,      // GainExperience: HUD redraw and "grew to level N!"
+    LevelStats,   // GainExperience: PrintStatsBox and its wait
+    LearnMove,    // LearnMoveFromLevelUp messages
+    LearnYesNo,   // LearnMove: yes/no boxes
+    LearnForget,  // LearnMove: list of moves to forget
+    Switch,       // next Pokemon of either side, retreat and send-out
+    SwitchYesNo,  // "Use next POKéMON?" or "Will ... change POKéMON?"
+    SwitchParty,  // party list reached from a switch
+    PartyBalls,   // ReplaceFaintedEnemyMon drawing the enemy's party balls
+    TrainerOutro, // TrainerBattleVictory
+    PlayerDefeat, // HandlePlayerBlackOut
+    Run,          // TryRunningFromBattle / EnemyRan
+    Capture,      // ItemUseBall, its Pokedex entry, nickname and storage
+    Evolution,    // EndOfBattle -> EvolutionAfterBattle
+    Exit,         // EndOfBattle without evolution
+};
+inline const char *phase_name(Phase phase) {
+    static const char *names[] = {"None",        "TrainerIntro", "Turn",         "Fainted",
+                                  "Experience",  "LevelUp",      "LevelStats",   "LearnMove",
+                                  "LearnYesNo",  "LearnForget",  "Switch",       "SwitchYesNo",
+                                  "SwitchParty", "PartyBalls",   "TrainerOutro", "PlayerDefeat",
+                                  "Run",         "Capture",      "Evolution",    "Exit"};
+    return names[int(phase)];
+}
+inline bool any_return(const GBContext *ctx, std::initializer_list<std::pair<size_t, int>> pairs) {
+    for (auto p : pairs)
+        if (live_return(ctx, p.first, p.second))
+            return true;
+    return false;
+}
+inline Phase phase(const GBContext *ctx) {
+    if (!normal(ctx))
+        return Phase::None;
+    // _InitBattleCommon farcalls StartBattle (0f:4127) at F613F and then
+    // EndOfBattle (04:7765) at F6147. Either frame is the root of every phase.
+    auto far = [&](size_t call, int target, int bank) {
+        return ctx->rom[call - 5] == 0x21 && ctx->rom[call - 4] == (target & 255) &&
+               ctx->rom[call - 3] == (target >> 8) && ctx->rom[call - 2] == 0x06 &&
+               ctx->rom[call - 1] == bank && live_return(ctx, call, 0x3e84);
+    };
+    if (far(0xf6147, 0x7765, 0x04))
+        return live_return(ctx, 0x137d0, 0x3eb4) ? Phase::Evolution : Phase::Exit;
+    if (!far(0xf613f, 0x4127, 0x0f))
+        return Phase::None;
+    // ItemUseBall (bank 3): its animation, result texts, Pokedex entry,
+    // AddPartyMon/SendNewMonToBox; wCapturedMonSpecies stays set until the
+    // bag returns after a successful capture.
+    if (read(ctx, 0xd11b) || any_return(ctx, {{0x79fe7, 0x4124},
+                                              {0xd606, 0x3c36},
+                                              {0xd632, 0x3c36},
+                                              {0xd640, 0x3eb4},
+                                              {0xd661, 0x391c},
+                                              {0xd669, 0x66e8},
+                                              {0xd679, 0x3c36},
+                                              {0xd681, 0x3c36}}))
+        return Phase::Capture;
+    // GainExperience (15:525F) runs inside FaintEnemyPokemon: by farcall at
+    // 3C633 (EXP.ALL first pass) or by `jp Bankswitch` at 3C651, which leaves
+    // the Bankswitch frame of FaintEnemyPokemon's caller (bank 0F, returns
+    // 4542 from HandleEnemyMonFainted or 4737 from HandlePlayerMonFainted).
+    bool experience = live_return(ctx, 0x3c633, 0x3e84) || far_frame(ctx, 0x0f, 0x4542) ||
+                      far_frame(ctx, 0x0f, 0x4737);
+    if (experience) {
+        // LearnMoveFromLevelUp (predef 1A) from GainExperience, then the
+        // shared LearnMove (bank 1) boxes.
+        if (live_return(ctx, 0x5542f, 0x3eb4)) {
+            if (any_return(ctx, {{0x6c9e, 0x3010}, {0x6c70, 0x3010}}))
+                return Phase::LearnYesNo;
+            if (live_return(ctx, 0x6cfd, 0x3aab))
+                return Phase::LearnForget;
+            return Phase::LearnMove;
+        }
+        if (any_return(ctx, {{0x5541a, 0x3e84}, {0x5541d, 0x3852}}))
+            return Phase::LevelStats;
+        if (any_return(ctx, {{0x55409, 0x3c36},
+                             {0x553de, 0x54c1},
+                             {0x553e4, 0x54c1},
+                             {0x553ea, 0x54c1},
+                             {0x553f0, 0x54c1},
+                             {0x553f6, 0x54c1}}))
+            return Phase::LevelUp;
+        return Phase::Experience;
+    }
+    if (any_return(ctx,
+                   {{0x3c53f, 0x457d}, {0x3c734, 0x457d}, {0x3c722, 0x475e}, {0x3c5fe, 0x475e}}))
+        return Phase::Fainted;
+    // DoUseNextMonDialogue, ChooseNextMon, ReplaceFaintedEnemyMon (which
+    // falls into EnemySendOutFirstMon and jumps to SwitchPlayerMon), the AI's
+    // SwitchEnemyMon/EnemySendOut, and the voluntary RetreatMon/SendOutMon.
+    bool use_next = any_return(ctx, {{0x3c742, 0x47ff}, {0x3c564, 0x47ff}});
+    bool choose = any_return(ctx, {{0x3c746, 0x483c}, {0x3c568, 0x483c}});
+    bool replace = any_return(ctx, {{0x3c570, 0x467a}, {0x3c751, 0x467a}});
+    if (use_next || choose || replace ||
+        any_return(ctx, {{0x3c2f8, 0x3e84},
+                         {0x3a808, 0x3e84},
+                         {0x3d2c6, 0x3e84},
+                         {0x3d2ce, 0x4d97},
+                         {0x3d2ef, 0x4cfb}})) {
+        if ((use_next && live_return(ctx, 0x3c81c, 0x3010)) || live_return(ctx, 0x3ca4d, 0x3010))
+            return Phase::SwitchYesNo;
+        if ((choose && any_return(ctx, {{0x3c841, 0x11c8}, {0x3c846, 0x11dd}})) ||
+            any_return(ctx, {{0x3ca5b, 0x11c8}, {0x3ca74, 0x11dd}, {0x3ca71, 0x3c36}}))
+            return Phase::SwitchParty;
+        if (replace && live_return(ctx, 0x3c693, 0x3e84))
+            return Phase::PartyBalls;
+        return Phase::Switch;
+    }
+    if (any_return(ctx, {{0x3c6d9, 0x4710},
+                         {0x3c6df, 0x3c36},
+                         {0x3c6e8, 0x6e9e},
+                         {0x3c6ed, 0x372f},
+                         {0x3c6f0, 0x331d},
+                         {0x3c6f6, 0x3c36}}))
+        return Phase::TrainerOutro;
+    if (any_return(ctx, {{0x3c8b3, 0x6e9e},
+                         {0x3c8b8, 0x372f},
+                         {0x3c8be, 0x3c36},
+                         {0x3c8d9, 0x3c36},
+                         {0x3c8e4, 0x16dd}}))
+        return Phase::PlayerDefeat;
+    if (any_return(ctx, {{0x3d30f, 0x4b1e},
+                         {0x3cbb9, 0x3c36},
+                         {0x3cbf0, 0x3736},
+                         {0x3cbf6, 0x3c36},
+                         {0x3c22c, 0x3c36}}))
+        return Phase::Run;
+    if (live_return(ctx, 0x3c14d, 0x498f) || trainer_intro(ctx))
+        return Phase::TrainerIntro;
+    return Phase::Turn;
+}
+// The screen outside the bottom message box, as the covered phases leave it:
+// each side either shows its HUD (its name at the CenterMonName position) or
+// has cleared it, and its picture rectangle holds only blank cells or tiles of
+// a picture (a partial slide or send-out stage). Every other cell of rows 0-11
+// is blank. A stats box, yes/no box, list, party balls or any other window
+// breaks one of these, so the caller keeps the complete original LCD.
+constexpr int EnemyHud[4] = {0, 0, 11, 4}, PlayerHud[4] = {9, 7, 11, 5};
+inline bool present(const GBContext *ctx, bool enemy) {
+    return enemy ? name_matches(ctx, 0xcfd9, 1, 0) : name_matches(ctx, 0xd008, 10, 7);
+}
+inline bool arena_coherent(const GBContext *ctx) {
+    if (!normal(ctx) || !(ctx->io[0x40] & 0x80) || ctx->io[0x47] != 0xe4 || ctx->io[0x42] ||
+        (ctx->io[0x43] != 0 && ctx->io[0x43] != 2) || read(ctx, 0xd11c))
+        return false;
+    bool shown[2] = {present(ctx, false), present(ctx, true)};
+    auto inside = [](const int *zone, int x, int y) {
+        return x >= zone[0] && x < zone[0] + zone[2] && y >= zone[1] && y < zone[1] + zone[3];
+    };
+    for (int y = 0; y < 12; y++)
+        for (int x = 0; x < 20; x++) {
+            int t = tile(ctx, x, y);
+            // Text box borders and the menu cursor never belong to the HUD.
+            if ((t >= 0x79 && t <= 0x7e) || t == 0xed || t == 0xec)
+                return false;
+            bool handled = false;
+            for (int side = 0; side < 2 && !handled; side++) {
+                Rect r = side ? Enemy : Player;
+                if (x >= r.x && x < r.x + 7 && y >= r.y && y < r.y + 7) {
+                    // AnimateSendingOutMon's small stages borrow picture
+                    // tiles of either side; HUD, box and text tiles are >= 62.
+                    if (t != 0x7f && t >= Player.base + 49)
+                        return false;
+                    handled = true;
+                }
+            }
+            for (int side = 0; side < 2 && !handled; side++)
+                if (inside(side ? EnemyHud : PlayerHud, x, y)) {
+                    if (!shown[side] && t != 0x7f)
+                        return false;
+                    handled = true;
+                }
+            if (!handled && t != 0x7f)
+                return false;
+        }
+    return true;
+}
+// Phases B1 presents over the arena when arena_coherent() confirms them.
+inline bool held_phase(Phase phase) {
+    return phase == Phase::Fainted || phase == Phase::Experience || phase == Phase::LevelUp ||
+           phase == Phase::LearnMove || phase == Phase::Switch;
+}
+// A switch is held only while the player's own Pokemon stays on screen: the
+// enemy's replacement. The player's retreat and send-out ("Come back!",
+// "Go!") replace the player's HUD and picture through animations that keep
+// the complete LCD until they are presented in 3D (phase C1).
+inline bool holds(const GBContext *ctx, Phase phase) {
+    return held_phase(phase) && arena_coherent(ctx) &&
+           (phase != Phase::Switch || (present(ctx, false) && rectangle(ctx, Player)));
 }
 enum class Effect { Original, Physical, Projectile, Status, Self };
 struct Move {

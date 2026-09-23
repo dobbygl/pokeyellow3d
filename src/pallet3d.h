@@ -161,6 +161,8 @@ struct PalletBattleInfo {
     float player_hp, enemy_hp, player_damage, enemy_damage;
     bool integrated_menu;
     int menu_kind, menu_panels;
+    int phase; // battle::Phase of the last presented frame.
+    bool held; // That phase keeps the arena with an absent picture (B1).
 };
 PalletBattleInfo pallet3d_battle();
 

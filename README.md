@@ -89,7 +89,7 @@ Each ZIP has a companion `.sha256` checksum. The launcher is included in `pokeye
 ### Requirements
 
 ROM-backed journeys and capture comparisons run on Linux with Mesa. Native
-Windows/MSVC builds and all thirty-one ROM-independent tests, including the
+Windows/MSVC builds and all thirty-two ROM-independent tests, including the
 Windows/ANGLE renderer, pass in CI. macOS has not been validated.
 
 - Git and CMake **3.18 or newer**.
@@ -230,7 +230,7 @@ The 3D layer reads the game state to draw the scene; it does not run a second ga
 
 ### Tests
 
-CMake registers 31 ROM-independent checks, including font decoding, layouts, controls, animation, synthetic rendering, shadow fallback and procedural geometry. With the ROM in `build/roms/pokeyellow.gbc` at configure time, 24 ROM-backed checks bring the total to 55. Some also need private savestates, VRAM or SRAM evidence; missing fixtures return 77 and are reported as skipped. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` for the ROM-independent set.
+CMake registers 32 ROM-independent checks, including font decoding, layouts, controls, animation, synthetic rendering, shadow fallback and procedural geometry. With the ROM in `build/roms/pokeyellow.gbc` at configure time, 28 ROM-backed checks bring the total to 60. Some also need private savestates, VRAM or SRAM evidence; missing fixtures return 77 and are reported as skipped. Reconfigure after adding the ROM. Use `ctest --test-dir build -LE rom --output-on-failure` for the ROM-independent set.
 
 ```sh
 cmake -S . -B build -DPOKEYELLOW_3D=ON

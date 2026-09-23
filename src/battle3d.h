@@ -6,8 +6,8 @@ GLuint texture = 0;
 struct Portrait {
     battle::Image image{};
     int species = 0;
-    float alpha = 0, hp = 0, damage = 0;
-    int last_hp = 0;
+    float alpha = 0, hp = 0, damage = 0, xp = -1;
+    int last_hp = 0, xp_level = 0;
     uint64_t fingerprint = 0;
 };
 std::array<Portrait, 2> portraits;
@@ -20,6 +20,12 @@ battle::Effect effect_kind = battle::Effect::Original;
 bool capture_effect = false;
 bool framed_overlay = false;
 bool integrated_menu = false;
+// B1: the engine phase of this frame and whether the arena presents it with
+// an absent picture instead of the complete LCD. `held` survives the few
+// instructions between two engine calls (no phase frame of their own) only
+// while a picture is still absent and the screen stays coherent.
+battle::Phase phase = battle::Phase::None;
+bool held = false;
 battle_menu::Kind menu_kind = battle_menu::Kind::Unknown;
 int menu_panels = 0;
 int trainer_class = 0;
@@ -64,6 +70,8 @@ void reset() {
     effect_kind = battle::Effect::Original;
     capture_effect = false;
     trainer_class = 0;
+    phase = battle::Phase::None;
+    held = false;
 }
 void shutdown() {
     if (texture)
@@ -243,7 +251,9 @@ void panel(const GBContext *ctx, bool enemy, float w, float h) {
         dl->AddText(nullptr, 13 * scale, {x + ui_theme::Padding * scale, y + 58 * scale},
                     ui_theme::DimInk, label);
     if (!enemy) {
-        float xp = battle::experience(ctx);
+        // Integrated: the engine's experience, eased per frame; Classic keeps
+        // the exact value.
+        float xp = styled && portraits[0].xp >= 0 ? portraits[0].xp : battle::experience(ctx);
         dl->AddRectFilled({x + ui_theme::Padding * scale, y + 83 * scale},
                           {x + pw - ui_theme::Padding * scale, y + 87 * scale}, ui_theme::BarTrack,
                           styled ? ui_theme::BarRadius * scale : 0);
@@ -320,9 +330,18 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
                       ? battle::move(ctx, id).presentation
                       : battle::Effect::Original;
     bool effect = capture_effect || effect_kind != battle::Effect::Original;
-    full_overlay = !opening && !intro && !effect && !moves &&
-                   (animation || !battle::rectangle(ctx, battle::Enemy, true) ||
-                    !battle::rectangle(ctx, battle::Player, true));
+    // B1: a KO, experience, level-up message, learned move or switch keeps
+    // the arena when the engine phase is known and the tile map agrees with
+    // it (decision 8); an absent picture then only fades its billboard. Any
+    // other phase, layout or inconsistency keeps the complete original LCD.
+    phase = battle::phase(ctx);
+    bool both =
+        battle::rectangle(ctx, battle::Enemy, true) && battle::rectangle(ctx, battle::Player, true);
+    bool candidate =
+        styled && !opening && !intro && !animation && menu.kind == battle_menu::Kind::Message;
+    held = candidate && (battle::holds(ctx, phase) || (held && phase == battle::Phase::Turn &&
+                                                       !both && battle::arena_coherent(ctx)));
+    full_overlay = !opening && !intro && !effect && !moves && !held && (animation || !both);
     // D049..D055 holds twelve trainer glyphs plus a terminator. Pokemon
     // nicknames have the shorter ten-glyph limit used by their status panels.
     bool unsupported_name = styled && (intro ? !hud_text::supported(ctx->wram + 0x1049, 13)
@@ -372,6 +391,14 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
             p.last_hp = m.hp;
         } else
             p.hp += (m.hp - p.hp) * (1 - std::exp(-dt * 12));
+        if (!i) {
+            float xp = battle::experience(ctx);
+            if (p.xp < 0 || p.xp_level != m.level)
+                p.xp = xp;
+            else
+                p.xp += (xp - p.xp) * (1 - std::exp(-dt * 8));
+            p.xp_level = m.level;
+        }
         if (m.hp < p.last_hp)
             p.damage = .4f;
         else
@@ -476,9 +503,10 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
     if (menu_open)
         return;
     if (overlay_alpha == 0 && !intro) {
-        if (!opening || battle::name_matches(ctx, 0xcfd9, 1, 0))
+        // A held phase never shows a panel whose HUD the LCD has cleared.
+        if ((!opening && !held) || battle::present(ctx, true))
             panel(ctx, true, float(w), float(h));
-        if (!opening || battle::name_matches(ctx, 0xd008, 10, 7))
+        if ((!opening && !held) || battle::present(ctx, false))
             panel(ctx, false, float(w), float(h));
     }
     if (intro && !unsupported_name) {

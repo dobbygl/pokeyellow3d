@@ -239,8 +239,8 @@ Trabajo:
 Criterios de aceptación:
 
 - [x] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
-- [x] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
-- [x] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
+- [ ] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
+- [ ] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
 
 ### Fase C2: materiales
 
@@ -915,3 +915,18 @@ Resumen y medidas en `build/qa/logs/c1-acceptance-summary.json`,
 ni assets derivados a git. C1 supera sus tres criterios; la PR #32 requiere
 CI verde en el commit final antes de fusionarse. Esto no cierra las fases
 pendientes del plan ni autoriza publicar v0.5.0.
+
+### C1 — integración de la PR #33 de combate
+
+Mientras se cerraba C1, `main` incorporó `57e357e` (B1 de combate). El único
+conflicto manual estaba en la lista de pruebas de `SyntheticTests.cmake`:
+se conservan `exterior_geometry_test` y `battle_phase_synthetic`. Los cambios
+de producción se integran sin conflicto; C1 conserva sus recetas y la PR #33
+aporta sus fases de combate y los dos campos nuevos de diagnóstico.
+
+La aceptación y los tiempos del apartado anterior corresponden a C1 sobre
+`4ccdaf4`. Se conservan como referencia inmutable, pero no se presentan como
+resultados del binario combinado. Se reabren los dos criterios automáticos
+hasta comprobar la integración, ejecutar las 60 pruebas con sus fixtures y
+repetir las comparaciones afectadas y la medición en el nuevo binario. La
+revisión artística sigue siendo válida para las recetas sin cambios.

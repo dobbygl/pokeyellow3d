@@ -239,8 +239,8 @@ Trabajo:
 Criterios de aceptación:
 
 - [x] Contactos revisados de Paleta, Ciudad Verde, Plateada, Azulona, Azafrán, Bosque Verde y el muelle en ambas cámaras y en tres horas del día.
-- [ ] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
-- [ ] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
+- [x] Ninguna malla nueva invade una casilla transitable ni oculta permanentemente al jugador; los recorridos de Kanto, primera persona y Corte pasan sin cambios en el estado del motor.
+- [x] Vértices por mapa por debajo de 2,0× respecto a v0.4.1 y presentación por debajo de 2,0×.
 
 ### Fase C2: materiales
 
@@ -829,7 +829,89 @@ Informes privados en `build/qa/logs/`: `c1-visual-review.json`,
 lectura y SHA-256 verificados (`c1-captures-backup.json`); no se publican.
 Las evidencias de la primera revisión rechazada se conservan en privado.
 
-Estado: PR #32 en borrador. Siguen pendientes las regresiones históricas
-completas, los recorridos con el pase activado y los diez escenarios de
-rendimiento frente a v0.4.1. Los dos criterios correspondientes permanecen
-abiertos; la fase no está cerrada.
+Los recorridos de Kanto y primera persona con el pase activado pasan en ambos
+estilos: 168 estados completos coinciden con OFF (`c1-on-world.json`), incluidos
+Corte, Surf, bicicleta, cargas y entradas a interiores. Se revisaron también las
+vistas posteriores a Corte y durante Surf (`c1-journey-visual-review.json`).
+Las 27 baterías clásicas conservan las 2.765 imágenes y 2.427 estados frente a
+v0.3.0/v0.4.1, con la excepción de interfaz de Esc documentada previamente.
+
+### C1 — aceptación local y entrega
+
+Las 54 baterías históricas pasan: 27 clásicas con 2.765 imágenes y 2.427
+estados, y 27 integradas con 3.022 imágenes y 2.684 estados. Se conservan
+las excepciones autorizadas del panel Esc y del único panel residual sobre
+blanco. Las 34 diferencias integradas heredadas de PR #31 se reproducen con
+el renderer exacto de `4ccdaf4`: 10 en iluminación, 10 en combate, 10 en
+interfaz de combate, 3 en almacenamiento y 1 en transiciones. En esos cinco
+recorridos, todas las imágenes y estados de C1 coinciden con esa base; no hay
+excepciones de memoria ni diferencias nuevas aceptadas por tolerancia.
+
+Los diez escenarios de presentación pasan en la misma Mesa Intel UHD 620
+(KBL GT2). Cada escenario conserva tres pares alternados de referencia/C1 y
+todas sus muestras, con `glFinish` por frame; los guards de ROM/memoria quedan
+fuera del intervalo cronometrado. Los casos vivos ejecutan el motor original
+y actualizan las sombras en cada frame. Se conservaron carga, presión de
+CPU/memoria/E/S y procesos antes/después de cada ejecución. No hubo otras
+baterías de juego durante esta medida ni se eliminaron muestras.
+
+| Escenario | Hora | v0.4.1 (ms) | C1 (ms) | Factor |
+|---|---:|---:|---:|---:|
+
+| Catálogo exterior | 6.5 | 3.031 | 4.282 | 1.413× |
+| Catálogo exterior | 12 | 2.975 | 4.204 | 1.413× |
+| Catálogo exterior | 17.5 | 3.068 | 4.374 | 1.426× |
+| Catálogo interior | 12 | 1.852 | 1.871 | 1.010× |
+| Ortográfica en movimiento | 6.5 | 4.843 | 6.891 | 1.423× |
+| Ortográfica en movimiento | 12 | 4.869 | 7.380 | 1.516× |
+| Ortográfica en movimiento | 17.5 | 4.841 | 7.535 | 1.557× |
+| Primera persona en movimiento | 6.5 | 4.707 | 6.980 | 1.483× |
+| Primera persona en movimiento | 12 | 4.696 | 7.003 | 1.491× |
+| Primera persona en movimiento | 17.5 | 4.822 | 7.938 | 1.646× |
+
+El máximo es 1,6462×, inferior a 2×. Las medias individuales por mapa del
+catálogo también quedan por debajo de 2×; la peor es 1,6118×. Los vértices
+máximos son 1,4875×. Estos son tiempos de presentación sincronizada, no una
+promesa de FPS del juego completo.
+
+SHA-256 de los binarios validados:
+
+- `pokeyellow3d`: `c4c2232482a71f325c6dade1c4d53b3743dbd41da704ff504a5f9a76a43f9d24`.
+- `pallet_render_smoke`: `7cb9cfc73541106e188098891bfbf6ff11dd11b7cdab566d36c15ae276d6cf11`.
+- `art_benchmark`: `58377a206f4d6bbe4842eac00710716604cc05266490982f45ac685faf02a366`.
+
+El cambio de nombre de un parámetro exigido por MSVC genera el mismo objeto
+binario que el utilizado por las capturas (`c1-portability-equivalence.json`).
+Runtime intacto: `00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e`.
+
+Reproducción con las fixtures privadas y helpers congelados descritos arriba:
+
+```sh
+ctest --test-dir build --output-on-failure
+python3 tests/art_qa.py build/pallet_render_smoke build/art_benchmark \
+  "$ROM" "$PALLET_STATE" "$FIVE_MAP_STATE" "$BENCHMARK_7955AAA" build/qa C1 \
+  --reference-smoke "$SMOKE_7955AAA" --compress-captures
+for style in classic integrated; do
+  QA_ART_PASS=on QA_MENU_STYLE="$style" QA_CAPTURE_STATES=1 \
+    bash tests/world_qa.sh "$ROM" "$PALLET_STATE" "$HOUSE_STATE"
+  QA_ART_PASS=on QA_MENU_STYLE="$style" QA_CAPTURE_STATES=1 \
+    bash tests/firstperson_qa.sh "$ROM" "$PALLET_STATE" "$HOUSE_STATE" "$ROUTE_STATE"
+done
+```
+
+La ejecución registrada separó capturas y tiempos para medir después de las
+regresiones. Sus comandos exactos, adaptaciones de scripts, hashes y salidas
+están en el directorio privado `pokeyellow-art-evidence-j_x0389o` de `/var/tmp`:
+`run-final-c1-regressions.py c1 classic`, `run-final-c1-regressions.py c1 integrated`,
+`c1-on-world.py` y `c1-performance.py`. Los scripts históricos eliminan solo las
+compilaciones/CTest redundantes; las acciones de juego y las comparaciones
+siguen siendo las congeladas. Las dos salidas interrumpidas por SIGTERM se
+conservaron y se repitieron únicamente sus baterías incompletas.
+
+Resumen y medidas en `build/qa/logs/c1-acceptance-summary.json`,
+`c1-historical-summary.json`, `c1-performance.json` y
+`c1-timing-environment-review.json`. Evidencia visual adicional:
+`c1-journey-visual-review.json`. No se han incorporado ROM, partidas, capturas
+ni assets derivados a git. C1 supera sus tres criterios; la PR #32 requiere
+CI verde en el commit final antes de fusionarse. Esto no cierra las fases
+pendientes del plan ni autoriza publicar v0.5.0.

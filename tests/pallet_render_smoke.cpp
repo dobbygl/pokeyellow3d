@@ -15,6 +15,10 @@ extern "C" {
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
 extern "C" uint8_t pokeyellow__rom_data[];
 #include "world_journey.h"
 #include "world_extended.h"
@@ -67,6 +71,7 @@ static void capture_surface(const char *path) {
 #include "boot_integration.h"
 #include "world_animation_integration.h"
 #include "daylight_integration.h"
+#include "shadow_integration.h"
 #include "hud_text_integration.h"
 
 int main(int argc, char **argv) {
@@ -91,13 +96,18 @@ int main(int argc, char **argv) {
             "       pallet_render_smoke ROM boot [menu|new|continue] [MAX_FRAMES] [BATTERY]\n");
         return 1;
     }
+    if ((requested_mode == "shadows" || requested_mode == "shadows-fp") &&
+        (!std::ifstream(argv[1], std::ios::binary) || !std::ifstream(argv[2], std::ios::binary))) {
+        std::fprintf(stderr, "SKIP: private ROM or shadow savestate missing\n");
+        return 77;
+    }
     FILE *f = std::fopen(argv[1], "rb");
     if (!f)
         return 2;
     std::vector<uint8_t> rom(1048576);
-    size_t count = std::fread(rom.data(), 1, rom.size(), f);
+    size_t rom_bytes_read = std::fread(rom.data(), 1, rom.size(), f);
     std::fclose(f);
-    if (count != 1048576)
+    if (rom_bytes_read != 1048576)
         return 3;
     // Match gb_load_assets: only the manifest sections are resident at runtime.
     std::memset(pokeyellow__rom_data, 0xff, 1048576);
@@ -131,6 +141,16 @@ int main(int argc, char **argv) {
     }
     if (artistic)
         pallet3d_artistic(true);
+    if (const char *value = std::getenv("QA_FIXED_HOUR")) {
+        char *end = nullptr;
+        const double hour = std::strtod(value, &end);
+        if (end == value || *end || !std::isfinite(hour) || hour < 0 || hour >= 24 ||
+            !pallet3d_daylight({daynight::Mode::Fixed, hour})) {
+            std::fprintf(stderr, "Invalid QA_FIXED_HOUR: expected a number in [0,24)\n");
+            gb_platform_shutdown();
+            return 2;
+        }
+    }
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
     if (argc > 5 && (!std::strcmp(argv[2], "--title-audit") || !std::strcmp(argv[2], "boot"))) {
@@ -285,6 +305,11 @@ int main(int argc, char **argv) {
         pallet::read(ctx, 0xd5f0), pallet::read(ctx, 0xd5ef), pallet::read(ctx, pallet::Font));
     if (argc > 3 && (!std::strcmp(argv[3], "daylight") || !std::strcmp(argv[3], "daylight-fp"))) {
         int result = daylight_qa::captures(ctx, !std::strcmp(argv[3], "daylight-fp"));
+        gb_platform_shutdown();
+        return result;
+    }
+    if (argc > 3 && (!std::strcmp(argv[3], "shadows") || !std::strcmp(argv[3], "shadows-fp"))) {
+        int result = shadow_qa::captures(ctx, !std::strcmp(argv[3], "shadows-fp"));
         gb_platform_shutdown();
         return result;
     }
@@ -624,7 +649,7 @@ int main(int argc, char **argv) {
         }
         std::fprintf(stderr, "[STACK]");
         for (int a = ctx->sp; a < 0xe000; a++)
-            std::fprintf(stderr, " %02x", pallet::read(ctx, a));
+            std::fprintf(stderr, " %02x", pallet::read(ctx, uint16_t(a)));
         std::fprintf(stderr, "\n");
         gb_platform_shutdown();
         return 0;
@@ -779,7 +804,7 @@ int main(int argc, char **argv) {
             int n = 0, bw = scene->width / 2;
             for (int z = 0; z < scene->height / 2; z++)
                 for (int x = 0; x < bw; x++) {
-                    int live = pallet::read(ctx, 0xc6e8 + (z + 3) * (bw + 6) + x + 3),
+                    int live = pallet::read(ctx, uint16_t(0xc6e8 + (z + 3) * (bw + 6) + x + 3)),
                         base = scene->block_data[z * bw + x];
                     if (live != base && n++ < 15)
                         std::fprintf(stderr, "[BLOCK] xy=%d,%d rom=%02x live=%02x\n", x, z, base,

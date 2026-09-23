@@ -47,7 +47,7 @@ inline int load_pause(GBContext *ctx, const char *path, bool fp) {
                 SDL_Event event{};
                 event.type = SDL_WINDOWEVENT;
                 event.window.event =
-                    gained ? SDL_WINDOWEVENT_FOCUS_GAINED : SDL_WINDOWEVENT_FOCUS_LOST;
+                    Uint8(gained ? SDL_WINDOWEVENT_FOCUS_GAINED : SDL_WINDOWEVENT_FOCUS_LOST);
                 pallet3d_event(&event, false);
             };
             if (settings)
@@ -267,7 +267,8 @@ inline void observe(GBContext *ctx, int frame) {
                  pallet3d_active(), pallet3d_warp_overlay(), pallet3d_input_mask(), ctx->pc,
                  ctx->sp);
     for (int a = ctx->sp; a >= 0xd000 && a < 0xdfff; a += 2)
-        std::fprintf(trace, "%04x ", pallet::read(ctx, a) | (pallet::read(ctx, a + 1) << 8));
+        std::fprintf(trace, "%04x ",
+                     pallet::read(ctx, uint16_t(a)) | (pallet::read(ctx, uint16_t(a + 1)) << 8));
     std::fputc('\n', trace);
     if (map != previous_map || view != previous_view || bgp != previous_bgp) {
         char path[100];

@@ -24,9 +24,9 @@ extern "C" uint8_t pokeyellow__rom_data[];
 int main(int argc, char **argv) {
     // Keep each measurement intact when renderer diagnostics share the log.
     std::setvbuf(stdout, nullptr, _IOLBF, 0);
-    if (argc != 6) {
+    if (argc != 6 && argc != 7) {
         std::fprintf(stderr, "Usage: art_benchmark ROM STATE catalog|interior-catalog|ortho|fp "
-                             "off|on HOUR(-1 disables)\n");
+                             "off|on HOUR(-1 disables) [animate]\n");
         return 2;
     }
     const bool art = !std::strcmp(argv[4], "on");
@@ -40,6 +40,9 @@ int main(int argc, char **argv) {
 #endif
     const std::string mode = argv[3];
     const bool catalog = mode == "catalog" || mode == "interior-catalog";
+    const bool animate = argc == 7 && !std::strcmp(argv[6], "animate");
+    if (argc == 7 && (!animate || catalog))
+        return 2;
     if (!catalog && mode != "ortho" && mode != "fp")
         return 2;
     char *end = nullptr;
@@ -103,11 +106,24 @@ int main(int argc, char **argv) {
     } else {
         maps.push_back(-1);
     }
-    ReadOnlyMemory before{ctx};
     const std::vector<uint8_t> immutable_rom(ctx->rom, ctx->rom + ctx->rom_size);
-    const auto cycles = ctx->cycles;
-    const auto pc = ctx->pc, sp = ctx->sp;
     auto render = [&](double *elapsed = nullptr) {
+        if (animate) {
+            gb_reset_frame(ctx);
+            ctx->stopped = 0;
+            unsigned slices = 0;
+            while (!ctx->frame_done) {
+                gb_run_cycles(ctx, 70224);
+                if (!gb_platform_poll_events(ctx) || ++slices >= 1000)
+                    return false;
+            }
+        }
+        // Advance the real guest and copy guards before starting the timer.
+        // Reference and candidate execute this same driver against their own
+        // renderer libraries; no artificial CPU clock or shadow invalidation.
+        ReadOnlyMemory before{ctx};
+        std::array<uint8_t, sizeof(GBContext)> registers{};
+        std::memcpy(registers.data(), ctx, registers.size());
         auto start = std::chrono::steady_clock::now();
         gb_platform_render_frame(gb_get_framebuffer(ctx));
         glFinish();
@@ -116,7 +132,7 @@ int main(int argc, char **argv) {
             *elapsed += std::chrono::duration<double, std::milli>(end - start).count();
         // Guard cost is outside the presentation measurement in both builds.
         return glGetError() == GL_NO_ERROR && before.unchanged(ctx) && pallet3d_active() &&
-               ctx->cycles == cycles && ctx->pc == pc && ctx->sp == sp &&
+               !std::memcmp(registers.data(), ctx, registers.size()) &&
                !std::memcmp(immutable_rom.data(), ctx->rom, immutable_rom.size());
     };
     std::printf("[ART-GPU] %s\n", glGetString(GL_RENDERER));
@@ -132,6 +148,9 @@ int main(int argc, char **argv) {
         const int count = catalog ? 30 : 100;
         const int batches = catalog ? 3 : 7;
         for (int sample = 0; sample < batches; ++sample) {
+#ifndef ART_REFERENCE_RENDERER
+            const auto before_passes = pallet3d_shadows().passes;
+#endif
             double elapsed = 0;
             for (int i = 0; i < count; ++i)
                 if (!render(&elapsed))
@@ -139,6 +158,15 @@ int main(int argc, char **argv) {
             double mean = elapsed / count;
             std::printf("[ART-PERF] mode=%s map=%d sample=%d frames=%d mean_ms=%.6f vertices=%zu\n",
                         mode.c_str(), id, sample, count, mean, stats.vertices);
+#ifndef ART_REFERENCE_RENDERER
+            const auto shadow = pallet3d_shadows();
+            const bool sunlight = art && hour > 6 && hour < 18 && mode != "interior-catalog";
+            if (shadow.active != sunlight ||
+                (sunlight && animate && shadow.passes - before_passes != size_t(count)))
+                return 11;
+            std::printf("[ART-SHADOW] active=%d passes=%zu animate=%d\n", shadow.active,
+                        shadow.passes - before_passes, animate);
+#endif
         }
     }
     std::puts("PASS: paired presentation benchmark, memory intact and zero GL errors per frame");

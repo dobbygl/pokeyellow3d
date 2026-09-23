@@ -7,6 +7,7 @@
 #include "firstperson.h"
 #include "interior_scene.h"
 #include "art_manifest.h"
+#include "shadow_map_gl.h"
 #include "imgui.h"
 #include "ui_theme.h"
 #include "rom_font.h"
@@ -48,6 +49,15 @@ struct Vertex {
     Vec normal{0, 1, 0};
     float emissive = 0;
 };
+void bind_vertices(GLuint id) {
+    glBindBuffer(GL_ARRAY_BUFFER, id);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, u));
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, c));
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, wind));
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void *)offsetof(Vertex, normal));
+}
 struct UV {
     float x, y, w, h;
 };
@@ -104,11 +114,13 @@ float focus_x = 10, focus_z = 9;
 bool camera_ready = false;
 unsigned active_frames = 0;
 std::vector<Vertex> scenery, vertices;
+std::vector<Vertex> shadow_hero;
 struct Mesh {
     GLuint buffer = 0;
     size_t count = 0;
     std::vector<uint8_t> blocks, pending;
     bool artistic = false;
+    sunlight::Bounds bounds;
 };
 std::map<int, Mesh> meshes;
 std::vector<int> visible_maps;
@@ -125,7 +137,25 @@ struct WorldFrame {
     float dusk = 0;
     float wind = 0;
     daynight::Light light{};
+    bool artistic = false;
 } world_frame;
+bool shadows_presented = false;
+struct ShadowCache {
+    bool valid = false, hide_hero = false;
+    size_t builds = 0;
+    firstperson::Matrix camera{};
+    daynight::RGB sun{};
+    float wind = 0;
+    std::vector<Vertex> actors, hero;
+    std::array<uint8_t, AW * 32 * 4> sprites{};
+    sunlight::Projection projection;
+} shadow_cache;
+bool same_vertices(const std::vector<Vertex> &a, const std::vector<Vertex> &b) {
+    // All members are initialized floats, with no padding to compare.
+    static_assert(sizeof(Vertex) == 14 * sizeof(float));
+    return a.size() == b.size() &&
+           (a.empty() || !std::memcmp(a.data(), b.data(), a.size() * sizeof(Vertex)));
+}
 bool world_frame_current = false;
 uint64_t world_frame_cycles = 0;
 pc_state::Motion pc_motion;
@@ -604,10 +634,13 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
         float(scene.height), -.8f, -.015f, {.42f, .48f, .34f});
 }
 
+GLuint shader(GLenum type, const char *source);
 void update_meshes(const GBContext *ctx) {
     // Validate the whole policy before generating any part of the resident scene.
     artistic_scene = artistic_settings && art::complete(art::Exterior, art::Terrain::Count) &&
                      art::complete(art::Interiors, art::Interior::Count);
+    if (artistic_scene && !shadow_map::initialize(shader))
+        artistic_scene = false;
     const auto &current = *presented_scene(ctx);
     visible_maps = preview_map >= 0 ? std::vector<int>{current.id} : pallet::resident_maps(current);
     if (last_component != current.component) {
@@ -654,6 +687,12 @@ void update_meshes(const GBContext *ctx) {
         mesh.count = scenery.size();
         mesh.blocks = std::move(blocks);
         mesh.artistic = artistic_scene;
+        mesh.bounds = {};
+        for (const auto &v : scenery) {
+            const double dx = std::abs(v.wind) * .13, dz = std::abs(v.wind) * .07;
+            mesh.bounds.add({v.p.x - dx, v.p.y, v.p.z - dz});
+            mesh.bounds.add({v.p.x + dx, v.p.y, v.p.z + dz});
+        }
         ++mesh_builds;
         double ms =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
@@ -714,6 +753,11 @@ bool initialize(const GBContext *ctx) {
         uniform mediump float daylight_enabled;
         uniform vec3 sun_direction, ambient_light, direct_light;
         varying mediump vec3 lighting_tint; varying mediump float glass;
+        uniform mat4 shadow_matrix; uniform mediump float shadow_enabled;
+        uniform SHADOW_PRECISION vec2 shadow_scale;
+        varying SHADOW_PRECISION vec4 shadow_position;
+        varying mediump vec3 direct_tint;
+        varying SHADOW_PRECISION float shadow_bias;
         uniform mat4 view_projection; uniform vec3 eye;
         uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
@@ -730,6 +774,21 @@ bool initialize(const GBContext *ctx) {
             lighting_tint=vec3(1.0); glass=material.w;
             if(daylight_enabled>0.5)
                 lighting_tint=ambient_light+direct_light*max(dot(material.xyz,sun_direction),0.0);
+            shadow_position=vec4(0.0); direct_tint=vec3(0.0); shadow_bias=0.0;
+            if(shadow_enabled>0.5) {
+                shadow_position=shadow_matrix*vec4(moved,1.0);
+                float sun_cosine=max(dot(material.xyz,sun_direction),0.0);
+                direct_tint=direct_light*sun_cosine;
+                vec3 sx=vec3(shadow_matrix[0].x,shadow_matrix[1].x,shadow_matrix[2].x);
+                vec3 sy=vec3(shadow_matrix[0].y,shadow_matrix[1].y,shadow_matrix[2].y);
+                // Bound depth change across the 2x2 sample footprint in each
+                // light axis separately. A scalar texel size underestimates
+                // grazing receivers and produces striped self-shadowing.
+                float slope=2.0*(abs(dot(material.xyz,sx))/dot(sx,sx)+
+                                 abs(dot(material.xyz,sy))/dot(sy,sy));
+                shadow_bias=2.0/65535.0+0.002/shadow_scale.y+
+                            1.05*slope/(max(sun_cosine,0.001)*shadow_scale.y*1024.0);
+            }
             // Resolve flat materials once per vertex for the orthographic view.
             // Its fragment path remains a single texture lookup, as before FP.
             if(fog_enabled<0.5 && color.a>1.5) {uv=vec2(511.25/512.0);tint.a=1.0;}
@@ -742,8 +801,27 @@ bool initialize(const GBContext *ctx) {
         uniform mediump float daylight_enabled, window_light;
         uniform vec3 day_horizon, day_zenith, day_fog;
         varying mediump vec3 lighting_tint; varying mediump float glass;
+        uniform mediump float shadow_enabled;
+        uniform SHADOW_PRECISION sampler2D shadow_image;
+        uniform vec3 shadow_ambient;
+        uniform SHADOW_PRECISION vec2 shadow_scale;
+        varying SHADOW_PRECISION vec4 shadow_position;
+        varying mediump vec3 direct_tint;
+        varying SHADOW_PRECISION float shadow_bias;
         uniform sampler2D image; uniform float xray; uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
+        SHADOW_PRECISION float visibility() {
+            SHADOW_PRECISION vec3 p=shadow_position.xyz*0.5+0.5;
+            if(any(lessThan(p,vec3(0.0))) || any(greaterThan(p,vec3(1.0)))) return 1.0;
+            SHADOW_PRECISION float total=0.0;
+            for(int y=0;y<2;++y) for(int x=0;x<2;++x) {
+                SHADOW_PRECISION vec2 uv=p.xy+(vec2(float(x),float(y))-0.5)/1024.0;
+                SHADOW_PRECISION vec3 encoded=texture2D(shadow_image,uv).rgb;
+                SHADOW_PRECISION float depth=dot(encoded,vec3(1.0,1.0/255.0,1.0/65025.0));
+                total+=step(p.z-shadow_bias,depth);
+            }
+            return total*0.25;
+        }
         void main() {
             vec4 c;
             if(fog_enabled<0.5 && sky<0.5) {
@@ -773,7 +851,9 @@ bool initialize(const GBContext *ctx) {
             if(c.a<0.08) discard;
             if(daylight_enabled>0.5) {
                 float pane=glass*step(0.55,c.r)*step(0.55,c.g)*window_light;
-                c.rgb=mix(c.rgb*lighting_tint,vec3(1.0,0.76,0.32),pane*0.9);
+                vec3 light=lighting_tint;
+                if(shadow_enabled>0.5) light=shadow_ambient+direct_tint*visibility();
+                c.rgb=mix(c.rgb*light,vec3(1.0,0.76,0.32),pane*0.9);
                 if(fog_enabled>0.5)
                     c.rgb=mix(c.rgb,day_fog,smoothstep(18.0,70.0,distance_to_eye));
             }
@@ -781,7 +861,13 @@ bool initialize(const GBContext *ctx) {
             c.rgb=c.rgb*fade_tone.x+fade_tone.y;
             gl_FragColor=c;
         })";
-    GLuint a = shader(GL_VERTEX_SHADER, vs), b = shader(GL_FRAGMENT_SHADER, fs);
+    GLint precision_range[2]{}, fragment_precision = 0;
+    glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_FLOAT, precision_range,
+                               &fragment_precision);
+    const std::string prefix = fragment_precision >= 16 ? "#define SHADOW_PRECISION highp\n"
+                                                        : "#define SHADOW_PRECISION mediump\n";
+    GLuint a = shader(GL_VERTEX_SHADER, (prefix + vs).c_str()),
+           b = shader(GL_FRAGMENT_SHADER, (prefix + fs).c_str());
     if (!a || !b) {
         if (a)
             glDeleteShader(a);
@@ -901,6 +987,7 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
     animate_tiles(ctx, current);
     update_meshes(ctx);
     vertices.clear();
+    shadow_hero.clear();
     const bool fp = preview_map >= 0 ? preview_fp : first_person;
     auto player_position = pallet::world_player(ctx);
     if (preview_map >= 0 && preview_fp) {
@@ -951,20 +1038,24 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
     float view_yaw = current.interior ? room_yaw : yaw;
     float cs = std::cos(view_yaw), sn = std::sin(view_yaw);
     for (int slot = 0; preview_map < 0 && slot < 16; slot++) {
-        if (fp && slot == 0)
+        const bool shadow_only = fp && slot == 0;
+        if (shadow_only && !artistic_scene)
             continue;
         pallet::Actor a;
         if (!pallet::actor(ctx, slot, a))
             continue;
         sprite_image(ctx, a);
-        ++actors_drawn;
-        hero_drawn |= slot == 0;
+        if (!shadow_only) {
+            ++actors_drawn;
+            hero_drawn |= slot == 0;
+        }
         const auto *scene = pallet::scene(pallet::read(ctx, pallet::Map));
         a.x += scene->origin_x;
         a.z += scene->origin_z;
-        if (slot == 0)
+        if (slot == 0 && !shadow_only)
             hero_begin = int(vertices.size());
-        shadow(vertices, a.x, a.z, .32f, .20f);
+        if (!shadow_only)
+            shadow(vertices, a.x, a.z, .32f, .20f);
         float half = .95f; // Transparent padding makes the visible sprite one tile wide.
         // Face the camera in both axes, preserving the original sprite aspect.
         auto corner = [&](float side, float up) -> Vec {
@@ -988,10 +1079,11 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
             bl = {a.x - rx * half, low, a.z - rz * half};
             br = {a.x + rx * half, low, a.z + rz * half};
         }
-        if (slot == 0)
+        if (slot == 0 && !shadow_only)
             player_first = int(vertices.size());
-        quad(vertices, tl, tr, br, bl, White, {float(slot * 32), 384, 32, 32});
-        if (slot == 0)
+        quad(shadow_only ? shadow_hero : vertices, tl, tr, br, bl, White,
+             {float(slot * 32), 384, 32, 32});
+        if (slot == 0 && !shadow_only)
             hero_end = int(vertices.size());
     }
     if (effects_enabled && preview_map < 0 && !current.interior && effects.map == current.id)
@@ -1073,6 +1165,7 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
                    fp,
                    {player_position[0], .6f, player_position[1]}};
     world_frame.wind = effects_enabled && preview_map < 0 && !current.interior ? effects.wind() : 0;
+    world_frame.artistic = artistic_scene;
     if (!current.interior)
         world_frame.light =
             daynight::sample(lighting_settings, daynight::local_hour(std::time(nullptr)));
@@ -1097,6 +1190,76 @@ std::array<float, 2> battle_zoom_center() {
 void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_xray,
                       float approach, const firstperson::Matrix *override_matrix) {
     const auto &frame = world_frame;
+    auto matrix = override_matrix ? *override_matrix : frame.matrix;
+    if (approach > 0) {
+        auto center = battle_zoom_center();
+        float scale = 1 + approach * 1.6f;
+        for (int col = 0; col < 4; col++)
+            for (int row = 0; row < 2; row++)
+                matrix[col * 4 + row] = scale * frame.matrix[col * 4 + row] -
+                                        (scale - 1) * center[row] * frame.matrix[col * 4 + 3];
+    }
+    sunlight::Projection projection;
+    shadows_presented = false;
+    if (frame.artistic && artistic_settings && shadow_map::ready && frame.light.enabled &&
+        frame.light.sun[1] > .001f &&
+        (frame.light.direct[0] > 0 || frame.light.direct[1] > 0 || frame.light.direct[2] > 0)) {
+        const bool cached = shadow_cache.valid && shadow_cache.hide_hero == hide_hero &&
+                            shadow_cache.builds == mesh_builds && shadow_cache.camera == matrix &&
+                            shadow_cache.sun == frame.light.sun &&
+                            shadow_cache.wind == frame.wind &&
+                            shadow_cache.sprites == uploaded_sprites &&
+                            same_vertices(shadow_cache.actors, vertices) &&
+                            same_vertices(shadow_cache.hero, shadow_hero);
+        if (cached) {
+            projection = shadow_cache.projection;
+            shadows_presented = true;
+        } else {
+            sunlight::Bounds resident;
+            for (int id : visible_maps) {
+                const auto &bounds = meshes.at(id).bounds;
+                if (bounds.valid()) {
+                    resident.add(bounds.low);
+                    resident.add(bounds.high);
+                }
+            }
+            for (const auto &v : vertices)
+                resident.add({v.p.x, v.p.y, v.p.z});
+            for (const auto &v : shadow_hero)
+                resident.add({v.p.x, v.p.y, v.p.z});
+            projection = sunlight::fit(
+                resident, matrix, {frame.light.sun[0], frame.light.sun[1], frame.light.sun[2]});
+            if (projection.valid) {
+                for (int i = 0; i < 5; ++i)
+                    glEnableVertexAttribArray(i);
+                shadow_map::render(projection, frame.wind, atlas, [&] {
+                    for (int id : visible_maps) {
+                        const auto &mesh = meshes.at(id);
+                        bind_vertices(mesh.buffer);
+                        glDrawArrays(GL_TRIANGLES, 0, GLsizei(mesh.count));
+                    }
+                    bind_vertices(buffer);
+                    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(),
+                                 GL_STREAM_DRAW);
+                    if (hide_hero && frame.hero_end > frame.hero_begin) {
+                        glDrawArrays(GL_TRIANGLES, 0, frame.hero_begin);
+                        glDrawArrays(GL_TRIANGLES, frame.hero_end,
+                                     GLsizei(vertices.size()) - frame.hero_end);
+                    } else
+                        glDrawArrays(GL_TRIANGLES, 0, GLsizei(vertices.size()));
+                    if (!hide_hero && frame.fp && !shadow_hero.empty()) {
+                        glBufferData(GL_ARRAY_BUFFER, shadow_hero.size() * sizeof(Vertex),
+                                     shadow_hero.data(), GL_STREAM_DRAW);
+                        glDrawArrays(GL_TRIANGLES, 0, GLsizei(shadow_hero.size()));
+                    }
+                });
+                shadows_presented = true;
+                shadow_cache = {
+                    true,       hide_hero, mesh_builds, matrix,           frame.light.sun,
+                    frame.wind, vertices,  shadow_hero, uploaded_sprites, projection};
+            }
+        }
+    }
     glViewport(0, 0, w, h);
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_CULL_FACE);
@@ -1113,16 +1276,18 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, atlas);
     glUniform2f(fade_loc, tone.multiply, tone.add);
-    auto matrix = override_matrix ? *override_matrix : frame.matrix;
-    if (approach > 0) {
-        auto center = battle_zoom_center();
-        float scale = 1 + approach * 1.6f;
-        for (int col = 0; col < 4; col++)
-            for (int row = 0; row < 2; row++)
-                matrix[col * 4 + row] = scale * frame.matrix[col * 4 + row] -
-                                        (scale - 1) * center[row] * frame.matrix[col * 4 + 3];
-    }
     glUniformMatrix4fv(matrix_loc, 1, GL_FALSE, matrix.data());
+    glUniform1f(glGetUniformLocation(program, "shadow_enabled"), shadows_presented ? 1.f : 0.f);
+    glUniform1i(glGetUniformLocation(program, "shadow_image"), 1);
+    if (shadows_presented) {
+        glUniformMatrix4fv(glGetUniformLocation(program, "shadow_matrix"), 1, GL_FALSE,
+                           projection.matrix.data());
+        glUniform2f(glGetUniformLocation(program, "shadow_scale"), projection.texel_world,
+                    projection.depth_span);
+    }
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, shadows_presented ? shadow_map::texture : 0);
+    glActiveTexture(GL_TEXTURE0);
     glUniform3f(eye_loc, frame.eye.x, frame.eye.y, frame.eye.z);
     glUniform1f(fog_loc, frame.fog);
     glUniform1f(dusk_loc, frame.dusk);
@@ -1133,6 +1298,7 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     };
     light_vector("sun_direction", frame.light.sun);
     light_vector("ambient_light", frame.light.ambient);
+    light_vector("shadow_ambient", frame.light.ambient);
     light_vector("direct_light", frame.light.direct);
     light_vector("day_horizon", frame.light.horizon);
     light_vector("day_zenith", frame.light.zenith);
@@ -1143,19 +1309,6 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glUniform1f(xray_loc, 0);
     for (int i = 0; i < 5; i++)
         glEnableVertexAttribArray(i);
-    auto bind_vertices = [](GLuint id) {
-        glBindBuffer(GL_ARRAY_BUFFER, id);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void *)offsetof(Vertex, p));
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void *)offsetof(Vertex, u));
-        glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void *)offsetof(Vertex, c));
-        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void *)offsetof(Vertex, wind));
-        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void *)offsetof(Vertex, normal));
-    };
     if (frame.fp || frame.light.enabled) {
         std::vector<Vertex> sky;
         quad(sky, {-1, 1, 0}, {1, 1, 0}, {1, -1, 0}, {-1, -1, 0});
@@ -1197,6 +1350,10 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glUniform1f(dusk_loc, 0);
     glUniform1f(wind_loc, 0);
     glUniform1f(glGetUniformLocation(program, "daylight_enabled"), 0);
+    glUniform1f(glGetUniformLocation(program, "shadow_enabled"), 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0);
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);
 }
@@ -1287,6 +1444,7 @@ void hud(GBContext *ctx) {
 } // namespace
 
 void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
+    shadows_presented = false;
     full_menu::shown = {};
     pokemon_menu::shown = {};
     menu_text::FrameEnd menu_frame_end{active, failed};
@@ -1731,6 +1889,10 @@ void pallet3d_shutdown() {
     menu_text::shutdown();
     lcd_overlay::shutdown();
     scene_filter::shutdown();
+    shadow_map::shutdown();
+    shadow_cache = {};
+    shadows_presented = false;
+    shadow_hero.clear();
     menu_overlay = menu_full = menu_blurred = false;
     for (auto &entry : meshes)
         glDeleteBuffers(1, &entry.second.buffer);
@@ -2207,4 +2369,9 @@ bool pallet3d_artistic(bool value, bool persist) {
 }
 bool pallet3d_artistic() {
     return artistic_settings;
+}
+PalletShadowInfo pallet3d_shadows() {
+    return {shadow_map::ready,    shadows_presented,
+            world_frame.artistic, shadows_presented && world_frame.fp && !shadow_hero.empty(),
+            shadow_map::passes,   shadow_map::texture};
 }

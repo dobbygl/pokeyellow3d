@@ -660,3 +660,99 @@ python3 "$EVIDENCE/audit-final-a1-regressions.py" --verify-archives --require-co
 `EVIDENCE` es la carpeta privada registrada en los informes. Una nueva fase
 debe usar salidas nuevas y conservar las referencias. No se incorporan ROM,
 partidas ni capturas del juego al repositorio.
+
+### B1 — implementación y validación inicial, 2026-09-23 (en curso)
+
+A1 se fusionó en la PR #29, commit `5af804f`, después de los cinco trabajos
+requeridos de CI verdes en `a634557` (ejecución `35802869110`). La rama
+`art-b1` parte de esa fusión. La comprobación previa vuelve a contrastar los
+archivos inmutables de A1 con v0.4.1/v0.3.0 y verifica sus hashes; el código
+de partida coincide con el A1 validado. No se presentan esas imágenes como
+nuevas capturas de B1. Informe privado: `art-b1-before.json`.
+
+Implementado el destino RGBA de 1024×1024, el recorte de receptores a la
+cámara conservando los emisores residentes, el filtrado de cuatro muestras
+y el sesgo por pendiente en ambos ejes de la textura. La sombra atenúa solo
+la luz directa; los billboards usan alfa y el jugador también proyecta en
+primera persona. Un fallo al crear los recursos desactiva la política
+artística antes de construir las mallas. La caché compara cámara, geometría,
+sprites, viento y dirección solar; no usa un reloj nuevo.
+
+La primera revisión rechazó bandas de autosombreado pese a que los tests
+funcionales pasaban. Se conserva esa evidencia como rechazada. El sesgo
+corregido pasa una prueba independiente sobre un mapa sintético plano, en
+ambas cámaras y a cinco horas: se verifica el suelo interior sin emisores,
+excluyendo únicamente media casilla exterior por el filtrado de siluetas.
+Una mutación temporal que anula el sesgo hace fallar ese mismo test; al
+restaurar exactamente el código, vuelve a pasar. La tolerancia de un nivel
+de color en este oráculo sintético cubre el redondeo de iluminación y no
+se aplica a ninguna comparación histórica de imágenes ni de estado.
+
+Validación inicial: 53/53 tests con fixtures privadas y 30/30 excluyendo
+`rom`, sin saltos; salida 77 comprobada expresamente para fixtures ausentes.
+Las doce combinaciones de Paleta/Ruta 1/Ciudad Verde, cámaras y estilos
+pasan ocho estados solares, caché, alfa del jugador, foco, Esc y la
+invariante completa del motor. Veinte capturas OFF de Paleta coinciden
+exactamente con A1; todavía falta la regresión histórica completa de B1.
+
+Comandos de esta comprobación:
+
+```sh
+cmake --build build -j2
+ctest --test-dir build --output-on-failure
+ctest --test-dir build -LE rom --output-on-failure
+python3 tests/shadow_qa.py build/pallet_render_smoke "$ROM" "$PALLET_STATE" \
+  "$ROUTE_STATE" "$CITY_STATE" "$EVIDENCE"
+```
+
+Los fixtures locales de CTest están en `build/roms/pokeyellow.gbc` y
+`build/qa/art-fixtures/pallet.state`. `shadow_rom_ortho` y `shadow_rom_fp`
+están registrados con etiqueta `rom` y `SKIP_RETURN_CODE 77`.
+
+SHA-256 de los binarios de esta validación inicial, aún no entrega final:
+
+- Aplicación: `b841c4f861b90bde453256829b49c64faea07ddd2c97c806c11398c46c096bb1`.
+- Driver: `0d96de991a01ba2058c203e94085c386ca3cfc5b73db627a4a8d926ae00cc1d6`.
+- Benchmark: `189ce6777431e8bae2f494eb3d380eea79e74f73acd574673b57c2291cae8f04`.
+
+Informes privados: `b1-corrected-ctest.log`, `b1-public-ctest.log`,
+`b1-planar-negative.json`, `b1-initial-visual-rejection.json` y
+`b1-preliminary-off-comparison.json`. Quedan pendientes las pruebas completas
+de carga, caída visual del renderer, rendimiento frente a v0.4.1, regresión
+histórica y CI Linux/Windows antes de cerrar y fusionar B1. Sus casillas
+permanecen abiertas.
+
+#### B1 — cargas, fallo de recursos y portabilidad (validación parcial)
+
+La prueba del renderer completo provoca un FBO realmente incompleto antes
+de la inicialización diferida. En ambas cámaras y estilos, el pase solicitado
+permanece activado en preferencias, pero la escena vuelve íntegramente a la
+referencia: coinciden todos los bytes RGBA y los vértices del HUD. Se comprueba
+la liberación de los recursos parciales, el estado completo del contexto,
+la ROM y todas las memorias, sin errores GL.
+
+La prueba alfa utiliza ahora un atlas sintético de 512×512, como el renderer.
+El anterior, de 2×2 ampliado 512 veces, colocaba muestras a 1/1024 de texel
+del borde; esa separación está por debajo de la precisión mínima de ocho
+bits fraccionales del muestreo de Direct3D. Véase la sección 7.18.7 de la
+[especificación D3D11](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm).
+El test conserva la comparación exacta de **todos** los píxeles, incluidos
+los bordes; no excluye una franja ni amplía tolerancias. Los cinco trabajos
+requeridos de CI pasan en `caf6de2`, ejecución `35807980433`. Los cambios
+posteriores de este apartado deben superar también la CI antes de fusionar.
+
+Las cargas en frío y a mitad de animación comparan 25 imágenes y texturas
+de profundidad completas, y 75 estados del motor entre las repeticiones
+activadas y desactivadas. El reloj se contrasta con los ciclos reales de la
+CPU; se mantiene la política existente de reiniciar el viento al cargar.
+La cámara puede no ver ningún emisor móvil, pero cada avance de la fase
+invalida y vuelve a dibujar el destino de profundidad. Pasan las dos pruebas
+con ROM y la batería local completa, 53/53, en esta revisión.
+
+El benchmark admite `animate` para los escenarios vivos: ejecuta el motor
+original fuera del intervalo medido y exige un paso real de sombras por
+frame con luz solar. `tests/art_qa.py` acepta `B1` como último argumento,
+añade catálogos exteriores de mediodía y mide amanecer, mediodía y atardecer
+frente al renderer congelado. El driver nuevo de referencia se enlaza con
+las bibliotecas originales; no reemplaza el benchmark archivado de A1.
+Las medidas completas y las regresiones históricas siguen pendientes.

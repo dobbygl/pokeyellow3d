@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A1: real GPU catalogs in both cameras/styles, exact toggles and paired timing.
+"""Art QA: real GPU catalogs, exact guest state and paired reference timing.
 
 Run without other GPU workloads. All generated images and fixtures stay private.
 The reference executable must be the frozen 7955aaa renderer, not a previous phase.
@@ -22,11 +22,13 @@ def sha(path):
 
 
 def main():
-    if len(sys.argv) != 8:
-        raise SystemExit('Expected smoke, benchmark, ROM, Pallet state, five-map state, baseline benchmark, output root')
-    candidate, benchmark, rom, pallet, route, baseline, output = map(Path, sys.argv[1:])
+    if len(sys.argv) not in (8, 9):
+        raise SystemExit('Expected smoke, benchmark, ROM, Pallet state, five-map state, baseline benchmark, output root [A1|B1]')
+    phase = sys.argv[8] if len(sys.argv) == 9 else 'A1'
+    assert phase in ('A1', 'B1'), phase
+    candidate, benchmark, rom, pallet, route, baseline, output = (Path(p).resolve() for p in sys.argv[1:8])
     output.mkdir(parents=True, exist_ok=True)
-    root = Path(tempfile.mkdtemp(prefix='art-a1-', dir=output))
+    root = Path(tempfile.mkdtemp(prefix=f'art-{phase.lower()}-', dir=output))
     print(f'QA output: {root}', flush=True)
     for name, source in [('candidate', candidate), ('benchmark', benchmark), ('reference', baseline),
                          ('cartridge.gbc', rom), ('pallet.state', pallet), ('route.state', route)]:
@@ -38,6 +40,7 @@ def main():
     env.update(SDL_VIDEODRIVER='offscreen', SDL_AUDIODRIVER='dummy', QA_CAPTURE_STATES='1')
     env.pop('QA_GLYPH_ORACLE', None)
     env.pop('QA_FULL_NEGATIVES', None)
+    env.pop('QA_FIXED_HOUR', None)
     results = []
 
     def run(label, binary, fixture, mode, *arguments, **settings):
@@ -82,6 +85,21 @@ def main():
                                         meshes=[dict(map=int(m), vertices=int(v), bytes=int(b))
                                                 for m, v, b in records]))
                 assert captures['off'] == captures['on'], (style, camera, kind, 'A1 changes pixels or memory')
+            if phase == 'B1':
+                noon = {}
+                for enabled in ('off', 'on'):
+                    label = f'{style}-{camera}-catalog-noon-{enabled}'
+                    mode = 'catalog' + ('-fp' if camera == 'fp' else '') + ('-art' if enabled == 'on' else '')
+                    directory, _ = run(label, 'candidate', 'pallet.state', mode,
+                                       QA_MENU_STYLE=style, QA_ART_PASS=enabled,
+                                       QA_FIXED_HOUR='12', CATALOG_CAPTURE_DIR='captures')
+                    images = {p.name: sha(p) for p in (directory / 'captures').glob('*.ppm')}
+                    states = {p.name: sha(p) for p in (directory / 'captures').glob('*.machine')}
+                    assert len(images) == len(states) == 38
+                    noon[enabled] = (images, states)
+                    results.append(dict(label=label, images=images, states=states))
+                assert noon['off'][1] == noon['on'][1], 'sunlit catalog changed engine state'
+                assert noon['off'][0] != noon['on'][0], 'sunlit catalog must exercise visible shadows'
             for enabled in ('off', 'on'):
                 mode = 'firstperson' if camera == 'fp' else 'journey'
                 if enabled == 'on':
@@ -105,21 +123,31 @@ def main():
                 hours[enabled] = (images, states)
                 results.append(dict(label=f'{style}-{camera}-hours-{enabled}',
                                     images=images, states=states))
-            assert hours['off'] == hours['on'], (style, camera, 'A1 hour captures differ')
+            assert hours['off'][1] == hours['on'][1], (style, camera, 'hour engine states differ')
+            for name, digest in hours['off'][0].items():
+                if phase == 'A1' or name != 'hour-12.ppm':
+                    assert digest == hours['on'][0][name], (style, camera, name)
+                else:
+                    assert digest != hours['on'][0][name], 'noon must exercise visible shadows'
 
     # Same scene, driver, process setup and synchronization. Alternate order to
     # expose warm-up/drift rather than comparing against an unrelated old number.
     performance = []
     gpu_names = set()
-    for mode in ('catalog', 'interior-catalog', 'ortho', 'fp'):
+    scenarios = [(mode, hour) for mode in ('catalog', 'interior-catalog', 'ortho', 'fp')
+                 for hour in ((-1,) if phase == 'A1' else
+                              (12,) if mode == 'interior-catalog' else (6.5, 12, 17.5))]
+    for mode, hour in scenarios:
         groups = {'reference': [], 'candidate': []}
         for repeat in range(3):
             order = ('reference', 'candidate') if repeat % 2 == 0 else ('candidate', 'reference')
             for binary in order:
                 fixture = 'pallet.state' if 'catalog' in mode else 'route.state'
-                _, text = run(f'perf-{mode}-{repeat}-{binary}',
+                animate = phase == 'B1' and mode in ('ortho', 'fp')
+                _, text = run(f'perf-{mode}-{hour}-{repeat}-{binary}',
                               'benchmark' if binary == 'candidate' else 'reference', fixture, mode,
-                              'on' if binary == 'candidate' else 'off', '-1')
+                              'on' if binary == 'candidate' else 'off', str(hour),
+                              *(['animate'] if animate else []))
                 entries = re.findall(r'\[ART-PERF\] mode=(\S+) map=(-?\d+) sample=(\d+) frames=(\d+) mean_ms=([0-9.]+) vertices=(\d+)', text)
                 batches = 3 if 'catalog' in mode else 7
                 maps = 179 if mode == 'interior-catalog' else 38 if mode == 'catalog' else 1
@@ -134,19 +162,26 @@ def main():
                 assert len(gpu) == 1
                 gpu_names.add(gpu[0])
                 assert all(n > 0 for n in samples)
+                if phase == 'B1' and binary == 'candidate':
+                    shadows = re.findall(r'\[ART-SHADOW\] active=(\d+) passes=(\d+) animate=(\d+)', text)
+                    assert len(shadows) == len(entries)
+                    assert all(int(active) == (mode != 'interior-catalog') and
+                               int(moving) == animate and int(passes) == (100 if animate else 0)
+                               for active, passes, moving in shadows)
                 groups[binary].append(samples)
         means = {key: statistics.mean(n for run in values for n in run) for key, values in groups.items()}
         ratio = means['candidate'] / means['reference']
         assert ratio <= 2.0, (mode, ratio)
-        performance.append(dict(mode=mode, samples_ms=groups, mean_ms=means, ratio=ratio,
+        performance.append(dict(mode=mode, hour=hour, animated=phase == 'B1' and mode in ('ortho', 'fp'),
+                                samples_ms=groups, mean_ms=means, ratio=ratio,
                                 statistic='arithmetic mean of synchronized presentation batches; invariant checks excluded'))
     assert len(gpu_names) == 1, gpu_names
     for name, expected in provenance.items():
         assert sha(root / name) == expected
-    report = dict(status='PASS', phase='A1', inputs=provenance, catalogs=results, performance=performance,
+    report = dict(status='PASS', phase=phase, inputs=provenance, catalogs=results, performance=performance,
                   gpu=sorted(gpu_names), reviewed=False, note='Contacts must be reviewed separately before phase acceptance.')
     (root / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
-    print(f'PASS: A1 art reference, both cameras/styles and paired performance; {root}')
+    print(f'PASS: {phase} art reference, both cameras/styles and paired performance; {root}')
 
 
 if __name__ == '__main__':

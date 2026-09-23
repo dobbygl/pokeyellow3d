@@ -1,5 +1,7 @@
 #include "synthetic_context.h"
 #include "pallet3d.h"
+#include "firstperson.h"
+#include "shadow_map_gl.h"
 #include "imgui.h"
 #include <SDL.h>
 #include <SDL_opengles2.h>
@@ -38,13 +40,17 @@ void check(bool condition, const char *message) {
 struct Snapshot {
     std::vector<uint8_t> wram, vram, eram, oam, hram, io, rom;
     std::vector<uint32_t> framebuffer;
+    std::array<uint8_t, sizeof(GBContext)> context{};
     explicit Snapshot(const synthetic::Context &m)
         : wram(m.wram.begin(), m.wram.end()), vram(m.vram.begin(), m.vram.end()),
           eram(m.eram.begin(), m.eram.end()), oam(m.oam.begin(), m.oam.end()),
           hram(m.hram.begin(), m.hram.end()), io(m.io.begin(), m.io.end()), rom(m.image),
-          framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {}
+          framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {
+        std::memcpy(context.data(), &m.ctx, context.size());
+    }
     bool unchanged(const synthetic::Context &m) const {
-        return !std::memcmp(wram.data(), m.wram.data(), wram.size()) &&
+        return !std::memcmp(context.data(), &m.ctx, context.size()) &&
+               !std::memcmp(wram.data(), m.wram.data(), wram.size()) &&
                !std::memcmp(vram.data(), m.vram.data(), vram.size()) &&
                !std::memcmp(eram.data(), m.eram.data(), eram.size()) &&
                !std::memcmp(oam.data(), m.oam.data(), oam.size()) &&
@@ -182,6 +188,36 @@ int main() {
         auto noon = lit(12), night = lit(0);
         check(noon != night && noon != disabled && night != disabled,
               "actual GPU pixels respond to time of day");
+        const auto old_passes = pallet3d_shadows().passes;
+        check(pallet3d_artistic(true), "enable artistic shadows");
+        auto shadowed = lit(12);
+        auto shadow_info = pallet3d_shadows();
+        check(shadow_info.ready && shadow_info.active && shadow_info.artistic_scene &&
+                  shadow_info.passes == old_passes + 1,
+              "daylight submits the actual shadow target");
+        size_t darker = 0;
+        const auto ambient = daynight::sample({daynight::Mode::Fixed, 12}, 0).ambient;
+        for (size_t i = 0; i < shadowed.size(); i += 4) {
+            if (!std::memcmp(shadowed.data() + i, noon.data() + i, 3))
+                continue;
+            ++darker;
+            for (size_t channel = 0; channel < 3; ++channel) {
+                check(shadowed[i + channel] <= noon[i + channel], "a shadow cannot add light");
+                // Orthographic, noon, no emissive windows or fog: the original
+                // unlit pixel times ambient is an independent lower bound.
+                // Two byte units cover both normalized-byte roundings.
+                check(shadowed[i + channel] + 2 >= disabled[i + channel] * ambient[channel],
+                      "shadow incorrectly attenuates ambient light");
+            }
+        }
+        check(darker > 0, "GPU shadow map must darken real visible geometry");
+        check(lit(0) == night, "night stays byte-exact with the artistic pass on");
+        check(!pallet3d_shadows().active && pallet3d_shadows().passes == old_passes + 1,
+              "night does not submit a depth pass");
+        check(pallet3d_artistic(false), "disable artistic shadows");
+        check(lit(12) == noon, "disabling shadows restores every reference daylight pixel");
+        check(pallet3d_shadows().passes == old_passes + 1,
+              "disabled artistic pass does not submit depth");
         check(pallet3d_daylight({}), "disable cycle");
         frame();
         glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
@@ -199,8 +235,149 @@ int main() {
         }
         check(pallet3d_active(), "the live overworld is presented in 3D as well");
         check(pallet3d_stats().vertices > 0, "the live overworld keeps its mesh");
+        // Inject a real allocation failure before the production renderer's
+        // lazy initialization. Compare the complete scene, not just the FBO
+        // helper's return value, in both styles/cameras and across re-entry.
+        for (auto style : {ui_preferences::Style::Classic, ui_preferences::Style::Integrated})
+            for (bool fp : {false, true}) {
+                std::vector<uint8_t> reference;
+                std::vector<ImDrawVert> hud_reference;
+                for (bool fail : {false, true}) {
+                    pallet3d_shutdown();
+                    pallet3d_menu_style(style);
+                    pallet3d_artistic(fail);
+                    pallet3d_daylight({daynight::Mode::Fixed, 12});
+                    if (fail) {
+                        bool incomplete = false, compiled = false;
+                        check(!shadow_map::initialize(
+                                  [&](GLenum, const char *) -> GLuint {
+                                      compiled = true;
+                                      return 0;
+                                  },
+                                  [&](GLuint color, GLuint depth) {
+                                      check(color && depth,
+                                            "negative case allocated real resources");
+                                      incomplete = glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                                                   GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT;
+                                  }) &&
+                                  incomplete && !compiled,
+                              "real incomplete target failed before shader compilation");
+                    }
+                    pallet3d_preview(plan.home, fp);
+                    Snapshot unchanged{machine};
+                    for (int repeat = 0; repeat < 10; ++repeat) {
+                        frame();
+                        check(unchanged.unchanged(machine), "fallback changed guest state");
+                        check(glGetError() == GL_NO_ERROR, "fallback frame raised GL error");
+                        check(pallet3d_active() && !pallet3d_shadows().artistic_scene &&
+                                  !pallet3d_shadows().active && !pallet3d_shadows().passes,
+                              "the whole scene must use reference policy, never partial art");
+                    }
+                    glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+                    auto &hud = ImGui::GetForegroundDrawList()->VtxBuffer;
+                    if (!fail) {
+                        reference = rgba;
+                        hud_reference.assign(hud.begin(), hud.end());
+                    } else {
+                        check(pallet3d_artistic(),
+                              "fallback does not change the user's preference");
+                        check(rgba == reference,
+                              "failed target restores every reference scene byte");
+                        check(hud_reference.size() == size_t(hud.Size) &&
+                                  (hud.empty() ||
+                                   !std::memcmp(hud_reference.data(), hud.Data,
+                                                hud_reference.size() * sizeof(ImDrawVert))),
+                              "fallback preserves HUD vertices, colours and glyph coordinates");
+                        check(shadow_map::attempted && !shadow_map::ready && !shadow_map::texture &&
+                                  !shadow_map::framebuffer && !shadow_map::depth &&
+                                  !shadow_map::program,
+                              "failed shadow resources stay released across scene re-entry");
+                    }
+                }
+            }
+        // Independent acne oracle: an entirely flat synthetic map has no
+        // object above the receiving plane, so it cannot cast a shadow onto
+        // itself. This catches sampling/bias errors that still darken pixels
+        // within the ambient bound and therefore pass the earlier test.
+        pallet3d_shutdown();
+        synthetic::Context plane;
+        for (int block = 0; block < 256; ++block)
+            for (int tile = 0; tile < 16; ++tile)
+                plane.image[plan.outdoor_block_table + size_t(block) * 16 + tile] =
+                    (tile / 4) % 2 ? plan.ground_bottom : plan.ground_top;
+        ctx = &plane.ctx;
+        plane.place_player(plan.home, 4, 4, 0);
+        pallet::catalog->tilesets.emplace(
+            23, kanto::read_tileset(kanto::Rom(ctx->rom, ctx->rom_size), 23));
+        for (bool fp : {false, true}) {
+            pallet3d_preview(plan.home, fp);
+            for (double hour : {6.5, 9., 12., 15., 17.5}) {
+                check(pallet3d_daylight({daynight::Mode::Fixed, hour}), "set planar test sun");
+                std::vector<uint8_t> reference;
+                for (bool artistic : {false, true}) {
+                    pallet3d_artistic(artistic);
+                    Snapshot unchanged{plane};
+                    frame();
+                    check(unchanged.unchanged(plane),
+                          "planar shadow test changed synthetic memory");
+                    check(glGetError() == GL_NO_ERROR, "planar shadow test raised GL error");
+                    glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+                    if (!artistic)
+                        reference = rgba;
+                    else {
+                        check(pallet3d_shadows().active, "flat fixture exercises shadow sampling");
+                        firstperson::Matrix camera;
+                        if (fp) {
+                            const auto info = pallet3d_camera();
+                            firstperson::Camera eye;
+                            eye.x = info.x;
+                            eye.y = info.y;
+                            eye.z = info.z;
+                            eye.yaw = info.yaw;
+                            camera = eye.perspective(float(Width) / Height);
+                        } else {
+                            const float c = std::cos(-.32f), s = std::abs(std::sin(-.32f));
+                            float unit = std::min(Width / (10 * (c + s) + 5),
+                                                  Height / (10 * (s + c) * .78f + 6));
+                            camera = firstperson::orthographic(5, 5, -.32f, 2 * unit / Width,
+                                                               2 * unit / Height);
+                        }
+                        size_t checked = 0;
+                        for (size_t pixel = 0; pixel < rgba.size(); ++pixel) {
+                            // Intersect this camera ray with y=0 independently
+                            // of the shadow fit. Exclude only the map's outer
+                            // half-cell: PCF can blend the slab silhouette there.
+                            double u = (pixel / 4 % Width + .5) * 2 / Width - 1;
+                            double v = (pixel / 4 / Width + .5) * 2 / Height - 1;
+                            double a = camera[0] - u * camera[3], b = camera[8] - u * camera[11];
+                            double c = camera[1] - v * camera[3], d = camera[9] - v * camera[11];
+                            double e = u * camera[15] - camera[12], f = v * camera[15] - camera[13];
+                            double determinant = a * d - b * c;
+                            if (std::abs(determinant) < 1e-10)
+                                continue;
+                            double x = (e * d - b * f) / determinant;
+                            double z = (a * f - e * c) / determinant;
+                            if (x < .5 || x > 9.5 || z < .5 || z > 9.5 ||
+                                camera[3] * x + camera[11] * z + camera[15] <= 0)
+                                continue;
+                            ++checked;
+                            if (std::abs(int(rgba[pixel]) - int(reference[pixel])) > 1)
+                                std::fprintf(stderr,
+                                             "[PLANE] fp=%d hour=%.2f pixel=%zu,%zu channel=%zu "
+                                             "reference=%u shadow=%u\n",
+                                             fp, hour, pixel / 4 % Width, pixel / 4 / Width,
+                                             pixel % 4, unsigned(reference[pixel]),
+                                             unsigned(rgba[pixel]));
+                            check(std::abs(int(rgba[pixel]) - int(reference[pixel])) <= 1,
+                                  "unoccluded flat surface has false shadow bands");
+                        }
+                        check(checked > 4000, "planar acne oracle covers a visible floor region");
+                    }
+                }
+            }
+        }
         std::fprintf(stderr, "PASS: 30 preview frames over three maps plus the live overworld, "
-                             "OpenGL clean, memory untouched and a non-empty surface\n");
+                             "OpenGL clean, memory untouched, real shadows and no planar acne\n");
     } catch (const std::exception &e) {
         std::fprintf(stderr, "FAIL: %s\n", e.what());
         status = 1;

@@ -39,6 +39,16 @@ set_tests_properties(render_preview_synthetic PROPERTIES
     SKIP_RETURN_CODE 77
     ENVIRONMENT "${preview_environment}")
 
+# Compile the production shadow resource in isolation so the negative case can
+# create a genuinely incomplete framebuffer without adding game fault switches.
+add_executable(shadow_map_gl_test tests/shadow_map_gl_test.cpp)
+target_include_directories(shadow_map_gl_test PRIVATE src)
+target_link_libraries(shadow_map_gl_test PRIVATE gbrt)
+target_compile_definitions(shadow_map_gl_test PRIVATE SDL_MAIN_HANDLED)
+add_test(NAME shadow_map_gl COMMAND shadow_map_gl_test)
+set_tests_properties(shadow_map_gl PROPERTIES
+    LABELS synthetic SKIP_RETURN_CODE 77 ENVIRONMENT "${preview_environment}")
+
 foreach(rom_test interior interior_audit battle_state fade_state battle_transition pallet_state kanto_geometry kanto_rom)
     if(TEST ${rom_test})
         set_tests_properties(${rom_test} PROPERTIES LABELS rom)

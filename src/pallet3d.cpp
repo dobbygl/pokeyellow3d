@@ -2230,7 +2230,9 @@ PalletBattleInfo pallet3d_battle() {
         battle3d::portraits[1].damage,
         battle3d::integrated_menu,
         int(battle3d::menu_kind),
-        battle3d::menu_panels};
+        battle3d::menu_panels,
+        int(battle3d::phase),
+        battle3d::held};
 }
 
 PalletAreaInfo pallet3d_area() {

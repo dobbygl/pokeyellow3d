@@ -151,9 +151,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Tras el KO de un salvaje y de cada Pokémon del rival, "fainted", la experiencia y la subida de nivel se ven integradas en ambas cámaras.
-- [ ] Una fase no reconocida o incoherente con la VRAM cae al LCD enmarcado completo, comprobado con controles negativos.
-- [ ] `check_battle_timing.py` sin cambios en los tiempos del motor y memoria intacta por frame.
+- [x] Tras el KO de un salvaje y de cada Pokémon del rival, "fainted", la experiencia y la subida de nivel se ven integradas en ambas cámaras.
+- [x] Una fase no reconocida o incoherente con la VRAM cae al LCD enmarcado completo, comprobado con controles negativos.
+- [x] `check_battle_timing.py` sin cambios en los tiempos del motor y memoria intacta por frame.
 
 ### Fase B2: disposiciones nuevas
 
@@ -382,3 +382,83 @@ Pendiente de validar al compilar:
 - Sin cubrir todavía: "is already out!" y "There's no will to fight!"
   (ningún fixture actual llega a ellos), MSVC, `clang-format` (no
   instalado) y `ctest -LE rom` sin ROM. Sin casillas marcadas.
+
+### B1: fase de combate y retratos ausentes, 2026-09-23
+
+Rama `battle-b1` sobre `4ccdaf4` (incluye A1 de combate, #31, y A1/B1 del
+pase artístico). Compilada y validada en Linux con build propio; MSVC y CI
+sin ejecutar.
+
+- `battle::Phase` (`src/battle_state.h`) se deduce solo de marcos vivos del
+  motor, de específica a general. Raíz obligatoria: `_InitBattleCommon`
+  farcall StartBattle (F613F, `ld hl,4127 / ld b,0F`) o EndOfBattle (F6147,
+  `ld hl,7765 / ld b,04`; con `137D0→3EB4` es Evolution, si no Exit). Bajo
+  StartBattle: Capture (`wCapturedMonSpecies` D11B o los CALL de ItemUseBall
+  79FE7, D606, D632, D640, D661, D669, D679, D681); GainExperience por el
+  farcall de EXP.ALL (3C633) o por `far_frame(0F, 4542|4737)`, el marco que
+  deja el `jp Bankswitch` de 3C651 (retorno de JumpToAddress 3E90, banco del
+  llamador, retorno del llamador; PHASES.md daba 3E93, la ROM dice 3E90), y
+  dentro de él LearnMove (5542F), con LearnYesNo (6C9E, 6C70) y LearnForget
+  (6CFD), LevelStats (5541A, 5541D), LevelUp (55409 y los CallBattleCore
+  553DE..553F6) o Experience; Fainted (3C53F, 3C734, 3C722, 3C5FE); Switch
+  (3C742/3C564, 3C746/3C568, 3C570/3C751, 3C2F8, 3A808, 3D2C6, 3D2CE, 3D2EF)
+  con SwitchYesNo (3C81C, 3CA4D), SwitchParty (3C841, 3C846, 3CA5B, 3CA74,
+  3CA71) y PartyBalls (3C693); TrainerOutro (3C6D9, `call nz`, 3C6DF..3C6F6);
+  PlayerDefeat (3C8B3..3C8E4); Run (3D30F, 3CBB9, 3CBF0, 3CBF6, 3C22C);
+  TrainerIntro (3C14D, `call nz`, o `trainer_intro`); Turn en otro caso.
+  `live_return` acepta ahora `C4/CC/D4/DC`, que empujan el mismo retorno.
+  Todos los pares se comprobaron contra la ROM canónica.
+- Decisión 8: `arena_coherent` exige paleta E4, SCY 0, SCX 0/2, LCD
+  encendido y D11C a 0, y en las filas 0-11 del tilemap solo HUD o blanco:
+  cada lado muestra su nombre (`name_matches`) o tiene su zona de HUD en
+  blanco; los rectángulos de retrato solo contienen blanco o teselas de
+  retrato (< 62, las etapas de AnimateSendingOutMon toman teselas de ambos
+  lados); fuera de eso, blanco; nunca bordes de caja (79-7E) ni cursor.
+  La caja de estadísticas, sí/no, listas y bolas del rival lo rompen.
+- `battle3d.h`: en estilo integrado, `full_overlay` ya no se activa por un
+  retrato ausente cuando `holds()` confirma Fainted, Experience, LevelUp,
+  LearnMove o Switch con disposición `Message` y sin animación. Switch solo
+  se mantiene con el Pokémon del jugador en pantalla (relevo del rival): la
+  retirada y el "Go!" propios siguen en LCD hasta C1. Entre dos llamadas del
+  motor sin marco propio la fase se conserva solo mientras falte un retrato
+  y la pantalla siga coherente. El billboard ausente se desvanece, el panel
+  cuyo nombre ya no está en el tilemap se oculta y la barra de experiencia
+  se acerca cada frame al valor del motor. Clásico sin cambios.
+- Tests: `battle_phase_synthetic` (33 sitios, cada fase y subfase con su
+  control negativo, `far_frame`, `arena_coherent` y `holds`) y
+  `battle_phases_{wild,trainer}_{classic,integrated}` (etiqueta `rom`,
+  SKIP 77, fixtures privadas en `build/qa/battle-phases/`). Secuencias
+  registradas: salvaje `Turn Fainted Experience Turn None`; rival `None
+  TrainerIntro Turn Fainted Experience LevelUp LevelStats LearnMove Switch
+  PartyBalls Switch SwitchYesNo Switch Turn`. Integrado: 203 y 802 frames
+  mantenidos; LCD completo en los 84 frames de subfases no presentadas y en
+  los 235 frames de Switch incoherentes (bolas del rival junto a "is about
+  to use"). Clásico: ningún frame mantenido. Memoria y GL intactos por frame.
+- CTest 58/58 con ROM (3 omitidos por fixtures ausentes: shadow_rom_ortho,
+  shadow_rom_fp, art_benchmark_fixture); `ctest -LE rom` 31/31 en el mismo
+  build, no en una máquina sin ROM. `clang-format` 18.1.8 limpio.
+- Baterías contra la referencia `4ccdaf4` con los mismos fixtures
+  (`battles_qa.sh` town/route, `ui_battles_qa.sh` fp-route/route22-trainer),
+  todas en PASS. Clásico: 66 + 491 ficheros de salida idénticos byte a byte.
+  Integrado: `battles_qa.sh` 76/76 idénticos; `ui_battles_qa.sh` 509/511
+  idénticos, incluidas todas las capturas, estados y `battle-timing.csv`;
+  solo cambian los dos `composed.mp4` del rival (ortográfica y primera
+  persona), revisados fotograma a fotograma: KO, experiencia, "learned
+  THUNDER WAVE!" y "GARY sent out EEVEE!" pasan del LCD enmarcado a la
+  arena integrada. `check_battle_timing.py` en PASS con los mismos recuentos.
+- Recorridos con `pallet_render_smoke play` (modos nuevos `SMOKE_FP`,
+  `SMOKE_TRACE`, `SMOKE_CAPTURE_EVERY`) sobre los savestates de la auditoría,
+  en ambas cámaras, antes (`4ccdaf4`) y después. Frames con LCD por fase
+  después: salvaje Fainted 0/83 y Experience 0/119; rival 1 Fainted 0/123,
+  Experience 0/88, LevelUp 0/199, LearnMove 4/240 (fundido de salida de la
+  caja de estadísticas), envío de EEVEE mantenido; rival 2 Fainted 0/147 y
+  Experience 0/120. Antes, todos esos momentos mostraban el LCD enmarcado.
+  Hojas de contactos privadas en el scratchpad de la sesión.
+- Siguen en el LCD completo, sin mezcla parcial: caja de estadísticas,
+  sí/no, listas de equipo y de olvidar, bolas del rival, retirada y envío
+  del Pokémon del jugador, outro del entrenador, captura, evolución y los
+  movimientos con `Effect::Original`.
+- Casillas marcadas: las tres de B1, cubiertas por los recorridos (salvaje,
+  SPEAROW y EEVEE del rival, en ambas cámaras), los controles negativos
+  sintéticos y con ROM, y la batería de tiempos. Pendiente para el PR: CI
+  Linux y Windows/MSVC.

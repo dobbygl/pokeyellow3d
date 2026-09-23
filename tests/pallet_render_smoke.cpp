@@ -73,6 +73,7 @@ static void capture_surface(const char *path) {
 #include "daylight_integration.h"
 #include "shadow_integration.h"
 #include "hud_text_integration.h"
+#include "battle_phases.h"
 
 int main(int argc, char **argv) {
     SDL_SetMainReady();
@@ -99,6 +100,11 @@ int main(int argc, char **argv) {
     if ((requested_mode == "shadows" || requested_mode == "shadows-fp") &&
         (!std::ifstream(argv[1], std::ios::binary) || !std::ifstream(argv[2], std::ios::binary))) {
         std::fprintf(stderr, "SKIP: private ROM or shadow savestate missing\n");
+        return 77;
+    }
+    if (requested_mode == "battle-phases" &&
+        (!std::ifstream(argv[1], std::ios::binary) || !std::ifstream(argv[2], std::ios::binary))) {
+        std::fprintf(stderr, "SKIP: private ROM or battle savestate missing\n");
         return 77;
     }
     FILE *f = std::fopen(argv[1], "rb");
@@ -548,6 +554,11 @@ int main(int argc, char **argv) {
         gb_platform_shutdown();
         return result;
     }
+    if (argc > 4 && std::strcmp(argv[3], "battle-phases") == 0) {
+        int result = battle_phases_qa::run(ctx, !std::strcmp(argv[4], "trainer"));
+        gb_platform_shutdown();
+        return result;
+    }
     if (argc > 3 && std::strcmp(argv[3], "battle-probe") == 0) {
         int result = battle_probe(ctx);
         gb_platform_shutdown();
@@ -845,6 +856,17 @@ int main(int argc, char **argv) {
     if (argc > 5 && std::strcmp(argv[3], "play") == 0) {
         gb_platform_set_input_script(argv[4]);
         int frames = std::atoi(argv[5]);
+        if (std::getenv("SMOKE_FP")) {
+            SDL_Event event{};
+            event.type = SDL_KEYDOWN;
+            event.key.keysym.scancode = SDL_SCANCODE_F3;
+            if (!pallet3d_event(&event, false) || !pallet3d_firstperson())
+                return 27;
+        }
+        // Optional per-frame trace of the engine phase and its presentation.
+        FILE *trace =
+            std::getenv("SMOKE_TRACE") ? std::fopen(std::getenv("SMOKE_TRACE"), "w") : nullptr;
+        int traced_phase = -1;
         for (int frame = 0; frame < frames; frame++) {
             int old_map = pallet::read(ctx, pallet::Map);
             gb_reset_frame(ctx);
@@ -860,6 +882,34 @@ int main(int argc, char **argv) {
             gb_platform_render_frame(gb_get_framebuffer(ctx));
             if (glGetError() != GL_NO_ERROR || std::memcmp(before.data(), ctx->wram, 8192))
                 return 16;
+            // Optional contact-sheet frames: SMOKE_CAPTURE_EVERY=N writes
+            // SMOKE_CAPTURE_DIR/fNNNNN.ppm every N frames of the same run.
+            if (const char *every = std::getenv("SMOKE_CAPTURE_EVERY"))
+                if (std::atoi(every) > 0 && (frame + 1) % std::atoi(every) == 0) {
+                    char path[512];
+                    std::snprintf(
+                        path, sizeof path, "%s/f%05d.ppm",
+                        std::getenv("SMOKE_CAPTURE_DIR") ? std::getenv("SMOKE_CAPTURE_DIR") : ".",
+                        frame + 1);
+                    capture_surface(path);
+                }
+            if (trace) {
+                auto phase = battle::phase(ctx);
+                auto info = pallet3d_battle();
+                std::fprintf(
+                    trace, "%d %s held=%d lcd=%d alpha=%.2f menu=%d panels=%d coherent=%d\n", frame,
+                    battle::phase_name(phase), info.held, info.full_overlay, info.overlay_alpha,
+                    info.menu_kind, info.menu_panels, battle::arena_coherent(ctx));
+                int key = int(phase) * 2 + battle::arena_coherent(ctx);
+                if (key != traced_phase && std::getenv("SMOKE_TILES"))
+                    for (int y = 0; y < 18; y++) {
+                        std::fprintf(trace, "  ");
+                        for (int x = 0; x < 20; x++)
+                            std::fprintf(trace, "%02x ", battle::tile(ctx, x, y));
+                        std::fprintf(trace, "\n");
+                    }
+                traced_phase = key;
+            }
             if (pallet3d_active() !=
                 (pallet3d_blend().active || view == pallet::View::Overworld ||
                  view == pallet::View::Battle || pallet3d_warp_overlay() ||
@@ -882,6 +932,8 @@ int main(int argc, char **argv) {
                      pallet::read(ctx, 0xd162),
                      pallet::read(ctx, 0xd16b) * 256 + pallet::read(ctx, 0xd16c),
                      pallet::read(ctx, pallet::Font));
+        if (trace)
+            std::fclose(trace);
         if (argc > 6 && !gb_context_save_state_file(ctx, argv[6]))
             return 18;
         if (const char *path = std::getenv("SMOKE_CAPTURE"))

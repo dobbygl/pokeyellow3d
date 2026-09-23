@@ -6,6 +6,7 @@
 #include "title_picture.h"
 #include "firstperson.h"
 #include "interior_scene.h"
+#include "art_manifest.h"
 #include "imgui.h"
 #include "ui_theme.h"
 #include "rom_font.h"
@@ -58,6 +59,7 @@ GLint dusk_loc = -1;
 GLint wind_loc = -1;
 daynight::Settings lighting_settings;
 ui_preferences::Style menu_style = ui_preferences::Style::Integrated;
+bool artistic_settings = true, artistic_scene = false;
 std::string preferences_path;
 bool preferences_error = false;
 world_effects::State effects;
@@ -106,11 +108,13 @@ struct Mesh {
     GLuint buffer = 0;
     size_t count = 0;
     std::vector<uint8_t> blocks, pending;
+    bool artistic = false;
 };
 std::map<int, Mesh> meshes;
 std::vector<int> visible_maps;
 int last_component = -1;
 int preview_map = -1;
+bool preview_fp = false;
 struct WorldFrame {
     int map = -1, player_first = -1, hero_begin = 0, hero_end = 0;
     firstperson::Matrix matrix{};
@@ -457,6 +461,8 @@ void interior_map(const GBContext *ctx, const pallet::Scene &scene,
     for (int z = 0; z < scene.height; z++)
         for (int x = 0; x < scene.width; x++) {
             auto cell = interior::classify(ctx->rom, scene, x, z, &blocks);
+            if (artistic_scene)
+                cell.kind = art::find(cell.kind)->reference_mesh;
             if (cell.height <= 0)
                 continue;
             int tile = pallet::map_tile(ctx->rom, scene, x * 2, z * 2, &blocks);
@@ -514,6 +520,8 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
         for (int ix = 0; ix < scene.width; ix++) {
             float x = float(ix + scene.origin_x), z = float(iz + scene.origin_z);
             auto type = pallet::terrain(ctx->rom, scene, ix, iz, &blocks);
+            if (artistic_scene)
+                type = art::find(type)->reference_mesh;
             UV foliage = tile_uv(scene, scene.tileset == 3 ? 0x16 : 0x41);
             UV stone = tile_uv(scene, scene.tileset == 23 ? 0x28 : 0x3a);
             if (type == pallet::Terrain::TallTree) {
@@ -597,6 +605,9 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
 }
 
 void update_meshes(const GBContext *ctx) {
+    // Validate the whole policy before generating any part of the resident scene.
+    artistic_scene = artistic_settings && art::complete(art::Exterior, art::Terrain::Count) &&
+                     art::complete(art::Interiors, art::Interior::Count);
     const auto &current = *presented_scene(ctx);
     visible_maps = preview_map >= 0 ? std::vector<int>{current.id} : pallet::resident_maps(current);
     if (last_component != current.component) {
@@ -631,7 +642,7 @@ void update_meshes(const GBContext *ctx) {
             // Keep the previous valid mesh until the incoming buffer is stable.
             blocks = mesh.buffer ? mesh.blocks : scene.block_data;
         }
-        if (mesh.buffer && mesh.blocks == blocks)
+        if (mesh.buffer && mesh.blocks == blocks && mesh.artistic == artistic_scene)
             continue;
         auto start = std::chrono::steady_clock::now();
         create_map(ctx, scene, blocks);
@@ -642,6 +653,7 @@ void update_meshes(const GBContext *ctx) {
                      GL_STATIC_DRAW);
         mesh.count = scenery.size();
         mesh.blocks = std::move(blocks);
+        mesh.artistic = artistic_scene;
         ++mesh_builds;
         double ms =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
@@ -889,15 +901,50 @@ void world(GBContext *ctx, int w, int h, fade::Tone tone = {}) {
     animate_tiles(ctx, current);
     update_meshes(ctx);
     vertices.clear();
-    const bool fp = first_person && preview_map < 0;
-    const auto player_position = pallet::world_player(ctx);
+    const bool fp = preview_map >= 0 ? preview_fp : first_person;
+    auto player_position = pallet::world_player(ctx);
+    if (preview_map >= 0 && preview_fp) {
+        // Pick a diagnostic eye once per preview. A collision-valid tile can
+        // still be covered by visual furniture, or face an adjacent wall.
+        // Prefer a clear northward view, then proximity to the map's center.
+        if (eye.ready) {
+            player_position = {eye.x, eye.z};
+        } else {
+            std::vector<bool> open(size_t(current.width) * current.height);
+            for (int z = 0; z < current.height; ++z)
+                for (int x = 0; x < current.width; ++x) {
+                    int tile = pallet::map_tile(ctx->rom, current, x * 2, z * 2 + 1);
+                    bool solid = current.interior
+                                     ? interior::classify(ctx->rom, current, x, z).height > 0
+                                     : pallet::cleared(ctx->rom, current, x, z);
+                    open[z * current.width + x] = pallet::tileset(current).walkable[tile] && !solid;
+                }
+            float best = -1e30f;
+            for (int z = 0; z < current.height; ++z)
+                for (int x = 0; x < current.width; ++x) {
+                    if (!open[z * current.width + x])
+                        continue;
+                    int clear = 0;
+                    while (clear < 4 && z > clear && open[(z - clear - 1) * current.width + x])
+                        ++clear;
+                    float dx = x + .5f - current.width * .5f;
+                    float dz = z + .5f - current.height * .75f;
+                    float score = clear * 100000.f - dx * dx - dz * dz;
+                    if (score > best) {
+                        best = score;
+                        player_position = {current.origin_x + x + .5f, current.origin_z + z + .5f};
+                    }
+                }
+        }
+    }
     float jump = 0;
     if ((pallet::read(ctx, 0xd735) & 0x40) && pallet::read(ctx, 0xd713) > 0)
         jump = .14f *
                std::sin(std::clamp(int(pallet::read(ctx, 0xd713)), 0, 15) * firstperson::Pi / 15);
     if (fp && (!dialogue_overlay || !eye.ready))
-        eye.update(player_position[0], player_position[1], pallet::read(ctx, 0xc109),
-                   ImGui::GetIO().DeltaTime, ctx->cycles, jump);
+        eye.update(player_position[0], player_position[1],
+                   preview_map >= 0 ? 4 : pallet::read(ctx, 0xc109), ImGui::GetIO().DeltaTime,
+                   ctx->cycles, jump);
     int player_first = -1, hero_begin = 0, hero_end = 0;
     actors_drawn = 0;
     hero_drawn = false;
@@ -1442,6 +1489,8 @@ void pallet3d_draw(GBContext *ctx, int width, int height, bool menu_open) {
         return;
     }
     if (warp_overlay) {
+        // Closing menu decoration must not survive above the map fade.
+        menu_text::motion_suppressed = true;
         auto tone = fade::tone(ctx->io[0x47]);
         if (!(ctx->io[0x40] & 0x80))
             tone = {0, ctx->io[0x47] == 0 ? 1.f : 0.f};
@@ -1812,7 +1861,17 @@ Pallet3DStats pallet3d_stats() {
 }
 void pallet3d_preview(int map_id) {
     preview_map = map_id;
+    preview_fp = false;
     camera_ready = false;
+}
+void pallet3d_preview(int map_id, bool fp) {
+    pallet3d_preview(map_id);
+    preview_fp = fp;
+    if (fp)
+        eye.reset();
+}
+bool pallet3d_preview_firstperson() {
+    return preview_map >= 0 && world_frame.fp;
 }
 
 bool pallet3d_firstperson() {
@@ -2043,6 +2102,7 @@ void pallet3d_load_preferences(const char *path) {
     auto settings = ui_preferences::load(preferences_path);
     lighting_settings = settings.lighting;
     menu_style = settings.style;
+    artistic_settings = settings.artistic;
     preferences_error = false;
 }
 bool pallet3d_daylight(daynight::Settings settings, bool persist) {
@@ -2052,7 +2112,8 @@ bool pallet3d_daylight(daynight::Settings settings, bool persist) {
     settings.hour = daynight::wrap(settings.hour);
     lighting_settings = settings;
     if (persist) {
-        preferences_error = !ui_preferences::save(preferences_path, {settings, menu_style});
+        preferences_error =
+            !ui_preferences::save(preferences_path, {settings, menu_style, artistic_settings});
         return !preferences_error;
     }
     return true;
@@ -2107,6 +2168,9 @@ void pallet3d_settings_ui(bool menu_open) {
     int style = int(menu_style);
     if (ImGui::Combo("Estilo de menus", &style, "Clasico\0Integrado\0"))
         pallet3d_menu_style(ui_preferences::Style(style), true);
+    bool art = artistic_settings;
+    if (ImGui::Checkbox("Pase artistico", &art))
+        pallet3d_artistic(art, true);
     if (preferences_error)
         ImGui::TextWrapped("No se pudieron guardar las preferencias de presentacion.");
     ImGui::Separator();
@@ -2119,7 +2183,8 @@ bool pallet3d_menu_style(ui_preferences::Style style, bool persist) {
         return false;
     menu_style = style;
     if (persist) {
-        preferences_error = !ui_preferences::save(preferences_path, {lighting_settings, style});
+        preferences_error =
+            !ui_preferences::save(preferences_path, {lighting_settings, style, artistic_settings});
         return !preferences_error;
     }
     return true;
@@ -2129,4 +2194,17 @@ ui_preferences::Style pallet3d_menu_style() {
 }
 bool pallet3d_window_focused() {
     return window_focused;
+}
+
+bool pallet3d_artistic(bool value, bool persist) {
+    artistic_settings = value;
+    if (persist) {
+        preferences_error = !ui_preferences::save(
+            preferences_path, {lighting_settings, menu_style, artistic_settings});
+        return !preferences_error;
+    }
+    return true;
+}
+bool pallet3d_artistic() {
+    return artistic_settings;
 }

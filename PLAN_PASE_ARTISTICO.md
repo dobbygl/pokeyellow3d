@@ -1,7 +1,8 @@
 # Plan: pase artístico e iluminación
 
-Fecha: 2026-09-22. Estado: propuesto; ninguna fase iniciada. Desarrolla el
-punto 3 de `PLAN_MEJORAS.md`.
+Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1 validada
+(3/24 criterios); siguientes fases pendientes. Desarrolla el punto 3 de
+`PLAN_MEJORAS.md`.
 
 ## Análisis del estado actual
 
@@ -83,8 +84,10 @@ C generado, y cualquier alteración del movimiento por casillas.
 ## Decisiones de arquitectura
 
 1. Un ajuste persistente "Pase artístico" con dos valores: desactivado, que
-   produce la imagen de v0.4.1 byte a byte, y activado, que es el objeto de
-   este plan. Valor por defecto activado. La referencia clásica se conserva
+   produce la imagen de v0.4.1 byte a byte salvo las excepciones autorizadas
+   de Esc y del panel residual de transición descritas en Validación, y
+   activado, que es el objeto de este plan. Valor por defecto activado.
+   La referencia clásica se conserva
    para las pruebas; el modo activado obtiene su propia referencia archivada
    tras revisión.
 2. Un manifiesto de familias en `src/art_manifest.h`: para cada familia de
@@ -144,9 +147,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] Con el pase desactivado, las 38 capturas exteriores, las 179 de interiores y las baterías de menús, combate, PC, Pokédex y título son idénticas byte a byte a v0.4.1.
-- [ ] Un fichero de preferencias de cualquier versión anterior sigue cargando y el ajuste se conserva tras reiniciar.
-- [ ] El manifiesto cubre todas las familias y `tests/art_qa.sh` produce las capturas y las medidas de rendimiento de ambos modos.
+- [x] Con el pase desactivado, las 38 capturas exteriores, las 179 de interiores y las baterías de menús, combate, PC, Pokédex y título son idénticas byte a byte a v0.4.1, salvo el panel de Esc y la eliminación autorizada de paneles residuales durante transiciones.
+- [x] Un fichero de preferencias de cualquier versión anterior sigue cargando y el ajuste se conserva tras reiniciar.
+- [x] El manifiesto cubre todas las familias y `tests/art_qa.sh` produce las capturas y las medidas de rendimiento de ambos modos.
 
 ### Fase A2: clasificación completa de interiores
 
@@ -326,6 +329,11 @@ Criterios de aceptación:
   baterías `tests/*_qa.sh` con el pase desactivado antes y después de cada
   fase; capturas idénticas a `7955aaa` en ambos estilos y cámaras; además,
   clásico idéntico a v0.3.0 (2.765 capturas y 38 exteriores).
+  Las únicas excepciones autorizadas son la interfaz del panel de Esc y la
+  eliminación de la decoración de menús residuales durante las transiciones
+  del juego. Esta última se limita a los paneles de cierre integrados que
+  quedaban sobre el fundido; no permite diferencias del mundo ni del estado
+  del motor. Cada diferencia se registra y verifica, sin tolerancias generales.
 - `tests/art_qa.sh` con el pase activado tras cada fase: catálogo exterior,
   catálogo de interiores, recorridos de Kanto y primera persona, tres horas
   del día, medición de rendimiento y comparación con la referencia
@@ -406,3 +414,249 @@ es el registro versionado de alcance, decisiones y evidencia.
 - Corregida la descripción de geometría existente: ya hay troncos/copas de
   cajas, hierba elevada y bordes de cornisa; C1 mejora esa geometría.
 - Sin criterios marcados: faltan todavía las ocho fases y su evidencia.
+
+### A1 en curso — ajuste y referencias
+
+- El usuario autoriza cambios para mejorar la presentación visual. La nueva
+  opción de Esc se registra como diferencia esperada del panel de ajustes;
+  la comparación byte a byte de las imágenes del juego con el pase
+  desactivado sigue siendo estricta en ambos estilos y cámaras.
+- Plan incorporado por PR #28 con cinco checks verdes antes de comenzar A1.
+  Implementación en una worktree aislada mientras `7955aaa` genera las
+  referencias privadas; no se recompila su binario con código de A1.
+- Ningún criterio de A1 acreditado todavía.
+
+### A1 — recuperación de evidencia y medición reproducible
+
+- Se borró permanentemente `build/qa` durante las regresiones. El usuario
+  confirmó el borrado y pidió continuar. Diez archivos privados externos
+  conservan 1.238 capturas, sus fixtures y el helper de referencia; el
+  proceso interrumpido terminó con error y no acredita el gate completo.
+- `build/qa/logs/art-recovery.json` registra los hashes recuperados y las
+  rutas privadas. Hay que reconstruir las referencias perdidas de v0.3.0
+  y repetir las comparaciones; no se rebajan sus requisitos.
+- `tests/art_benchmark.cpp` mide la media de lotes sincronizados con
+  `glFinish`, excluyendo del tiempo los controles de memoria y GL por frame.
+  El mismo driver se enlaza con las bibliotecas congeladas de `7955aaa` y
+  con A1; alterna el orden de ejecución sobre el mismo dispositivo.
+  Incluye los catálogos completos y ambas cámaras con cinco mapas residentes.
+- La nueva fixture del benchmark queda registrada en CTest con etiqueta
+  `rom` y salto explícito 77 cuando falta el material privado.
+- La PR #29 sigue en borrador; ninguna fase ni criterio queda cerrado.
+
+- Recuperadas las fixtures de Pokédex, PC y fuente mediante el motor original;
+  la base vuelve a pasar 46/46 pruebas. A1 pasa 49/49 y el build independiente
+  sin ROM 28/28, sin saltos (`art-a1-recovered-ctest.log` y
+  `art-a1-recovered-no-rom-ctest.log`).
+- La comparación A1 activado/desactivado de los catálogos conserva 1.736
+  imágenes en ambos estilos y cámaras. La revisión detectó encuadres de
+  diagnóstico pegados a paredes: el preview ahora busca suelo transitable
+  libre de sólidos visuales y cuatro casillas de visión, una vez por mapa.
+  La cámara del jugador no cambia. Se regeneran las referencias tras esta
+  mejora; el primer pase de contactos no se acredita como definitivo.
+- La batería de horas conserva el ajuste artístico al recargar preferencias.
+  El benchmark escribe líneas completas para impedir que los mensajes del
+  renderer corrompan su formato; las mediciones incompletas se descartaron.
+
+### A1 — referencias y rendimiento anteriores a la corrección (histórico)
+
+- El pase anterior, `build/qa/art-a1-4mwrsvda`, conserva las 1.736 imágenes de los 38 exteriores
+  y 179 interiores en ambas cámaras, estilos y estados del ajuste. Activado y
+  desactivado son idénticos; los 28 contactos están revisados. También se
+  revisaron las cuatro horas y los dos estados de la casilla de Esc.
+- Los 217 catálogos ortográficos clásicos y sus 217 estados completos
+  coinciden con los archivos recuperados de `7955aaa`; informe
+  `art-a1-recovered-catalog-comparison.json`.
+- Medias en Intel UHD 620, referencia → A1: exteriores 2,057 → 2,090 ms
+  (1,016×), interiores 1,679 → 1,681 ms (1,001×), cinco mapas ortográficos
+  4,322 → 4,137 ms (0,957×), cinco mapas en primera persona 4,987 → 4,958 ms
+  (0,994×). Tres repeticiones con orden alternado, sincronización GPU y
+  controles de memoria/GL fuera del intervalo medido; todas bajo 2×.
+- La prueba de persistencia añade once procesos nuevos: escritura y lectura
+  de las cuatro combinaciones estilo/pase, más migración real de v1 y v2.
+  Se arranca cada lector con el ajuste contrario para comprobar la carga.
+  Evidencia: `art-a1-preferences-restart.json`; la ampliación del driver de QA
+  no cambia el renderer ni los binarios de aplicación/benchmark ya medidos.
+- Aplicación: SHA-256 `6502dbbe0ca27fa8fc9fd7eef9faa8d37861a5f308945eefca6e958145d6f754`.
+  Benchmark: `32fe7ce2fbd7ed491c3d7bb5a06a993e0dc3fe1f3d15107be0cc997fc32ae577`.
+  Informe completo: `build/qa/logs/art-a1-reference-summary.json`; los
+  archivos privados se comprimen y verifican byte a byte antes de retirar
+  únicamente los directorios de ejecuciones sustituidas.
+- El driver ampliado enlazado con la producción inalterada de v0.3.0 conserva
+  las 38 capturas exteriores y las once de PC, junto con todos sus estados,
+  frente al driver original. Las baterías completas clásica/integrada están
+  en curso. El primer criterio de A1, su fusión y las siete fases siguientes
+  permanecen pendientes; la PR #29 sigue en borrador.
+
+Comandos del gate artístico (build y CTest ejecutados por separado):
+
+```sh
+cmake --build build --target all pallet_render_smoke art_benchmark --parallel 4
+ctest --test-dir build --output-on-failure
+ctest --test-dir build/qa/no-rom -LE rom --output-on-failure
+python3 tests/art_qa.py build/pallet_render_smoke build/art_benchmark \
+  "$ROM" "$PALLET_STATE" "$FIVE_MAP_STATE" "$V041_BENCHMARK" "$QA_OUTPUT"
+```
+
+Los caminos absolutos, hashes y comandos concretos de las fixtures privadas
+figuran en `inputs.json`, los informes de procedencia del benchmark y
+`art-a1-preferences-restart.json`, fuera del repositorio.
+
+### A1 — cobertura reconstruida y defecto previo de la referencia
+
+- Las 27 baterías clásicas reconstruidas alcanzan las 2.765 capturas y los
+  2.427 estados del motor: v0.3.0 y `7955aaa` coinciden byte a byte. Se
+  conservan los archivos anteriores a cada ampliación de evidencia. El
+  inventario está en `build/qa/logs/art-full-regression-summary.json`.
+- La batería de retratos ejecuta ahora por defecto el observador DATA por
+  fotograma y las dos cargas en frío ya documentadas: `dex-screen` y
+  `dex-screen-fp`, incluida la detección de especie/VRAM incoherentes. Estas
+  dos comprobaciones faltaban en el ejecutor reconstruido. Se descartó la
+  hipótesis inicial sobre la preparación del menú: genera 52 capturas y no
+  explicaba el desfase de dos. No se incorporaron esas capturas al recuento.
+- Las 38 vistas exteriores de A1 y sus 38 estados coinciden directamente con
+  el driver original de v0.3.0; `art-a1-original-v030-catalog.json`. Las pruebas
+  adicionales de pausa/carga de paneles integrados también coinciden con
+  `7955aaa` en ambas cámaras; `art-menu-motion/result.json`.
+- La referencia integrada `7955aaa` falla en `ui_transitions`, salida blanca
+  de combate, fotograma 3883: la decoración de cierre deja un panel vacío
+  sobre el blanco. Es un fallo reproducido en la producción original. Una
+  copia privada que suprime esa decoración durante `warp_overlay` pasa el
+  recorrido completo y conserva el estado del motor del mismo fotograma.
+  Evidencia privada: `art-transition-probe/result.json` y capturas antes/después.
+- Aplicar esa corrección al modo desactivado requería una excepción acotada a
+  la identidad visual solicitada. Se preparó y verificó primero en una copia
+  privada; la incidencia original no se cuenta como una prueba aprobada.
+- Un recorrido diagnóstico completo confirma que A1 desactivado conserva
+  exactamente las 18 capturas y los 18 estados de `7955aaa`, incluidos los
+  nueve fotogramas rechazados, 3883–3891. El diagnóstico continúa para recoger
+  evidencia, pero termina con código 41: no sustituye a una prueba aprobada.
+  Informe: `build/qa/logs/art-a1-inherited-transition-comparison.json`.
+- Frente a la copia corregida, los nueve estados de las capturas comunes
+  permanecen idénticos y solo cambia `warp-01-map-012-bgp-00.ppm`;
+  `art-transition-fix-scope.json` delimita esa diferencia. Las 139 piezas de
+  evidencia del diagnóstico y de la corrección aislada tienen una copia
+  privada fuera de `build/qa`, verificada byte a byte al leer el archivo.
+
+### A1 — corrección de transición autorizada
+
+- El usuario autoriza corregir y documentar la excepción visual acotada de
+  los paneles residuales durante transiciones, también con el pase apagado.
+  Se suprime únicamente su decoración de cierre mientras `warp_overlay`
+  presenta el fundido original. No se modifica el estado del motor.
+- Antes de esta corrección, A1 completó las 27 baterías clásicas: 2.755
+  imágenes del juego y los 2.427 estados son idénticos a ambas referencias;
+  las diez imágenes de Esc son la excepción de interfaz ya autorizada.
+  `art-a1-classic-complete.json` registra la auditoría de todos los archivos.
+- Los binarios anteriores se conservan mientras terminan sus recorridos.
+  La versión corregida requiere su propia validación; las pruebas anteriores
+  no acreditan automáticamente el cambio. La fase sigue sin cerrar.
+- En `82c039e`, la corrección solo suprime el dibujo de la decoración de
+  cierre durante `warp_overlay`; la evolución de la animación continúa.
+  Se comprueban ocho recorridos de salida blanca: ambos estilos, ambas
+  cámaras y ambos estados del pase, sin relajar los oráculos de transición.
+- Frente a la producción original, el estilo clásico conserva todas las
+  imágenes y los estados en ambas cámaras. En integrado solo cambia la
+  captura `white/logs/warp-01-map-012-bgp-00.ppm` del inventario histórico;
+  el recorrido adicional `white-fp` verifica la misma corrección en primera
+  persona. Todos los estados siguen siendo idénticos. La imagen corregida
+  debe ser blanca en sus 800×720 píxeles; en la original, los píxeles del
+  panel están limitados al rectángulo inclusivo (95, 549)–(704, 710).
+  El diagnóstico original conserva su salida 41 y sus nueve fotogramas
+  rechazados, 3883–3891; nunca se registra como prueba aprobada.
+- El verificador de la excepción rechaza un byte distinto del motor, la
+  imagen en otra batería, el mismo nombre en otra ruta y un solo píxel no
+  blanco en el resultado. No hay tolerancia visual general ni excepción
+  para estados. Evidencia: `art-transition-exception-validator.json`,
+  `art-a1-fixed-white.json` y `art-original-white-fp.json`.
+- El script completo de transiciones, ampliado con `transitions-white-fp`,
+  pasa con 132 capturas y 132 estados por estilo; los archivos privados se
+  verifican byte a byte tras comprimirlos. Informe:
+  `build/qa/logs/art-final-transition-suites.json`. También pasan los 49
+  tests con ROM, los 28 sin ROM y los cinco trabajos requeridos de CI de
+  Linux/Windows para `82c039e` (ejecución `35791107179`).
+- Las regresiones completas, los recorridos acumulados y el gate artístico
+  del binario corregido siguen pendientes de cierre. Estos resultados
+  parciales no acreditan todavía la fase A1.
+
+### A1 — validación final del binario corregido — 2026-09-23 (3/24 criterios)
+
+La referencia vigente es `build/qa/art-reference/A1`, que apunta al pase
+`art-a1-evh9hy4g`. Las cifras anteriores pertenecen a sus respectivos
+binarios históricos; no sustituyen las pruebas del binario corregido.
+
+- Clásico: 27/27 baterías, 2.765 capturas y 2.427 estados. Las 2.755 imágenes
+  del juego y todos los estados coinciden exactamente con v0.3.0 y
+  `7955aaa`; las diez capturas restantes son el panel de Esc autorizado.
+- Integrado: 27/27 baterías, 3.022 capturas y 2.684 estados. Coinciden
+  exactamente 3.011 imágenes y todos los estados con `7955aaa`. Solo
+  difieren las diez capturas de Esc y el extremo blanco delimitado antes.
+  La referencia original conserva su fallo; no se cuenta como prueba aprobada.
+- Pasan los 82 recorridos acumulados y los dos de animación de menús.
+  La batería actual de transiciones añade 132 capturas y 132 estados por
+  estilo, incluida primera persona. Los cinco controles negativos de la
+  excepción impiden ampliar su alcance.
+- Pasan 49/49 tests con ROM y 28/28 sin ROM, sin saltos silenciosos.
+  Las tres cargas de preferencias v1/v2 se repiten con el binario corregido;
+  el pase final añade ocho procesos de escritura/lectura de v3. Empiezan
+  con el valor artístico contrario al esperado.
+- Las 1.736 capturas de catálogo y sus estados coinciden entre pase activado
+  y desactivado. Los 217 catálogos ortográficos clásicos coinciden con
+  v0.4.1; los 38 exteriores también se comparan directamente con el driver
+  original de v0.3.0.
+- Las 28 hojas y todas sus fuentes a resolución completa son idénticas a
+  las previamente revisadas. Se inspeccionan otra vez seis hojas del binario
+  final; las otras 22 conservan su revisión mediante esa identidad exacta.
+  Se revisan los 16 encuadres de cuatro horas en ambos estilos/cámaras y
+  los dos estados de Esc. A1 conserva la geometría existente; la clasificación
+  y el mobiliario restantes corresponden a A2/D1.
+- Los archivos privados se verifican al leer su contenido descomprimido.
+  Una primera copia final se interrumpió con salida 143; se conserva el
+  parcial y se completa una copia independiente de 3.775 archivos, incluida
+  la aplicación. Los metadatos de revisión se guardan aparte con hashes;
+  no se modifican los píxeles ni las fixtures.
+
+Medias de presentación sincronizada en Mesa Intel UHD Graphics 620, tres
+repeticiones con referencia/candidato alternados y controles de memoria/GL
+fuera del intervalo medido:
+
+| Escenario | v0.4.1 (ms) | A1 (ms) | A1 / v0.4.1 |
+| --- | ---: | ---: | ---: |
+| 38 exteriores | 2,045 | 2,071 | 1,013× |
+| 179 interiores | 2,211 | 2,403 | 1,087× |
+| Cinco mapas, ortográfica | 3,416 | 3,198 | 0,936× |
+| Cinco mapas, primera persona | 3,521 | 3,425 | 0,973× |
+
+Todos los escenarios están bajo 2,0×. SHA-256 de los binarios finales:
+
+- Aplicación: `59fe9d1d0c00a19b90ac3866de93679813224a11d8fc72af35f7d1f63222b1f5`.
+- Driver: `4593eb513d6c6b778c4f4f6a3cd0f77c9a994558ace3886de41cc1099cbf0a0d`.
+- Benchmark A1: `753776f6192ac7f97da90fb3785224cb190d63fcc3ed62ba82696c3d6659aea0`.
+- Benchmark v0.4.1: `8c21f81a0407c7c0014fb3a3445396096a09772fbd919c1398e9690e4c31d524`.
+
+La producción corresponde a `82c039e`; los commits posteriores hasta esta
+validación solo documentan evidencia. Los cinco trabajos requeridos de
+Linux/Windows y formato pasan en `80f9b46` (ejecución `35796519524`); el
+commit de este cierre debe superar también la CI antes de fusionar la PR
+#29. B1 no comienza hasta esa fusión.
+
+Informes privados bajo `build/qa/logs/`: `art-final-regression-summary.json`,
+`art-cumulative-a1-fixed-archive.json`, `art-a1-fixed-legacy-preferences.json`,
+`art-a1-corrected-catalog-comparisons.json`, `art-a1-final-visual-review.json`
+y `art-a1-backup-recovery.json`. El `result.json` del pase final conserva
+entradas, muestras completas, medidas y la base de la revisión.
+
+Además del build/CTest y `tests/art_qa.py` documentados antes, los ejecutores
+privados conservan los comandos y las adaptaciones del inventario histórico:
+
+```sh
+python3 "$EVIDENCE/run-final-a1-regressions.py" a1 classic
+python3 "$EVIDENCE/run-final-a1-regressions.py" a1 integrated
+python3 "$EVIDENCE/run-cumulative-a1-fixed.py"
+python3 "$EVIDENCE/check-fixed-legacy-preferences.py"
+python3 "$EVIDENCE/audit-final-a1-regressions.py" --verify-archives --require-complete
+```
+
+`EVIDENCE` es la carpeta privada registrada en los informes. Una nueva fase
+debe usar salidas nuevas y conservar las referencias. No se incorporan ROM,
+partidas ni capturas del juego al repositorio.

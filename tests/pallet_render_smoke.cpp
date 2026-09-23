@@ -72,6 +72,12 @@ static void capture_surface(const char *path) {
 int main(int argc, char **argv) {
     SDL_SetMainReady();
     std::string requested_mode = argc > 3 ? argv[3] : "";
+    const bool artistic = requested_mode.size() >= 4 &&
+                          requested_mode.compare(requested_mode.size() - 4, 4, "-art") == 0;
+    if (artistic) {
+        requested_mode.resize(requested_mode.size() - 4);
+        argv[3] = requested_mode.data();
+    }
     const bool styled = requested_mode.size() >= 7 &&
                         requested_mode.compare(requested_mode.size() - 7, 7, "-styled") == 0;
     if (styled) {
@@ -115,6 +121,16 @@ int main(int argc, char **argv) {
             pallet3d_menu_style(!std::strcmp(style, "integrated")
                                     ? ui_preferences::Style::Integrated
                                     : ui_preferences::Style::Classic);
+    if (const char *art = std::getenv("QA_ART_PASS")) {
+        if (std::strcmp(art, "on") && std::strcmp(art, "off")) {
+            std::fprintf(stderr, "Invalid QA_ART_PASS: expected on or off\n");
+            gb_platform_shutdown();
+            return 2;
+        }
+        pallet3d_artistic(!std::strcmp(art, "on"));
+    }
+    if (artistic)
+        pallet3d_artistic(true);
     gb_platform_register_context(ctx);
     gb_platform_set_game_id(ctx, "pokeyellow");
     if (argc > 5 && (!std::strcmp(argv[2], "--title-audit") || !std::strcmp(argv[2], "boot"))) {
@@ -214,11 +230,16 @@ int main(int argc, char **argv) {
         pallet3d_load_preferences(argv[4]);
         auto expected = !std::strcmp(argv[5], "classic") ? ui_preferences::Style::Classic
                                                          : ui_preferences::Style::Integrated;
+        if (argc > 6 && std::strcmp(argv[6], "on") && std::strcmp(argv[6], "off"))
+            return 2;
+        bool expected_art = argc > 6 && !std::strcmp(argv[6], "on");
         bool write = !std::strcmp(argv[3], "preferences-write");
         if (write && (!pallet3d_daylight({daynight::Mode::Fixed, 18.25}, true) ||
-                      !pallet3d_menu_style(expected, true)))
+                      !pallet3d_menu_style(expected, true) ||
+                      (argc > 6 && !pallet3d_artistic(expected_art, true))))
             return 64;
         bool ok = pallet3d_menu_style() == expected &&
+                  (argc <= 6 || pallet3d_artistic() == expected_art) &&
                   pallet3d_daylight_settings().mode == daynight::Mode::Fixed &&
                   pallet3d_daylight_settings().hour == 18.25;
         gb_platform_shutdown();
@@ -234,6 +255,18 @@ int main(int argc, char **argv) {
         std::fclose(font);
         gb_platform_shutdown();
         return ok ? 0 : 19;
+    }
+    bool catalog_firstperson = false;
+    if (argc > 3 &&
+        (!std::strcmp(argv[3], "catalog-fp") || !std::strcmp(argv[3], "interior-catalog-fp"))) {
+        SDL_Event event{};
+        event.type = SDL_KEYDOWN;
+        event.key.keysym.scancode = SDL_SCANCODE_F3;
+        if (!pallet3d_event(&event, false) || !pallet3d_firstperson())
+            return 27;
+        catalog_firstperson = true;
+        requested_mode.resize(requested_mode.size() - 3);
+        argv[3] = requested_mode.data();
     }
     if (argc > 3 &&
         (std::strcmp(argv[3], "firstperson") == 0 || std::strcmp(argv[3], "fp-camera") == 0)) {
@@ -464,8 +497,9 @@ int main(int argc, char **argv) {
         gb_platform_shutdown();
         return result;
     }
-    if (argc > 3 && !std::strcmp(argv[3], "transitions-white")) {
-        int result = transition_qa::run(ctx, false, true);
+    if (argc > 3 && (!std::strcmp(argv[3], "transitions-white") ||
+                     !std::strcmp(argv[3], "transitions-white-fp"))) {
+        int result = transition_qa::run(ctx, !std::strcmp(argv[3], "transitions-white-fp"), true);
         gb_platform_shutdown();
         return result;
     }
@@ -667,12 +701,14 @@ int main(int argc, char **argv) {
         for (const auto &entry : pallet::catalog->maps) {
             if (interiors && !entry.second.interior)
                 continue;
-            pallet3d_preview(entry.first);
+            pallet3d_preview(entry.first, catalog_firstperson);
             for (int frame = 0; frame < 3; frame++) {
                 gb_platform_render_frame(gb_get_framebuffer(ctx));
                 if (glGetError() != GL_NO_ERROR || !pallet3d_active() || !before.unchanged(ctx))
                     return 21;
             }
+            if (pallet3d_preview_firstperson() != catalog_firstperson)
+                return 27;
             auto stats = pallet3d_stats();
             if (stats.resident_maps != 1 || !stats.vertices)
                 return 22;
@@ -683,6 +719,8 @@ int main(int argc, char **argv) {
                 for (int i = 0; i < count; i++) {
                     gb_platform_render_frame(gb_get_framebuffer(ctx));
                     glFinish();
+                    if (glGetError() != GL_NO_ERROR || !before.unchanged(ctx))
+                        return 21;
                 }
                 double ms = std::chrono::duration<double, std::milli>(
                                 std::chrono::steady_clock::now() - start)

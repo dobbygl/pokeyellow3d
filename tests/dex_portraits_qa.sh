@@ -5,7 +5,7 @@ if (( $# < 2 || $# > 3 )); then echo "Usage: $0 ROM WORLD_WITH_POKEDEX [dex-data
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 rom=$(realpath -- "$1")
 state=$(realpath -- "$2")
-mode=${3:-dex-portraits}
+mode=${3:-dex-data}
 if [[ $mode != dex-portraits && $mode != dex-data ]]; then echo "Invalid QA mode" >&2; exit 2; fi
 cmake --build "$project/build" --target all pallet_render_smoke --parallel 4
 qa_dir=$(mktemp -d "$project/build/qa/dex-portraits-XXXXXX")
@@ -17,9 +17,17 @@ cd -- "$qa_dir"
 sha256sum roms/pokeyellow.gbc world.state > logs/inputs.sha256
 echo "QA output: $qa_dir"
 SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy ./pallet_render_smoke roms/pokeyellow.gbc world.state "$mode" > logs/run.log 2>&1
+for camera in ortho fp; do
+    cold_mode=dex-screen
+    if [[ $camera == fp ]]; then cold_mode=dex-screen-fp; fi
+    mkdir -p "cold-$camera/logs"
+    (cd "cold-$camera"; SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
+        ../pallet_render_smoke ../roms/pokeyellow.gbc ../logs/dex-data-025.state \
+        "$cold_mode" > logs/run.log 2>&1)
+done
 sha256sum --check logs/inputs.sha256
 "$project/build/mon_pic_test" roms/pokeyellow.gbc logs/front-vram.bin
 mkdir -p "$project/build/qa/dex"
 cp -- logs/front-vram.bin "$project/build/qa/dex/front-vram.bin"
 ctest --test-dir "$project/build" --output-on-failure -R mon_pic
-echo "PASS: original-engine portrait evidence in $qa_dir"
+echo "PASS: 151 original-engine portraits and cold DATA loads in both cameras; evidence in $qa_dir"

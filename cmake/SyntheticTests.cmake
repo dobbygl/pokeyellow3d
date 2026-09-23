@@ -7,7 +7,7 @@ get_target_property(gbrt_runtime_dir gbrt SOURCE_DIR)
 
 # Header-only state tests: kanto_rom.h, world_scene.h, pallet_state.h and
 # battle_state.h, the last two of which need the runtime's gbrt.h.
-foreach(synthetic_test rom_reader_synthetic terrain_synthetic view_synthetic battle_state_synthetic pc_details_test tile_animation_test world_animation_test daylight_test ui_preferences_test rom_font_test pokemon_menu_test item_menu_test dex_menu_test battle_bag_test options_menu_test trainer_card_test naming_menu_test)
+foreach(synthetic_test art_manifest_test rom_reader_synthetic terrain_synthetic view_synthetic battle_state_synthetic pc_details_test tile_animation_test world_animation_test daylight_test ui_preferences_test rom_font_test pokemon_menu_test item_menu_test dex_menu_test battle_bag_test options_menu_test trainer_card_test naming_menu_test)
     add_executable(${synthetic_test} tests/${synthetic_test}.cpp)
     target_include_directories(${synthetic_test} PRIVATE src "${gbrt_runtime_dir}/include")
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -44,3 +44,9 @@ foreach(rom_test interior interior_audit battle_state fade_state battle_transiti
         set_tests_properties(${rom_test} PROPERTIES LABELS rom)
     endif()
 endforeach()
+
+# Registered even without the private ROM: exclusion/skipping is explicit.
+add_executable(art_manifest_rom tests/art_manifest_rom.cpp)
+target_include_directories(art_manifest_rom PRIVATE src)
+add_test(NAME art_manifest_rom COMMAND art_manifest_rom "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc")
+set_tests_properties(art_manifest_rom PROPERTIES LABELS rom SKIP_RETURN_CODE 77)

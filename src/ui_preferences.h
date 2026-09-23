@@ -6,21 +6,29 @@ enum class Style { Classic, Integrated };
 struct Settings {
     daynight::Settings lighting;
     Style style = Style::Integrated;
+    bool artistic = true;
 };
 inline Settings load(const std::string &path) {
     Settings fallback;
     std::ifstream input(path);
     input.imbue(std::locale::classic());
-    std::string header, mode, style, extra;
+    std::string header, mode, style, art, extra;
     int version = 0;
     if (!(input >> header >> version) || header != "pokeyellow3d-lighting")
         return fallback;
     if (version == 1)
         return {daynight::load(path), Style::Integrated};
     Settings result;
-    if (version != 2 || !(input >> mode >> result.lighting.hour >> style) || (input >> extra) ||
+    if ((version != 2 && version != 3) || !(input >> mode >> result.lighting.hour >> style) ||
         !std::isfinite(result.lighting.hour) || result.lighting.hour < 0 ||
         result.lighting.hour >= 24)
+        return fallback;
+    if (version == 3) {
+        if (!(input >> art) || (art != "art-on" && art != "art-off"))
+            return fallback;
+        result.artistic = art == "art-on";
+    }
+    if (input >> extra)
         return fallback;
     if (mode == "disabled")
         result.lighting.mode = daynight::Mode::Disabled;
@@ -45,12 +53,13 @@ inline bool save(const std::string &path, Settings settings) {
     std::ofstream output(path, std::ios::trunc);
     output.imbue(std::locale::classic());
     output.precision(17);
-    output << "pokeyellow3d-lighting 2\n"
+    output << "pokeyellow3d-lighting 3\n"
            << (settings.lighting.mode == Mode::Disabled    ? "disabled"
                : settings.lighting.mode == Mode::Automatic ? "automatic"
                                                            : "fixed")
            << ' ' << daynight::wrap(settings.lighting.hour) << '\n'
-           << (settings.style == Style::Classic ? "classic" : "integrated") << '\n';
+           << (settings.style == Style::Classic ? "classic" : "integrated") << '\n'
+           << (settings.artistic ? "art-on" : "art-off") << '\n';
     output.close();
     return bool(output);
 }

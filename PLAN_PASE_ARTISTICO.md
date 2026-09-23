@@ -787,8 +787,9 @@ identifica esas familias, se incorporarán con evidencia de sus tiles.
 Pruebas añadidas: volumen analítico y cierre de frusta (control negativo con
 una cara ausente), límites y presupuesto de copas, recetas inválidas y
 excepciones de tejado; auditoría ROM registrada en CTest (`rom`, ausencia 77).
-Esta última verifica 5.584 footprints sólidos, incluidos 159 árboles altos y
-32 de Corte, y rechaza árboles en 20.349 casillas transitables. Comprueba también
+Esta última descubre también los exteriores accesibles por warp (Safari): verifica
+5.722 footprints sólidos, incluidos 182 árboles altos y 32 de Corte, y rechaza
+árboles en 23.044 casillas transitables. Comprueba también
 la presencia de los tres edificios singulares y que la ROM queda intacta.
 
 Correcciones de QA necesarias desde C1:

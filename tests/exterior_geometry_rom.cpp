@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
         const auto before = rom;
         if (!pallet::load_catalog(rom.data(), rom.size()))
             throw std::runtime_error("invalid ROM catalog");
+        pallet::catalog->discover_warps(kanto::Rom(rom.data(), rom.size()));
         size_t objects = 0, walkable_controls = 0, tall = 0, cuts = 0;
         std::array<bool, 3> roofs{};
         for (const auto &entry : pallet::catalog->maps) {

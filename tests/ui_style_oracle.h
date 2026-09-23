@@ -254,6 +254,17 @@ inline void observe(GBContext *ctx, int w, int h, bool menu_open) {
         menu_text::prepare(ctx->wram + 0x3a0, ctx->vram, font, layout, float(w), float(h),
                            ui_theme::Padding, ui_theme::StartGlyphScale, ui_theme::BottomGlyphScale,
                            in_battle ? menu_text::Placement::Battle : menu_text::Placement::World);
+    if (in_battle && battle_layout.kind == battle_menu::Kind::Moves) {
+        // battle3d lifts TYPE/PP above the move list; the glyph checks below
+        // follow that placement. Independently require the visible gap.
+        menu_text::separate(plan, battle_menu::MovesInfo, battle_menu::MovesList,
+                            ui_theme::Padding);
+        const auto &info_panel = plan.panels[battle_menu::MovesInfo];
+        const auto &list_panel = plan.panels[battle_menu::MovesList];
+        if (info_panel.visible && list_panel.visible && info_panel.right > list_panel.left &&
+            info_panel.bottom + ui_theme::Padding > list_panel.top)
+            fail("TYPE/PP panel overlaps the integrated move list");
+    }
     if (in_battle) {
         int expected_panels = 0;
         for (size_t i = 0; i < layout.count; ++i) {

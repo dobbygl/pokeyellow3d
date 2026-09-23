@@ -500,10 +500,36 @@ void draw(GBContext *ctx, int w, int h, bool menu_open, bool opening = false) {
         lcd_overlay::framed(gb_get_framebuffer(ctx), float(w), float(h), overlay_alpha);
         return;
     }
-    if (styled && !animation && overlay_alpha == 0 && menu.kind != battle_menu::Kind::Unknown) {
+    // Effect animations and the capture keep the arena (effect == true), so
+    // their messages use the integrated box as well; Effect::Original keeps the
+    // complete LCD above. During an animation the box is integrated only while
+    // the displayed LCD layer shows these same wTileMap cells; their glyphs are
+    // still validated against the ROM font by menu_text::regions.
+    bool text_shown = !animation;
+    if (styled && animation && effect) {
+        text_shown = menu.regions.count > 0;
+        for (size_t i = 0; i < menu.regions.count && text_shown; ++i) {
+            auto r = menu.regions.regions[i];
+            text_shown = battle::displayed(ctx, r.x, r.y, r.w, r.h);
+        }
+    }
+    if (styled && text_shown && overlay_alpha == 0 && menu.kind != battle_menu::Kind::Unknown) {
+        menu_text::Plan plan;
+        const menu_text::Plan *positioned = nullptr;
+        if (menu.kind == battle_menu::Kind::Moves) {
+            // Same plan regions() would prepare, with the TYPE/PP panel lifted
+            // clear of the four move rows. Validation and ownership unchanged.
+            plan = menu_text::prepare(
+                ctx->wram + 0x3a0, ctx->vram, rom_font::get(ctx->rom, ctx->rom_size), menu.regions,
+                float(w), float(h), ui_theme::Padding, ui_theme::StartGlyphScale,
+                ui_theme::BottomGlyphScale, menu_text::Placement::Battle, ctx->rom, ctx->rom_size);
+            menu_text::separate(plan, battle_menu::MovesInfo, battle_menu::MovesList,
+                                ui_theme::Padding);
+            positioned = &plan;
+        }
         auto drawn = menu_text::regions(ctx->wram + 0x3a0, ctx->vram, ctx->rom, ctx->rom_size,
                                         gb_get_framebuffer(ctx), menu.regions, float(w), float(h),
-                                        menu_text::Placement::Battle);
+                                        menu_text::Placement::Battle, positioned);
         integrated_menu = true;
         menu_kind = menu.kind;
         menu_panels = drawn.panels;

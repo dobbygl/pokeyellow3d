@@ -303,3 +303,82 @@ adelantarse si no coincide con una fase del pase que toque el shader.
   `build/pallet_render_smoke` posterior a `7955aaa`, sin compilar ni
   modificar código. Tabla de estado actual derivada de esa auditoría.
 - Sin criterios marcados.
+
+### A1: implementación inicial sin compilar — 2026-09-22
+
+Rama `battle-a1` sobre `589620e`. Código escrito por lectura, sin compilar ni
+ejecutar nada; ninguna casilla marcada.
+
+- Texto durante efectos (`src/battle3d.h`): la rama de mensajes integrados
+  admite `animation && effect` (efecto 3D o captura). Durante la animación
+  exige además `battle::displayed` (nuevo en `src/battle_state.h`) sobre cada
+  región clasificada: la capa visible (ventana a WX≈7/WY≈0 o BG con su scroll
+  en tiles) debe mostrar exactamente las celdas de `wTileMap`. Transferencia
+  BG pendiente, otro mapa, BG apagado o LCD apagado mantienen el recorte
+  original. Las sacudidas de menos de un tile y los destellos de paleta
+  (BGP) no invalidan el cuadro: el texto es el mismo, solo desplazado o
+  recoloreado. `Effect::Original` sigue en el LCD completo y Clásico no entra
+  en la rama.
+- Lista de equipo (`src/pokemon_menu_state.h`): `party_text` reconoce los
+  `PrintText` (3C36) del banco 0F sobre la lista aún visible, verificados en
+  la ROM: AlreadyOutText desde EnemySendOutFirstMon (3CA71, retorno 4A74) y
+  PartyMenuOrRockOrRun (3D29E, 52A1); NoWillText de HasMonFainted (3CB14,
+  4B17) solo con su llamada desde ChooseNextMon (3C84B, 484E), desde
+  EnemySendOutFirstMon (3CA79, 4A7C) o desde PartyMenuOrRockOrRun (3D2A4,
+  52A7), nunca desde StartBattle (3C1C7). La entrada al bucle de selección
+  del cambio forzado (ChooseNextMon, 3C841) y del "Will … change POKéMON?"
+  (3CA5B) pasa por `DisplayPartyMenu` y ya la cubre `party_return`. En esos
+  mensajes la fila elegida es wWhichPokemon (CF91), porque
+  EnemySendOutFirstMon.next9 fija CC26 a 1, y se exige la flecha vacía en
+  esa fila.
+- Movimientos (`src/menu_text.h`, `src/battle_menu_layout.h`): con
+  `Kind::Moves`, `menu_text::separate` sube el panel TIPO/PP hasta dejar
+  `ui_theme::Padding` sobre las cuatro filas; a 800x720 pasa de 4 a 14 px
+  (sube 10 px). Solo cambia su posición, no la propiedad de celdas ni la
+  validación.
+- Tests: `battle_state_synthetic` (displayed con ventana, BG, scroll,
+  mapas y controles negativos), `battle_menu_layout_test` (separación,
+  idempotencia y controles), `pokemon_menu_test` (cinco llamadas nuevas,
+  StartBattle excluido, contexto de combate y link). Oráculos de
+  `ui_style_oracle.h` (misma colocación y hueco mínimo TIPO/PP) y
+  `ui_pokemon_menu_oracle.h` (fila elegida por la flecha vacía única).
+  Sin cambios de CMake: todos ya estaban registrados.
+
+Pendiente de validar al compilar:
+
+- Compilación Linux y MSVC, `clang-format` (no instalado en esta sesión) y
+  CTest completo, incluido `ctest -LE rom` sin ROM.
+- `ui_battles_qa.sh` y `battles_qa.sh` en PASS con `QA_MENU_STYLE=classic` e
+  `integrated`, en ambas cámaras; `check_battle_timing.py` sin cambios.
+- Clásico idéntico byte a byte a `7955aaa` en ambas cámaras.
+- Recorrido real: ataque con efecto 3D y lanzamiento de Poké Ball con el
+  mensaje integrado y sin parpadeo entre integrado y recorte; confirmar que
+  en combate la capa visible es la ventana y que `displayed` es verdadero
+  durante las animaciones con efecto.
+- "is already out!" y "There's no will to fight!" integrados en el cambio
+  del rival y en el forzado. En el cambio voluntario el submenú
+  SWITCH/STATS/CANCEL puede dejar su borde superior en la fila 11; con seis
+  Pokémon eso rompe la sexta barra y cae al LCD enmarcado (fallback
+  atómico, aceptable), a comprobar con captura.
+- Lista de movimientos sin solape a 800x720 y en ventanas pequeñas.
+- Regenerar la auditoría de partida en `build/qa/battle-audit-baseline/`.
+
+### A1: primera validación local, 2026-09-23
+
+- Build Linux propio fuera de `build/` (runtime local
+  `gb-recompiled-windows`, `nice -n 19`), sin avisos nuevos en `src/`.
+  CTest 46/46 con ROM, incluido `rom_font_vram`.
+- Referencia: `main` en `589620e` (código de `7955aaa`) compilado aparte.
+  Mismos fixtures para ambos binarios: `battles_qa.sh` (town, route) y
+  `ui_battles_qa.sh` (route de primera persona, rival de la Ruta 22).
+- Clásico: 59 + 474 ficheros de salida (capturas, estados, volcados)
+  idénticos byte a byte a la referencia, en ambas cámaras.
+- Integrado: ambas baterías en PASS, con `check_battle_timing.py` y memoria
+  de solo lectura. Estados y volcados idénticos; solo cambian las 20
+  capturas esperadas (efectos físico, proyectil y estado, lanzamiento,
+  trayectoria y sacudidas de Poké Ball, y lista de movimientos) más los
+  vídeos compuestos. Revisadas: el mensaje se dibuja en el panel integrado
+  durante el efecto y la Poké Ball, y el cuadro TIPO/PP queda separado.
+- Sin cubrir todavía: "is already out!" y "There's no will to fight!"
+  (ningún fixture actual llega a ellos), MSVC, `clang-format` (no
+  instalado) y `ctest -LE rom` sin ROM. Sin casillas marcadas.

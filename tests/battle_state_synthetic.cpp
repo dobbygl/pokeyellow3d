@@ -254,6 +254,69 @@ int main() {
         machine.write(battle::Animation, 0);
         check(battle::ready(ctx), "the arena is composed again without an animation");
 
+        // --- displayed(): the message box on the LCD layer ---------------------------
+        // A procedural bottom box in wTileMap and in both BG maps. Effect
+        // animations may present it integrated only while the displayed layer
+        // shows these exact cells.
+        for (int y = 12; y < 18; y++)
+            for (int x = 0; x < 20; x++) {
+                int value = y == 12 || y == 17 || !x || x == 19 ? 0x79 + (x + y) % 6
+                                                                : 0x80 + (x * 5 + y) % 26;
+                machine.tile(x, y, value);
+                machine.vram[size_t(0x1800 + y * 32 + x)] = uint8_t(value);
+                machine.vram[size_t(0x1c00 + y * 32 + x)] = uint8_t(value);
+            }
+        auto before = machine.wram;
+        check(battle::displayed(ctx, 0, 12, 20, 6), "the BG map shows the tile-map message box");
+        check(before == machine.wram, "displayed() reads memory only");
+        check(!battle::displayed(ctx, 0, 12, 20, 7) && !battle::displayed(ctx, -1, 12, 20, 6) &&
+                  !battle::displayed(ctx, 0, 12, 0, 6),
+              "areas outside the 20x18 screen are refused");
+        machine.vram[0x1800 + 15 * 32 + 7] ^= 0x40;
+        check(!battle::displayed(ctx, 0, 12, 20, 6),
+              "a BG cell awaiting the auto transfer is not displayed");
+        check(battle::displayed(ctx, 8, 12, 12, 6), "cells outside the checked area are ignored");
+        machine.vram[0x1800 + 15 * 32 + 7] ^= 0x40;
+        machine.io[0x42] = 7;
+        machine.io[0x43] = 6;
+        check(battle::displayed(ctx, 0, 12, 20, 6), "a sub-tile shake shows the same tiles");
+        machine.io[0x42] = 8;
+        check(!battle::displayed(ctx, 0, 12, 20, 6), "a whole-tile BG scroll shows other cells");
+        machine.io[0x42] = 0;
+        machine.io[0x43] = 0;
+        machine.io[0x40] |= 0x08;
+        machine.vram[0x1c00 + 13 * 32 + 3] ^= 1;
+        check(!battle::displayed(ctx, 0, 12, 20, 6), "the selected 9C00 BG map is compared");
+        machine.vram[0x1c00 + 13 * 32 + 3] ^= 1;
+        check(battle::displayed(ctx, 0, 12, 20, 6), "and accepted once it holds the box");
+        machine.io[0x40] &= uint8_t(~0x08);
+        // The battle normally presents the window at WX=7, WY=0 from 9C00.
+        machine.io[0x40] |= 0x60;
+        machine.vram[0x1800 + 14 * 32 + 2] ^= 1;
+        check(battle::displayed(ctx, 0, 12, 20, 6), "the full-screen window hides a stale BG map");
+        machine.io[0x4b] = 11;
+        machine.io[0x4a] = 3;
+        check(battle::displayed(ctx, 0, 12, 20, 6), "a shaken window still shows the same box");
+        machine.vram[0x1c00 + 16 * 32 + 18] ^= 1;
+        check(!battle::displayed(ctx, 0, 12, 20, 6), "a window map mismatch is refused");
+        machine.vram[0x1c00 + 16 * 32 + 18] ^= 1;
+        machine.io[0x4a] = 0x90;
+        check(!battle::displayed(ctx, 0, 12, 20, 6),
+              "a hidden window falls back to the stale BG map");
+        machine.vram[0x1800 + 14 * 32 + 2] ^= 1;
+        check(battle::displayed(ctx, 0, 12, 20, 6), "which is accepted once it is current");
+        machine.io[0x4a] = 0;
+        machine.io[0x4b] = 7;
+        machine.io[0x40] &= uint8_t(~0x60);
+        machine.io[0x40] &= uint8_t(~0x01);
+        check(!battle::displayed(ctx, 0, 12, 20, 6), "a disabled BG shows no message");
+        machine.io[0x40] |= 0x01;
+        machine.lcd_on(false);
+        check(!battle::displayed(ctx, 0, 12, 20, 6), "an off LCD shows no message");
+        machine.lcd_on(true);
+        check(battle::displayed(ctx, 0, 12, 20, 6) && battle::ready(ctx),
+              "the message box and the arena are back");
+
         // --- the trainer introduction path ------------------------------------------
         machine.write(battle::IsInBattle, 2);
         machine.write(0xd030, 1);

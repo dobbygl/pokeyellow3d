@@ -56,11 +56,24 @@ inline void observe(GBContext *ctx, int width, int height) {
     }
     if (shown.kind <= 2) {
         int selected = ctx->wram[shown.kind == 1 ? 0xc26 : 0xc2b];
-        for (int row = 0; row < ctx->wram[0x1162]; ++row)
-            if (ctx->wram[0x3a0 + (row * 2 + 1) * 20] == (shown.kind == 1 ? 0xed : 0xec)) {
+        bool active = false;
+        int chosen = -1, unfilled = 0;
+        for (int row = 0; row < ctx->wram[0x1162]; ++row) {
+            uint8_t arrow = ctx->wram[0x3a0 + (row * 2 + 1) * 20];
+            if (arrow == (shown.kind == 1 ? 0xed : 0xec)) {
                 selected = row;
+                active = true;
                 break;
             }
+            if (arrow == 0xec) {
+                chosen = row;
+                ++unfilled;
+            }
+        }
+        // A battle message over a party choice (already out, no will to fight)
+        // keeps only the unfilled arrow that marks the chosen row.
+        if (shown.kind == 1 && !active && unfilled == 1)
+            selected = chosen;
         if (shown.selected != selected || selected >= 6 ||
             shown.species != ctx->wram[0x116a + selected * 44])
             fail("portrait does not follow the visibly selected original party row");

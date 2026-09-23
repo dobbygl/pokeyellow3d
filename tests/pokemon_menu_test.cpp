@@ -61,6 +61,63 @@ int main() {
         machine.write(battle::IsInBattle, 0);
         check(pokemon_menu::context(ctx) == Kind::None,
               "battle action return requires battle context");
+        // Messages printed over the still-displayed battle party list, after
+        // HandlePartyMenuInput returned. Each is a bank 0F CALL to PrintText.
+        auto arm = [&](size_t address, uint16_t target) {
+            rom[address] = 0xcd;
+            rom[address + 1] = uint8_t(target);
+            rom[address + 2] = uint8_t(target >> 8);
+        };
+        auto push = [&](int slot, uint16_t returned) {
+            machine.write(slot, returned & 255);
+            machine.write(slot + 1, returned >> 8);
+        };
+        for (int a = 0xdff0; a < 0xe000; ++a)
+            machine.write(a, 0);
+        ctx->sp = 0xdff9;
+        for (const auto call : {Call{0x3ca71, 0x3c36, 0x4a74, Kind::Party},
+                                Call{0x3d29e, 0x3c36, 0x52a1, Kind::Party}}) {
+            arm(call.address, call.target);
+            push(0xdff9, call.returned);
+            machine.write(battle::IsInBattle, 2);
+            check(pokemon_menu::context(ctx) == Kind::Party,
+                  "AlreadyOutText over the battle party list");
+            machine.write(battle::IsInBattle, 0);
+            check(pokemon_menu::context(ctx) == Kind::None,
+                  "AlreadyOutText return requires battle context");
+            machine.write(battle::IsInBattle, 2);
+            machine.write(battle::Link, 1);
+            check(pokemon_menu::context(ctx) == Kind::None, "link battle is never recognized");
+            machine.write(battle::Link, 0);
+            rom[call.address + 1] ^= 1;
+            check(pokemon_menu::context(ctx) == Kind::None, "changed PrintText target rejected");
+            rom[call.address + 1] ^= 1;
+            push(0xdff9, 0);
+            check(pokemon_menu::context(ctx) == Kind::None,
+                  "returned PrintText identifies nothing");
+        }
+        // NoWillText is printed by HasMonFainted; only its party callers count.
+        arm(0x3cb14, 0x3c36);
+        push(0xdff9, 0x4b17);
+        check(pokemon_menu::context(ctx) == Kind::None,
+              "HasMonFainted text without a verified party caller");
+        for (const auto call : {Call{0x3c84b, 0x4afc, 0x484e, Kind::Party},
+                                Call{0x3ca79, 0x4afc, 0x4a7c, Kind::Party},
+                                Call{0x3d2a4, 0x4afc, 0x52a7, Kind::Party},
+                                Call{0x3c1c7, 0x4afc, 0x41ca, Kind::None}}) {
+            arm(call.address, call.target);
+            push(0xdffb, call.returned);
+            check(pokemon_menu::context(ctx) == call.kind,
+                  "NoWillText over the forced, trainer and voluntary party lists only");
+            push(0xdff9, 0);
+            check(pokemon_menu::context(ctx) == Kind::None,
+                  "caller alone does not identify the message");
+            push(0xdff9, 0x4b17);
+            push(0xdffb, 0);
+        }
+        machine.write(battle::IsInBattle, 0);
+        for (int a = 0xdff0; a < 0xe000; ++a)
+            machine.write(a, 0);
         // 78 is a PC box pictogram but a vertical line on the summary; 6E
         // changes source too. Neither source may leak into the other profile.
         for (int row = 0; row < 8; ++row) {

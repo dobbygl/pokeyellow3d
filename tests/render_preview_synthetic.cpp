@@ -106,6 +106,7 @@ int main() {
         synthetic::Context machine;
         GBContext *ctx = &machine.ctx;
         machine.reset();
+        const auto original_image = machine.image;
         machine.place_player(plan.home, 4, 4, 0);
         check(pallet::view(ctx) == pallet::View::Overworld,
               "the fixture starts on a live overworld");
@@ -261,6 +262,14 @@ int main() {
         // Inject a real allocation failure before the production renderer's
         // lazy initialization. Compare the complete scene, not just the FBO
         // helper's return value, in both styles/cameras and across re-entry.
+        // Restore the C1 trees/rocks as well: a sign-only fixture would not
+        // catch a partial geometry fallback after the shadow FBO failed.
+        pallet3d_shutdown();
+        std::copy(original_image.begin(), original_image.end(), machine.image.begin());
+        pallet::catalog.reset();
+        check(pallet::load_catalog(ctx->rom, ctx->rom_size), "restore C1 fallback fixture");
+        pallet::catalog->tilesets.emplace(
+            23, kanto::read_tileset(kanto::Rom(ctx->rom, ctx->rom_size), 23));
         for (auto style : {ui_preferences::Style::Classic, ui_preferences::Style::Integrated})
             for (bool fp : {false, true}) {
                 std::vector<uint8_t> reference;

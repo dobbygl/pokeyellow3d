@@ -59,6 +59,7 @@ template <class Compile> bool initialize(Compile compile) {
             attribute vec3 position; attribute vec2 texcoord; attribute vec4 color;
             attribute float wind; uniform mat4 view_projection; uniform float wind_time;
             varying mediump vec2 uv; varying mediump float opacity;
+            varying highp float shadow_depth;
             void main() {
                 vec3 moved=position;
                 if(wind_time>0.0 && wind>0.0) {
@@ -67,17 +68,22 @@ template <class Compile> bool initialize(Compile compile) {
                     moved.z+=(cos(phase+wind_time)-cos(phase))*0.035*wind;
                 }
                 gl_Position=view_projection*vec4(moved,1.0);
+                // The light projection is orthographic (w=1). ESSL2 permits
+                // mediump gl_FragCoord on some drivers, so interpolate depth
+                // explicitly at highp instead of losing bits before packing.
+                shadow_depth=gl_Position.z*0.5+0.5;
                 uv=texcoord; opacity=color.a;
             })";
         const char *fs = R"(
             precision highp float;
             uniform sampler2D image;
             varying mediump vec2 uv; varying mediump float opacity;
+            varying highp float shadow_depth;
             void main() {
                 // Alpha silhouettes cast; the old translucent ground blobs
                 // and fully transparent sprite padding never become casters.
                 if(opacity<=1.5 && texture2D(image,uv).a*opacity<0.5) discard;
-                vec3 encoded=fract(min(gl_FragCoord.z,0.999999)*vec3(1.0,255.0,65025.0));
+                vec3 encoded=fract(min(shadow_depth,0.999999)*vec3(1.0,255.0,65025.0));
                 encoded.xy-=encoded.yz/255.0;
                 gl_FragColor=vec4(encoded,1.0);
             })";

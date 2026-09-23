@@ -15,6 +15,10 @@ extern "C" {
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
 extern "C" uint8_t pokeyellow__rom_data[];
 #include "world_journey.h"
 #include "world_extended.h"

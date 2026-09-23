@@ -91,9 +91,10 @@ int main() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        // position.xyz + uv.xy, full clip square at depth exactly 0.5.
-        const float quad[]{-1, -1, 0, 0, 0, 1, -1, 0, 1, 0, 1,  1, 0, 1, 1,
-                           -1, -1, 0, 0, 0, 1, 1,  0, 1, 1, -1, 1, 0, 0, 1};
+        // position.xyz + uv.xy; depth ramps from 0.1 to 0.9 so precision
+        // and interpolation are checked, not just the exactly representable 0.5.
+        const float quad[]{-1, -1, -.8f, 0, 0, 1, -1, .8f, 1, 0, 1,  1, .8f,  1, 1,
+                           -1, -1, -.8f, 0, 0, 1, 1,  .8f, 1, 1, -1, 1, -.8f, 0, 1};
         glGenBuffers(1, &vertices);
         glBindBuffer(GL_ARRAY_BUFFER, vertices);
         glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
@@ -143,7 +144,12 @@ int main() {
                           "transparent sprite padding must not cast");
                 else {
                     double z = pixel[0] / 255. + pixel[1] / 65025. + pixel[2] / 16581375.;
-                    check(std::abs(z - .5) < 2. / 65535.,
+                    if (std::abs(z - (.1 + .8 * (x + .5) / 1024)) >= 2. / 65535.)
+                        std::fprintf(stderr,
+                                     "[DEPTH] xy=%d,%d rgb=%u,%u,%u decoded=%.9f expected=%.9f\n",
+                                     x, y, unsigned(pixel[0]), unsigned(pixel[1]),
+                                     unsigned(pixel[2]), z, .1 + .8 * (x + .5) / 1024);
+                    check(std::abs(z - (.1 + .8 * (x + .5) / 1024)) < 2. / 65535.,
                           "opaque silhouette must encode the analytic depth, not a rectangle");
                 }
             }

@@ -5,10 +5,10 @@
 
 namespace shadow_map {
 constexpr int Resolution = 1024;
-GLuint program = 0, texture = 0, framebuffer = 0, depth = 0;
-bool attempted = false, ready = false;
-size_t passes = 0;
-void shutdown() {
+inline GLuint program = 0, texture = 0, framebuffer = 0, depth = 0;
+inline bool attempted = false, ready = false;
+inline size_t passes = 0;
+inline void shutdown() {
     if (framebuffer)
         glDeleteFramebuffers(1, &framebuffer);
     if (depth)
@@ -21,9 +21,15 @@ void shutdown() {
     attempted = ready = false;
     passes = 0;
 }
-// Compiler is supplied by the renderer; this header is also exercised with a
-// real incomplete framebuffer in the standalone GL test, without a game hook.
-template <class Compile> bool initialize(Compile compile) {
+inline void attach(GLuint color, GLuint depth_buffer) {
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_buffer);
+}
+// The normal allocator always attaches both resources. An alternate attachment
+// operation lets GPU tests create a genuinely incomplete FBO before the real
+// renderer attempts initialization, without a runtime fault switch.
+template <class Compile, class Attach = decltype(&attach)>
+bool initialize(Compile compile, Attach attach_resources = attach) {
     if (attempted)
         return ready;
     attempted = true;
@@ -50,8 +56,7 @@ template <class Compile> bool initialize(Compile compile) {
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, Resolution, Resolution);
         glGenFramebuffers(1, &framebuffer);
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth);
+        attach_resources(texture, depth);
         supported = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     }
     if (supported) {

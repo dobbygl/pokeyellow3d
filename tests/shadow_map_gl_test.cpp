@@ -5,25 +5,10 @@
 #include <stdexcept>
 #include <vector>
 
-namespace {
-bool omit_attachments = false;
-void color_attachment(GLenum target, GLenum attachment, GLenum type, GLuint texture, GLint level) {
-    if (!omit_attachments)
-        glFramebufferTexture2D(target, attachment, type, texture, level);
-}
-void depth_attachment(GLenum target, GLenum attachment, GLenum type, GLuint renderbuffer) {
-    if (!omit_attachments)
-        glFramebufferRenderbuffer(target, attachment, type, renderbuffer);
-}
-} // namespace
 // Actual missing-attachment FBO, not a manufactured status code. The production
 // header is compiled in a private test namespace, with no game fault switch.
 #define shadow_map shadow_test_map
-#define glFramebufferTexture2D color_attachment
-#define glFramebufferRenderbuffer depth_attachment
 #include "shadow_map_gl.h"
-#undef glFramebufferTexture2D
-#undef glFramebufferRenderbuffer
 #undef shadow_map
 namespace shadow_map = shadow_test_map;
 
@@ -72,23 +57,35 @@ int main() {
                  glGetString(GL_VERSION));
     GLuint atlas = 0, vertices = 0, readback = 0;
     try {
-        omit_attachments = true;
-        check(!shadow_map::initialize(compile), "an incomplete FBO must reject artistic rendering");
+        bool incomplete = false;
+        check(!shadow_map::initialize(compile,
+                                      [&](GLuint, GLuint) {
+                                          incomplete = glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                                                       GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT;
+                                      }) &&
+                  incomplete,
+              "a real incomplete FBO must reject artistic rendering");
         check(!shadow_map::ready && !shadow_map::texture && !shadow_map::framebuffer &&
                   !shadow_map::depth && !shadow_map::program,
               "failed FBO must release all partial resources");
         check(glGetError() == GL_NO_ERROR, "fallback leaves no GL error");
-        omit_attachments = false;
         check(!shadow_map::initialize(compile),
               "failed target stays rejected until lifecycle reset");
         shadow_map::shutdown();
         check(shadow_map::initialize(compile), "valid RGBA8 target and program initialize");
-        // White RGB with one transparent quadrant; texture alpha is the oracle.
-        const unsigned char pixels[]{255, 255, 255, 0,   255, 255, 255, 255,
-                                     255, 255, 255, 255, 255, 255, 255, 255};
+        // Match the production 512px atlas. Magnifying a 2px texture 512x
+        // places samples only 1/1024 texel from the quadrant boundary, below
+        // D3D11's guaranteed 8-bit subtexel precision. At 2x magnification
+        // every sample is a full quarter texel from a boundary, so the exact
+        // alpha oracle is portable without ignoring any edge pixels.
+        std::vector<unsigned char> pixels(512 * 512 * 4, 255);
+        for (int y = 0; y < 256; ++y)
+            for (int x = 0; x < 256; ++x)
+                pixels[size_t(y * 512 + x) * 4 + 3] = 0;
         glGenTextures(1, &atlas);
         glBindTexture(GL_TEXTURE_2D, atlas);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 512, 512, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     pixels.data());
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

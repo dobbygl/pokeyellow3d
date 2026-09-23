@@ -1,6 +1,7 @@
 #include "synthetic_context.h"
 #include "pallet3d.h"
 #include "firstperson.h"
+#include "shadow_map_gl.h"
 #include "imgui.h"
 #include <SDL.h>
 #include <SDL_opengles2.h>
@@ -39,13 +40,17 @@ void check(bool condition, const char *message) {
 struct Snapshot {
     std::vector<uint8_t> wram, vram, eram, oam, hram, io, rom;
     std::vector<uint32_t> framebuffer;
+    std::array<uint8_t, sizeof(GBContext)> context{};
     explicit Snapshot(const synthetic::Context &m)
         : wram(m.wram.begin(), m.wram.end()), vram(m.vram.begin(), m.vram.end()),
           eram(m.eram.begin(), m.eram.end()), oam(m.oam.begin(), m.oam.end()),
           hram(m.hram.begin(), m.hram.end()), io(m.io.begin(), m.io.end()), rom(m.image),
-          framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {}
+          framebuffer(m.framebuffer.begin(), m.framebuffer.end()) {
+        std::memcpy(context.data(), &m.ctx, context.size());
+    }
     bool unchanged(const synthetic::Context &m) const {
-        return !std::memcmp(wram.data(), m.wram.data(), wram.size()) &&
+        return !std::memcmp(context.data(), &m.ctx, context.size()) &&
+               !std::memcmp(wram.data(), m.wram.data(), wram.size()) &&
                !std::memcmp(vram.data(), m.vram.data(), vram.size()) &&
                !std::memcmp(eram.data(), m.eram.data(), eram.size()) &&
                !std::memcmp(oam.data(), m.oam.data(), oam.size()) &&
@@ -230,6 +235,66 @@ int main() {
         }
         check(pallet3d_active(), "the live overworld is presented in 3D as well");
         check(pallet3d_stats().vertices > 0, "the live overworld keeps its mesh");
+        // Inject a real allocation failure before the production renderer's
+        // lazy initialization. Compare the complete scene, not just the FBO
+        // helper's return value, in both styles/cameras and across re-entry.
+        for (auto style : {ui_preferences::Style::Classic, ui_preferences::Style::Integrated})
+            for (bool fp : {false, true}) {
+                std::vector<uint8_t> reference;
+                std::vector<ImDrawVert> hud_reference;
+                for (bool fail : {false, true}) {
+                    pallet3d_shutdown();
+                    pallet3d_menu_style(style);
+                    pallet3d_artistic(fail);
+                    pallet3d_daylight({daynight::Mode::Fixed, 12});
+                    if (fail) {
+                        bool incomplete = false, compiled = false;
+                        check(!shadow_map::initialize(
+                                  [&](GLenum, const char *) -> GLuint {
+                                      compiled = true;
+                                      return 0;
+                                  },
+                                  [&](GLuint color, GLuint depth) {
+                                      check(color && depth,
+                                            "negative case allocated real resources");
+                                      incomplete = glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                                                   GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT;
+                                  }) &&
+                                  incomplete && !compiled,
+                              "real incomplete target failed before shader compilation");
+                    }
+                    pallet3d_preview(plan.home, fp);
+                    Snapshot unchanged{machine};
+                    for (int repeat = 0; repeat < 10; ++repeat) {
+                        frame();
+                        check(unchanged.unchanged(machine), "fallback changed guest state");
+                        check(glGetError() == GL_NO_ERROR, "fallback frame raised GL error");
+                        check(pallet3d_active() && !pallet3d_shadows().artistic_scene &&
+                                  !pallet3d_shadows().active && !pallet3d_shadows().passes,
+                              "the whole scene must use reference policy, never partial art");
+                    }
+                    glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+                    auto &hud = ImGui::GetForegroundDrawList()->VtxBuffer;
+                    if (!fail) {
+                        reference = rgba;
+                        hud_reference.assign(hud.begin(), hud.end());
+                    } else {
+                        check(pallet3d_artistic(),
+                              "fallback does not change the user's preference");
+                        check(rgba == reference,
+                              "failed target restores every reference scene byte");
+                        check(hud_reference.size() == size_t(hud.Size) &&
+                                  (hud.empty() ||
+                                   !std::memcmp(hud_reference.data(), hud.Data,
+                                                hud_reference.size() * sizeof(ImDrawVert))),
+                              "fallback preserves HUD vertices, colours and glyph coordinates");
+                        check(shadow_map::attempted && !shadow_map::ready && !shadow_map::texture &&
+                                  !shadow_map::framebuffer && !shadow_map::depth &&
+                                  !shadow_map::program,
+                              "failed shadow resources stay released across scene re-entry");
+                    }
+                }
+            }
         // Independent acne oracle: an entirely flat synthetic map has no
         // object above the receiving plane, so it cannot cast a shadow onto
         // itself. This catches sampling/bias errors that still darken pixels

@@ -48,6 +48,11 @@ El catálogo compara 3.906 imágenes y sus estados serializados:
 - Cambian 97 interiores en ortográfica y 88 en FP. Algunas casillas
   clasificadas son vacíos que deben seguir planos.
 
+El catálogo se capturó antes de ampliar la espera de la madre en el arnés.
+Los SHA de las cuatro fuentes de producción modificadas coinciden con la
+versión final; ese cambio posterior afecta al recorrido de casa, no al
+modo catálogo. Recorridos y CTest usan el binario final.
+
 Revisión visual: atlas de los 25 tilesets, 14 hojas del borrador y 174 imágenes
 comparadas de 29 mapas en ambas cámaras. Incluye los 21 tilesets interiores,
 los cuatro exteriores y cuatro mapas dudosos adicionales. Se revisaron
@@ -74,6 +79,37 @@ que el motor vuelva al mundo. El helper del padre se recompila con el mismo
 arnés y su renderer congelado; no se modifica su lógica de presentación.
 Las primeras ejecuciones fallidas se conservan como evidencia: espera corta
 de la madre y omisión de `QA_GLYPH_ORACLE` en el runner nuevo.
+
+Resultado local: **66/66 CTest sin omisiones**, incluidos los tests privados
+con ROM. Los **30 recorridos pareados pasan**, con 216 imágenes y 216 estados:
+72 pares OFF exactos frente a B2 y estado idéntico entre OFF y ON. Los nueve
+recorridos de casa/ciudad integrados verifican glifos y bits, sin texto de
+fuente de depuración. Se revisaron además 12 imágenes de diálogo, comparando
+padre/OFF/ON en los dos estilos y cámaras. Informe privado:
+`a2-local-functional.json`; recorridos: `a2-interiors-i8bes18x`.
+
+La CI del cambio funcional `549b47c` pasa en GCC, Clang, 2D, formato y
+Windows/MSVC con ANGLE:
+[ejecución 36027574576](https://github.com/dobbygl/pokeyellow3d/actions/runs/36027574576).
+
+Presentación estática de los 179 interiores: tres pares alternados frente a
+`7955aaa`, seis ejecuciones, 3.222 muestras y 96.660 fotogramas medidos,
+sin descartar muestras. Media: **2,327 ms frente a 2,121 ms (1,097×)** en
+Mesa Intel UHD Graphics 620. El recálculo desde los logs coincide. En las
+12 observaciones de entorno, carga de un minuto máxima 5,09 y presión de
+CPU máxima 2,66 %, sin otros procesos de batería gráfica o auditoría
+identificados. Son observaciones antes/después, no monitorización continua
+de GPU. El resultado es numérico y acotado al catálogo estático: no certifica
+los recorridos animados/FP ni el presupuesto de construcción por mapa de B2.
+Muestras, binarios, entradas, hashes y revisión: `presentation-15j8iewa/`.
+
+Para repetir esa medida, ejecutar en serie tres pares alternando el orden,
+conservar todos los logs y revisar el entorno de cada ejecución:
+
+```sh
+"$BENCH_7955AAA" "$ROM" "$PALLET_STATE" interior-catalog off 12
+build/art_benchmark "$ROM" "$PALLET_STATE" interior-catalog on 12
+```
 
 Esta validación no sustituye las regresiones históricas completas de menús,
 combate, PC, Pokédex y título ni cierra el presupuesto de B2. La fusión de A2

@@ -1165,3 +1165,10 @@ de todos los muebles y las regresiones históricas completas siguen siendo
 gates separados; no se infieren del audit ni de unos contactos representativos.
 La fusión queda pendiente de la revisión de B2. Decisiones, alcance de la
 evidencia y recetas: [ART_A2_VALIDATION.md](docs/ART_A2_VALIDATION.md).
+
+Validación funcional terminada: 66/66 CTest, sin omisiones; 30 recorridos
+pareados, 216 imágenes y estados, OFF exacto frente a B2 y ON/OFF con estado
+idéntico. CI GCC, Clang, 2D, formato y Windows/MSVC con ANGLE en verde para
+`549b47c`. El catálogo estático de interiores mide 1,097× frente a `7955aaa`
+en tres pares alternados, con todas las muestras conservadas. Esta medida
+no cierra los recorridos animados/FP ni el presupuesto de mallas de B2.

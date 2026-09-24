@@ -85,7 +85,7 @@ class MeshReportTest(unittest.TestCase):
                 for role in order:
                     name = f"pair-{pair}-{role}.log"
                     text = log("1.000000" if role == "reference" else "1.200000", run=len(runs))
-                    (root / name).write_text(text)
+                    (root / name).write_bytes(text.encode())  # exact bytes on every OS
                     runs.append({"pair": pair, "role": role, "log": name,
                                  "log_sha256": hashlib.sha256(text.encode()).hexdigest(),
                                  "binary_sha256": role, "started_unix": clock,

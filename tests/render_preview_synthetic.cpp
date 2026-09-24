@@ -235,7 +235,18 @@ int main() {
             }
         }
         check(darker > 0, "GPU shadow map must darken real visible geometry");
-        check(lit(0) == night, "night stays byte-exact with the artistic pass on");
+        // Without sun no shadow pass runs. The only artistic change at night is
+        // static vertex AO: it darkens and never below four occluded probes.
+        const auto night_passes = pallet3d_shadows().passes;
+        const auto artistic_night = lit(0);
+        check(pallet3d_shadows().passes == night_passes, "night submits no shadow pass");
+        for (size_t i = 0; i < night.size(); i += 4)
+            for (size_t channel = 0; channel < 3; ++channel) {
+                check(artistic_night[i + channel] <= night[i + channel],
+                      "artistic pass cannot add light at night");
+                check(artistic_night[i + channel] + 2 >= night[i + channel] * .68f,
+                      "night darkening is bounded by vertex AO");
+            }
         check(!pallet3d_shadows().active && pallet3d_shadows().passes == old_passes + 1,
               "night does not submit a depth pass");
         check(pallet3d_artistic(false), "disable artistic shadows");
@@ -314,6 +325,42 @@ int main() {
         }
         check(pallet3d_active(), "the live overworld is presented in 3D as well");
         check(pallet3d_stats().vertices > 0, "the live overworld keeps its mesh");
+        {
+            // AO invalidation follows the halo: a live block change far from
+            // every seam rebuilds only its own map; one on the northern seam
+            // also rebuilds the northern neighbour, never the eastern one.
+            pallet3d_artistic(true);
+            auto settle = [&] {
+                // A changed block is staged for one frame before it is used.
+                for (int i = 0; i < 3; i++)
+                    frame();
+            };
+            settle();
+            check(pallet3d_stats().resident_maps == 3, "home and both neighbours are resident");
+            auto live_block = [](int x, int z) { return 0xc6e8 + (z + 3) * (5 + 6) + x + 3; };
+            auto builds = pallet3d_stats().mesh_builds;
+            settle();
+            check(pallet3d_stats().mesh_builds == builds, "a static live scene is never rebuilt");
+            const int centre = machine.at(live_block(2, 2)), corner = machine.at(live_block(0, 0));
+            machine.write(live_block(2, 2), centre == 1 ? 2 : 1);
+            settle();
+            std::fprintf(stderr, "[SYNTH] AO rebuilds after a central block change: %zu\n",
+                         pallet3d_stats().mesh_builds - builds);
+            check(pallet3d_stats().mesh_builds == builds + 1,
+                  "a change far from every seam rebuilds only its own map");
+            builds = pallet3d_stats().mesh_builds;
+            machine.write(live_block(0, 0), corner == 1 ? 2 : 1);
+            settle();
+            std::fprintf(stderr, "[SYNTH] AO rebuilds after a northern seam change: %zu\n",
+                         pallet3d_stats().mesh_builds - builds);
+            check(pallet3d_stats().mesh_builds == builds + 2,
+                  "a seam change rebuilds its map and the neighbour reading it");
+            machine.write(live_block(2, 2), centre);
+            machine.write(live_block(0, 0), corner);
+            settle();
+            pallet3d_artistic(false);
+            settle();
+        }
         // Inject a real allocation failure before the production renderer's
         // lazy initialization. Compare the complete scene, not just the FBO
         // helper's return value, in both styles/cameras and across re-entry.

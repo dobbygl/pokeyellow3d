@@ -72,11 +72,17 @@ bool initialize(const GBContext *ctx) {
         anchors = dex_nests::entrances(overview);
         std::vector<Vertex> all;
         // create_map has one scratch vector. Restore it even if a ROM read throws.
+        // The overview reads static ROM blocks only: set the live game's
+        // resident snapshots aside so no Cut state leaks into its AO.
         struct Scratch {
             std::vector<Vertex> saved;
-            Scratch() : saved(std::move(scenery)) {}
+            std::map<int, std::vector<uint8_t>> live;
+            Scratch() : saved(std::move(scenery)), live(std::move(resident_blocks)) {
+                resident_blocks.clear();
+            }
             ~Scratch() {
                 scenery = std::move(saved);
+                resident_blocks = std::move(live);
             }
         } scratch;
         bool first = true;

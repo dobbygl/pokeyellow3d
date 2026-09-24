@@ -11,13 +11,11 @@ struct Cell {
 inline bool cave(const pallet::Scene &scene) {
     return scene.tileset == 17 || scene.tileset == 11;
 }
-inline Cell classify(const uint8_t *rom, const pallet::Scene &scene, int x, int z,
-                     const std::vector<uint8_t> *live = nullptr) {
+// Classification of one movement cell from its two left-column tiles.
+inline Cell classify_tiles(const pallet::Scene &scene, int x, int z, int top, int bottom) {
     for (auto w : scene.warps)
         if (w.x == x && w.z == z)
             return {Kind::Warp, 0, true};
-    int top = pallet::map_tile(rom, scene, x * 2, z * 2, live);
-    int bottom = pallet::map_tile(rom, scene, x * 2, z * 2 + 1, live);
     const auto &tiles = pallet::tileset(scene);
     if (scene.tileset == 1 || scene.tileset == 4) {
         if (scene.tileset == 4 && (bottom == 0x26 || bottom == 0x27))
@@ -177,5 +175,11 @@ inline Cell classify(const uint8_t *rom, const pallet::Scene &scene, int x, int 
     // Unrecognized art retains its original flat texture. Collision remains
     // wholly owned by the engine; an unknown solid is not necessarily a desk.
     return {Kind::Floor, 0, false};
+}
+inline Cell classify(const uint8_t *rom, const pallet::Scene &scene, int x, int z,
+                     const std::vector<uint8_t> *live = nullptr) {
+    int top = pallet::map_tile(rom, scene, x * 2, z * 2, live);
+    int bottom = pallet::map_tile(rom, scene, x * 2, z * 2 + 1, live);
+    return classify_tiles(scene, x, z, top, bottom);
 }
 } // namespace interior

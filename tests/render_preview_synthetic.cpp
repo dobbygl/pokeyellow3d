@@ -247,6 +247,61 @@ int main() {
         glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
         check(rgba == disabled, "disabled cycle recovers every original pixel");
         preview(plan.interior, "interior");
+        // Isolate B2 from silhouettes, furniture contacts and sunlight: an
+        // empty synthetic room has only floor and perimeter walls. Every
+        // pixel change must therefore be local occlusion of existing faces.
+        pallet3d_shutdown();
+        const size_t indoor_blocks = synthetic::detail::IndoorBlocks;
+        std::copy_n(machine.image.begin() + indoor_blocks, 16,
+                    machine.image.begin() + indoor_blocks + 2 * 16);
+        pallet::catalog.reset();
+        check(pallet::load_catalog(ctx->rom, ctx->rom_size), "load empty room AO oracle");
+        check(pallet::ensure_scene(plan.interior) != nullptr, "load AO room");
+        for (bool fp : {false, true}) {
+            pallet3d_artistic(false);
+            pallet3d_preview(plan.interior, fp);
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            const auto room_off = rgba;
+            const auto room_vertices = pallet3d_stats().vertices;
+            const auto builds = pallet3d_stats().mesh_builds;
+            pallet3d_artistic(true);
+            Snapshot unchanged{machine};
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            size_t ao_pixels = 0, unchanged_pixels = 0;
+            for (size_t i = 0; i < rgba.size(); i += 4) {
+                bool dark = false;
+                for (int c = 0; c < 3; ++c) {
+                    check(rgba[i + c] <= room_off[i + c], "AO cannot brighten an empty room");
+                    dark |= rgba[i + c] < room_off[i + c];
+                }
+                ao_pixels += dark;
+                unchanged_pixels += !dark;
+            }
+            check(ao_pixels > 0 && unchanged_pixels > 0, "AO reaches visible room pixels locally");
+            check(pallet3d_stats().vertices == room_vertices,
+                  "vertex AO adds no geometry in an empty room");
+            for (int i = 0; i < 5; ++i) {
+                frame();
+                check(pallet3d_stats().mesh_builds == builds + 1,
+                      "AO is built once and reused on subsequent frames");
+                check(unchanged.unchanged(machine) && glGetError() == GL_NO_ERROR,
+                      "AO frames keep guest memory and GL intact");
+            }
+            pallet3d_artistic(false);
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            check(rgba == room_off, "disabling AO restores every room pixel");
+        }
+        // Restore the television block before the remaining live/fallback QA.
+        pallet3d_shutdown();
+        std::copy_n(original_image.begin() + indoor_blocks + 2 * 16, 16,
+                    machine.image.begin() + indoor_blocks + 2 * 16);
+        pallet::catalog.reset();
+        check(pallet::load_catalog(ctx->rom, ctx->rom_size), "restore room fixture");
+        pallet::catalog->tilesets.emplace(
+            23, kanto::read_tileset(kanto::Rom(ctx->rom, ctx->rom_size), 23));
         preview(plan.east, "neighbour");
 
         // Back to the live game: the overworld state above is drawn instead.

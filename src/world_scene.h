@@ -82,10 +82,8 @@ enum class Terrain {
     Portal,
     Count
 };
-inline Terrain terrain(const uint8_t *rom, const Scene &s, int x, int z,
-                       const std::vector<uint8_t> *live = nullptr) {
-    int top = map_tile(rom, s, x * 2, z * 2, live),
-        bottom = map_tile(rom, s, x * 2, z * 2 + 1, live);
+// Classification of one movement cell from its two left-column tiles.
+inline Terrain terrain_of(const Scene &s, int top, int bottom) {
     if (bottom == tileset(s).grass)
         return Terrain::Grass;
     if (s.tileset == 0) {
@@ -130,6 +128,12 @@ inline Terrain terrain(const uint8_t *rom, const Scene &s, int x, int z,
     if (bottom == 0x14)
         return Terrain::Water;
     return Terrain::Ground;
+}
+inline Terrain terrain(const uint8_t *rom, const Scene &s, int x, int z,
+                       const std::vector<uint8_t> *live = nullptr) {
+    int top = map_tile(rom, s, x * 2, z * 2, live),
+        bottom = map_tile(rom, s, x * 2, z * 2 + 1, live);
+    return terrain_of(s, top, bottom);
 }
 // Roof borders divide attached city buildings more reliably than a flood fill
 // of collision solids. Width/depth and facade rows are decoded from ROM tiles.
@@ -200,15 +204,20 @@ inline const std::vector<House> &houses(const Scene &s) {
         result.push_back({5, 0, 10, 6, true, 3.f, .4f, 8});
     return house_cache.emplace(s.id, std::move(result)).first->second;
 }
-inline bool cleared(const uint8_t *rom, const Scene &s, int x, int z,
-                    const std::vector<uint8_t> *live = nullptr) {
+inline bool in_house(const Scene &s, int x, int z) {
     for (const auto &h : houses(s))
         if (x >= h.x && x < h.x + h.w && z >= h.z && z < h.z + h.d)
             return true;
-    auto t = terrain(rom, s, x, z, live);
+    return false;
+}
+inline bool clears(Terrain t) {
     return t == Terrain::Tree || t == Terrain::TallTree || t == Terrain::Canopy ||
            t == Terrain::Pillar || t == Terrain::Wall || t == Terrain::Portal ||
            t == Terrain::CutTree || t == Terrain::Rock || t == Terrain::Fence || t == Terrain::Sign;
+}
+inline bool cleared(const uint8_t *rom, const Scene &s, int x, int z,
+                    const std::vector<uint8_t> *live = nullptr) {
+    return in_house(s, x, z) || clears(terrain(rom, s, x, z, live));
 }
 inline std::array<float, 2> camera_target(float x, float z, float) {
     // A common world focus follows the player continuously across map seams.

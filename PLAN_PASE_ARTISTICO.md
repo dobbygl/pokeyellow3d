@@ -1072,3 +1072,72 @@ Se marca el criterio de rendimiento de B1. Las revisiones quedan en
 `build/qa/logs`; las ejecuciones, en el directorio privado de evidencia.
 Son medidas numéricas y de entorno: la aceptación de cada fase se apoya
 además en las pruebas y revisiones descritas en los apartados anteriores.
+
+### B2 — reanudación y validación en curso (24 de septiembre)
+
+El usuario confirmó el borrado del antiguo directorio privado
+`/var/tmp/pokeyellow-art-evidence-j_x0389o`. Sus rutas históricas ya no son
+reproducibles desde ese archivo local. Se conservaron los informes que
+sobrevivían y se reconstruyeron los helpers de `7955aaa` y del padre
+`e2a81ea` desde Git, con el runtime fijado y el mismo cartucho generado.
+La única instrumentación del renderer histórico es aumentar a seis decimales
+el diagnóstico del tiempo de construcción; no cambia la imagen.
+
+B2 continúa en una rama aislada, heredando las optimizaciones sin commit de
+Claude. El borrador añade oclusión en el color de los vértices, contactos con
+borde transparente y reconstrucción de las mallas vecinas cuando cambia el
+bloque de un mapa residente. Normales, emisividad, ROM y estado del motor
+conservan su contrato. La oclusión utiliza muestras alineadas al mundo,
+precalculadas y reutilizadas durante la generación de las mallas.
+
+Se añaden un oráculo gráfico de habitación vacía sin sol ni mobiliario y
+pruebas de límites, esquinas, particiones de mapa y caché. El oráculo comprueba
+oscurecimiento visible, ausencia de geometría adicional, reutilización de la
+malla y restauración exacta de los píxeles al desactivar el pase. Dos fixtures
+CTest de catálogo se registran con etiqueta `rom` y código de ausencia 77.
+
+La primera implementación pasó el gate independiente de catálogos:
+868 pares de capturas OFF frente al padre (217 mapas, dos cámaras y dos
+estilos), más 434 frente a `7955aaa` en ortográfica. Todos los estados del
+motor coincidieron. La API histórica no ofrece previsualización FP; su
+comparación exige además los recorridos FP históricos. Este resultado **no
+certifica las optimizaciones posteriores** ni sustituye las baterías completas.
+
+El rendimiento sigue abierto: las primeras medidas exploratorias incumplen
+el máximo de 1,5× por mapa. Una medida del propio C1 sin B2 también supera
+ese máximo; se está optimizando la construcción común además de la oclusión.
+Se conservan muestras fallidas, binarios, hashes y carga del equipo. Ninguna
+medida exploratoria ni un promedio global sirven para cerrar el criterio.
+
+Recetas incorporadas para evitar depender de scripts perdidos:
+
+```sh
+python3 tests/art_reference_build.py --build build --runtime "$RUNTIME_FIJADO" \
+  --parent e2a81ea --output "$EVIDENCIA_PRIVADA"
+python3 tests/art_b2_catalog_qa.py --smoke "$SMOKE_B2" \
+  --parent "$SMOKE_PADRE" --reference "$SMOKE_7955AAA" \
+  --rom "$ROM" --state "$PALLET_STATE" --output "$EVIDENCIA_PRIVADA"
+ctest --test-dir build -R 'ambient_|art_mesh_report|render_preview_synthetic' \
+  --output-on-failure
+python3 tests/art_mesh_report.py --mode catalog \
+  --reference "$REF1" "$REF2" "$REF3" \
+  --candidate "$B2_1" "$B2_2" "$B2_3" --output "$INFORME"
+```
+
+El informe de mallas exige tres pares completos, diez reconstrucciones por
+mapa y todas las muestras sin filtrado, y comprueba el límite por mapa.
+Su resultado numérico exige una revisión adicional de procedencia y entorno.
+El driver de benchmark comparte un adaptador de reloj independiente de las
+APIs de menús cambiantes, tanto en el candidato como en la referencia.
+Los tres criterios B2 permanecen sin marcar; faltan la validación histórica
+completa, la revisión visual final, los presupuestos y CI Linux/Windows.
+
+Estado funcional del borrador recuperado: compilación Linux completa y 64/64
+pruebas CTest aprobadas, sin omisiones, incluidas las siete entradas privadas
+restauradas. La comparación actual repite 3.906 imágenes y estados de los
+catálogos en 36 ejecuciones: OFF conserva los 868 pares frente al padre y
+los 434 frente a `7955aaa` en ortográfica; todos los estados coinciden.
+Informes locales: `build/qa/logs/b2-local-functional.json`,
+`b2-restored-ctest-inputs.json` y `b2-current-catalogs.json`.
+Estos resultados funcionales no cierran el presupuesto de B2 ni sustituyen
+las regresiones históricas completas de pantallas y recorridos.

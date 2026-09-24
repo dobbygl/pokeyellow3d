@@ -7,6 +7,7 @@
 #include "firstperson.h"
 #include "interior_scene.h"
 #include "art_manifest.h"
+#include "ambient_occlusion.h"
 #include "shadow_map_gl.h"
 #include "imgui.h"
 #include "ui_theme.h"
@@ -45,9 +46,17 @@ struct Vertex {
     Vec p;
     float u, v;
     Color c;
-    float wind = 0;
-    Vec normal{0, 1, 0};
-    float emissive = 0;
+    float wind;
+    Vec normal;
+    float emissive;
+    // Only emit_quad and shadow grow uninitialized vertex storage; both
+    // overwrite every attribute before any read or upload. Avoid zeroing
+    // the whole record first. All ordinary construction supplies a position.
+    Vertex() noexcept {}
+    Vertex(Vec point, float u_coord, float v_coord, Color color, float sway = 0,
+           Vec face = {0, 1, 0}, float emission = 0)
+        : p(point), u(u_coord), v(v_coord), c(color), wind(sway), normal(face), emissive(emission) {
+    }
 };
 void bind_vertices(GLuint id) {
     glBindBuffer(GL_ARRAY_BUFFER, id);
@@ -66,7 +75,7 @@ constexpr Color White = ui_theme::TexturedWhite;
 GLuint program = 0, buffer = 0, atlas = 0;
 GLint fade_loc = -1, matrix_loc = -1, eye_loc = -1, fog_loc = -1, sky_loc = -1, xray_loc = -1;
 GLint dusk_loc = -1;
-GLint wind_loc = -1;
+GLint wind_loc = -1, soft_contacts_loc = -1;
 daynight::Settings lighting_settings;
 ui_preferences::Style menu_style = ui_preferences::Style::Integrated;
 bool artistic_settings = true, artistic_scene = false;
@@ -114,6 +123,9 @@ float focus_x = 10, focus_z = 9;
 bool camera_ready = false;
 unsigned active_frames = 0;
 std::vector<Vertex> scenery, vertices;
+art::ambient::Field ambient_field;
+bool ambient_ready = false;
+std::map<int, std::vector<uint8_t>> resident_blocks;
 std::vector<Vertex> shadow_hero;
 struct Mesh {
     GLuint buffer = 0;
@@ -277,33 +289,63 @@ Color shade(Color c, float f) {
     return {c.r * f, c.g * f, c.b * f, c.a};
 }
 
-void surface_normal(std::vector<Vertex> &v, size_t start, Vec a, Vec b, Vec d, float emissive = 0) {
+Vec face_normal(Vec a, Vec b, Vec d) {
     Vec u{d.x - a.x, d.y - a.y, d.z - a.z}, w{b.x - a.x, b.y - a.y, b.z - a.z};
     Vec n{u.y * w.z - u.z * w.y, u.z * w.x - u.x * w.z, u.x * w.y - u.y * w.x};
     float length = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
-    n = length > .0001f ? Vec{n.x / length, n.y / length, n.z / length} : Vec{0, 1, 0};
-    for (size_t i = start; i < v.size(); ++i) {
-        v[i].normal = n;
-        v[i].emissive = emissive;
+    return length > .0001f ? Vec{n.x / length, n.y / length, n.z / length} : Vec{0, 1, 0};
+}
+struct Corner {
+    Vec p;
+    float u, v;
+};
+// Writes the six vertices of two triangles once, normal included. Produces
+// the same bytes as inserting them and then assigning surface_normal.
+// A triangle keeps only the first three corners, as a quad whose last point
+// repeats the third would after dropping its degenerate second half.
+void emit_quad(std::vector<Vertex> &v, const std::array<Corner, 6> &corners, Color color,
+               Vec normal, float emissive = 0, bool triangle = false) {
+    const int count = triangle ? 3 : 6;
+    const size_t start = v.size();
+    v.resize(start + count);
+    Vertex *out = v.data() + start;
+    const bool ambient = ambient_ready && &v == &scenery && color.a >= 1 && emissive == 0;
+    std::array<float, 3> first_ao{};
+    for (int i = 0; i < count; ++i, ++out) {
+        out->p = corners[i].p;
+        out->u = corners[i].u;
+        out->v = corners[i].v;
+        out->c = color;
+        if (ambient) {
+            // The second triangle repeats corners zero and two exactly.
+            const float ao = i == 3   ? first_ao[0]
+                             : i == 4 ? first_ao[2]
+                                      : ambient_field.visibility({out->p.x, out->p.y, out->p.z},
+                                                                 {normal.x, normal.y, normal.z});
+            if (i < 3)
+                first_ao[i] = ao;
+            out->c.r *= ao;
+            out->c.g *= ao;
+            out->c.b *= ao;
+        }
+        out->wind = 0;
+        out->normal = normal;
+        out->emissive = emissive;
     }
 }
 void quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color color = White, UV uv = Solid,
-          float emissive = 0) {
+          float emissive = 0, bool triangle = false) {
     float u0 = (uv.x + .25f) / AW, v0 = (uv.y + .25f) / AH;
     float u1 = (uv.x + std::max(uv.w - .25f, .25f)) / AW;
     float v1 = (uv.y + std::max(uv.h - .25f, .25f)) / AH;
-    v.insert(v.end(), {{a, u0, v0, color},
-                       {b, u1, v0, color},
-                       {c, u1, v1, color},
-                       {a, u0, v0, color},
-                       {c, u1, v1, color},
-                       {d, u0, v1, color}});
-    surface_normal(v, v.size() - 6, a, b, d, emissive);
+    emit_quad(v, {{{a, u0, v0}, {b, u1, v0}, {c, u1, v1}, {a, u0, v0}, {c, u1, v1}, {d, u0, v1}}},
+              color, face_normal(a, b, d), emissive, triangle);
 }
 
-void detailed_quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color color, UV detail) {
+void detailed_quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color color, UV detail,
+                   bool triangle = false) {
     if (detail.w == 0) {
-        quad(v, a, b, c, d, color);
+        quad(v, a, b, c, d, color, Solid, 0, triangle);
         return;
     }
     // Opaque surfaces reuse the alpha channel for their atlas-cell index.
@@ -315,13 +357,8 @@ void detailed_quad(std::vector<Vertex> &v, Vec a, Vec b, Vec c, Vec d, Color col
                          (a.z - b.z) * (a.z - b.z));
     };
     float u = length(a, b) / .75f, t = length(a, d) / .75f;
-    v.insert(v.end(), {{a, 0, 0, color},
-                       {b, u, 0, color},
-                       {c, u, t, color},
-                       {a, 0, 0, color},
-                       {c, u, t, color},
-                       {d, 0, t, color}});
-    surface_normal(v, v.size() - 6, a, b, d);
+    emit_quad(v, {{{a, 0, 0}, {b, u, 0}, {c, u, t}, {a, 0, 0}, {c, u, t}, {d, 0, t}}}, color,
+              face_normal(a, b, d), 0, triangle);
 }
 
 void box(std::vector<Vertex> &v, float x, float z, float w, float d, float bottom, float top,
@@ -340,23 +377,39 @@ void box(std::vector<Vertex> &v, float x, float z, float w, float d, float botto
 
 void shadow(std::vector<Vertex> &v, float x, float z, float rx, float rz) {
     Color c{.14f, .22f, .17f, .22f};
+    // The 21 unit directions are fixed; evaluate each expression once.
+    static const auto unit = [] {
+        std::array<std::array<float, 2>, 21> directions{};
+        for (int i = 0; i <= 20; i++) {
+            const float a = i * 6.283185f / 20;
+            directions[i] = {std::cos(a), std::sin(a)};
+        }
+        return directions;
+    }();
+    const float u = (511.25f) / AW, t = (511.25f) / AH;
+    const size_t start = v.size();
+    v.resize(start + 60);
+    Vertex *out = v.data() + start;
     for (int i = 0; i < 20; i++) {
-        float a = i * 6.283185f / 20, b = (i + 1) * 6.283185f / 20;
-        float u = (511.25f) / AW, t = (511.25f) / AH;
-        v.insert(v.end(), {{{x, .016f, z}, u, t, c},
-                           {{x + std::cos(a) * rx, .016f, z + std::sin(a) * rz}, u, t, c},
-                           {{x + std::cos(b) * rx, .016f, z + std::sin(b) * rz}, u, t, c}});
+        *out++ = {{x, .016f, z}, u, t, c};
+        *out++ = {{x + unit[i][0] * rx, .016f, z + unit[i][1] * rz}, u, t, c};
+        *out++ = {{x + unit[i + 1][0] * rx, .016f, z + unit[i + 1][1] * rz}, u, t, c};
+        if (artistic_scene) {
+            // Procedural contacts blend to zero; normals and emissive keep
+            // their usual meaning for the lighting pipeline.
+            out[-3].c.a = art::ambient::contact_alpha(0);
+            out[-2].c.a = out[-1].c.a = art::ambient::contact_alpha(1);
+        }
     }
 }
 
 void facet(std::vector<Vertex> &mesh_vertices, const art::geometry::Face &face, Color color,
            UV detail = Solid) {
     auto point = [](art::geometry::Point p) { return Vec{p.x, p.y, p.z}; };
-    detailed_quad(mesh_vertices, point(face[0]), point(face[1]), point(face[2]), point(face[3]),
-                  color, detail);
     // Caps really submit one triangle; do not upload degenerate triangles.
-    if (face[2].x == face[3].x && face[2].y == face[3].y && face[2].z == face[3].z)
-        mesh_vertices.resize(mesh_vertices.size() - 3);
+    const bool cap = face[2].x == face[3].x && face[2].y == face[3].y && face[2].z == face[3].z;
+    detailed_quad(mesh_vertices, point(face[0]), point(face[1]), point(face[2]), point(face[3]),
+                  color, detail, cap);
 }
 
 void artistic_house(const pallet::Scene &scene, const pallet::House &h,
@@ -574,31 +627,200 @@ void animate_tiles(const GBContext *ctx, const pallet::Scene &current) {
     }
 }
 
-void interior_map(const GBContext *ctx, const pallet::Scene &scene,
-                  const std::vector<uint8_t> &blocks) {
+// Mesh bounds for the shadow projection, folded while the newest vertices
+// are still in cache. Same comparisons, in the same vertex order, as two
+// sunlight::Bounds::add calls per vertex over the finished mesh; builders
+// never modify vertices that have already been folded.
+struct BoundsFold {
+    sunlight::Point low, high;
+    size_t done = 0;
+    void reset() {
+        const sunlight::Bounds empty;
+        low = empty.low;
+        high = empty.high;
+        done = 0;
+    }
+    void fold(const std::vector<Vertex> &v) {
+        for (; done < v.size(); ++done) {
+            const Vertex &vertex = v[done];
+            const double dx = std::abs(vertex.wind) * .13, dz = std::abs(vertex.wind) * .07;
+            const double y = vertex.p.y;
+            low[1] = std::min(low[1], y);
+            high[1] = std::max(high[1], y);
+            // Repeating an identical point cannot change a min/max result.
+            for (const double sign : {-1., 1.}) {
+                const double x = sign < 0 ? vertex.p.x - dx : vertex.p.x + dx;
+                const double z = sign < 0 ? vertex.p.z - dz : vertex.p.z + dz;
+                low[0] = std::min(low[0], x);
+                high[0] = std::max(high[0], x);
+                low[2] = std::min(low[2], z);
+                high[2] = std::max(high[2], z);
+                if (dx == 0 && dz == 0)
+                    break;
+            }
+        }
+    }
+} scenery_bounds;
+
+// Tiles, terrain and cleared cells resolved once per mesh build. Lookups
+// return exactly what pallet::map_tile/terrain/cleared return for the same
+// blocks; the builders below no longer decode each ROM block repeatedly.
+struct MapTiles {
+    int width = 0;
+    std::vector<uint8_t> tiles, cleared;
+    std::vector<pallet::Terrain> terrain;
+    uint8_t operator()(int tx, int tz) const {
+        return tiles[size_t(tz) * width + tx];
+    }
+    pallet::Terrain cell(int x, int z) const {
+        return terrain[size_t(z) * (width / 2) + x];
+    }
+} map_tiles;
+void resolve_tiles(const GBContext *ctx, const pallet::Scene &scene,
+                   const std::vector<uint8_t> &blocks) {
+    auto &m = map_tiles;
+    m.width = scene.width * 2;
+    m.tiles.resize(size_t(m.width) * scene.height * 2);
+    for (int tz = 0; tz < scene.height * 2; tz++)
+        for (int tx = 0; tx < m.width; tx++)
+            m.tiles[size_t(tz) * m.width + tx] = pallet::map_tile(ctx->rom, scene, tx, tz, &blocks);
+    m.terrain.clear();
+    m.cleared.clear();
+    if (scene.interior)
+        return;
+    m.terrain.resize(size_t(scene.width) * scene.height);
+    m.cleared.resize(m.terrain.size());
     for (int z = 0; z < scene.height; z++)
         for (int x = 0; x < scene.width; x++) {
-            auto cell = interior::classify(ctx->rom, scene, x, z, &blocks);
+            const auto type = pallet::terrain_of(scene, m(x * 2, z * 2), m(x * 2, z * 2 + 1));
+            m.terrain[size_t(z) * scene.width + x] = type;
+            m.cleared[size_t(z) * scene.width + x] =
+                pallet::in_house(scene, x, z) || pallet::clears(type);
+        }
+}
+
+// A local halo includes solids across map boundaries. All participating maps
+// use the same staged block snapshots as their meshes, including live Cut.
+// These are presentation volumes, never guest collision or movement data.
+void prepare_ambient(const GBContext *ctx, const pallet::Scene &current) {
+    ambient_ready = false;
+    if (!artistic_scene)
+        return;
+    ambient_field.reset(current.origin_x - 1, current.origin_z - 1, current.width + 2,
+                        current.height + 2);
+    for (const auto &entry : pallet::catalog->maps) {
+        const auto &scene = entry.second;
+        if (scene.id != current.id &&
+            (scene.interior || current.interior || scene.component != current.component))
+            continue;
+        if (scene.origin_x > current.origin_x + current.width + 1 ||
+            scene.origin_z > current.origin_z + current.height + 1 ||
+            scene.origin_x + scene.width < current.origin_x - 1 ||
+            scene.origin_z + scene.height < current.origin_z - 1)
+            continue;
+        const auto live = resident_blocks.find(scene.id);
+        const auto &blocks = live == resident_blocks.end() ? scene.block_data : live->second;
+        auto add = [&](float x, float z, float w, float d, float bottom, float top) {
+            ambient_field.add({{x, bottom, z}, {x + w, top, z + d}});
+        };
+        if (!scene.interior)
+            for (const auto &house : pallet::houses(scene)) {
+                const float x = scene.origin_x + house.x, z = scene.origin_z + house.z;
+                add(x + .05f, z + .05f, house.w - .1f, house.d - .1f, 0, house.eave - .08f);
+                add(x, z, house.w, house.d, house.eave - .08f, house.eave);
+            }
+        for (int iz = 0; iz < scene.height; ++iz)
+            for (int ix = 0; ix < scene.width; ++ix) {
+                const float x = float(scene.origin_x + ix), z = float(scene.origin_z + iz);
+                if (x + 2 < current.origin_x - 1 || z + 2 < current.origin_z - 1 ||
+                    x > current.origin_x + current.width + 1 ||
+                    z > current.origin_z + current.height + 1)
+                    continue;
+                if (scene.interior) {
+                    const auto cell = interior::classify(ctx->rom, scene, ix, iz, &blocks);
+                    const auto *policy = art::find(cell.kind);
+                    if (policy && policy->occlusion == art::Occlusion::Solid && cell.height > 0)
+                        add(x, z, 1, 1, 0, cell.height);
+                    continue;
+                }
+                const auto terrain = pallet::terrain(ctx->rom, scene, ix, iz, &blocks);
+                const auto *policy = art::find(terrain);
+                if (!policy || policy->occlusion != art::Occlusion::Solid)
+                    continue;
+                switch (terrain) {
+                case pallet::Terrain::Tree:
+                case pallet::Terrain::CutTree:
+                case pallet::Terrain::TallTree: {
+                    const bool tall = terrain == pallet::Terrain::TallTree;
+                    const float width = tall ? 2.f : 1.f;
+                    add(x + width * .4f, z + width * .4f, width * .2f, width * .2f, 0,
+                        tall ? .95f : .65f);
+                    add(x + width * .12f, z + width * .12f, width * .76f, width * .76f,
+                        tall ? .85f : .5f, tall ? 2.5f : 1.6f);
+                    break;
+                }
+                case pallet::Terrain::Rock:
+                    add(x + .15f, z + .18f, .7f, .64f, 0, .58f);
+                    break;
+                case pallet::Terrain::Wall:
+                    add(x, z, 1, 1, 0, 1.15f);
+                    break;
+                case pallet::Terrain::Pillar:
+                    add(x + .16f, z + .16f, .68f, .68f, 0, 1.65f);
+                    break;
+                case pallet::Terrain::Fence:
+                    add(x, z + .55f, 1, .14f, .25f, .65f);
+                    break;
+                case pallet::Terrain::Sign:
+                    add(x + .1f, z + .4f, .8f, .16f, .45f, .98f);
+                    break;
+                case pallet::Terrain::Portal:
+                    add(x - .1f, z + .65f, .18f, .35f, 0, 1.7f);
+                    add(x + .92f, z + .65f, .18f, .35f, 0, 1.7f);
+                    add(x - .1f, z + .65f, 1.2f, .35f, 1.7f, 1.9f);
+                    break;
+                default:
+                    break;
+                }
+            }
+    }
+    ambient_ready = true;
+}
+
+void interior_map(const pallet::Scene &scene) {
+    // Side colours average the atlas cell; one build reads a fixed atlas.
+    std::array<Color, 256> averages{};
+    std::array<bool, 256> averaged{};
+    for (int z = 0; z < scene.height; z++)
+        for (int x = 0; x < scene.width; x++) {
+            auto cell = interior::classify_tiles(scene, x, z, map_tiles(x * 2, z * 2),
+                                                 map_tiles(x * 2, z * 2 + 1));
             if (artistic_scene)
                 cell.kind = art::find(cell.kind)->reference_mesh;
             if (cell.height <= 0)
                 continue;
-            int tile = pallet::map_tile(ctx->rom, scene, x * 2, z * 2, &blocks);
-            UV uv = tile_uv(scene, tile);
-            Color side{};
-            side.r = side.g = side.b = 0;
-            side.a = 1;
-            for (int y = 0; y < 8; y++)
-                for (int xx = 0; xx < 8; xx++) {
-                    size_t at = ((int(uv.y) + y) * AW + int(uv.x) + xx) * 4;
-                    side.r += pixels[at] / (255.f * 64);
-                    side.g += pixels[at + 1] / (255.f * 64);
-                    side.b += pixels[at + 2] / (255.f * 64);
-                }
-            box(scenery, float(x), float(z), 1, 1, 0, cell.height, side);
+            if (artistic_scene && cell.kind == interior::Kind::Furniture)
+                shadow(scenery, x + .5f, z + .5f, .56f, .52f);
+            int tile = map_tiles(x * 2, z * 2);
+            if (!averaged[tile]) {
+                UV uv = tile_uv(scene, tile);
+                Color side{};
+                side.r = side.g = side.b = 0;
+                side.a = 1;
+                for (int y = 0; y < 8; y++)
+                    for (int xx = 0; xx < 8; xx++) {
+                        size_t at = ((int(uv.y) + y) * AW + int(uv.x) + xx) * 4;
+                        side.r += pixels[at] / (255.f * 64);
+                        side.g += pixels[at + 1] / (255.f * 64);
+                        side.b += pixels[at + 2] / (255.f * 64);
+                    }
+                averages[tile] = side;
+                averaged[tile] = true;
+            }
+            box(scenery, float(x), float(z), 1, 1, 0, cell.height, averages[tile]);
             for (int row = 0; row < 2; row++)
                 for (int col = 0; col < 2; col++) {
-                    int t = pallet::map_tile(ctx->rom, scene, x * 2 + col, z * 2 + row, &blocks);
+                    int t = map_tiles(x * 2 + col, z * 2 + row);
                     float left = x + col * .5f, back = z + row * .5f, h = cell.height + .002f;
                     quad(scenery, {left, h, back}, {left + .5f, h, back},
                          {left + .5f, h, back + .5f}, {left, h, back + .5f}, White,
@@ -611,33 +833,40 @@ void interior_map(const GBContext *ctx, const pallet::Scene &scene,
                              tile_uv(scene, t));
                     }
                 }
+            scenery_bounds.fold(scenery);
         }
 }
 
 void create_map(const GBContext *ctx, const pallet::Scene &scene,
                 const std::vector<uint8_t> &blocks) {
     scenery.clear();
+    scenery_bounds.reset();
+    resolve_tiles(ctx, scene, blocks);
+    prepare_ambient(ctx, scene);
     for (int tz = 0; tz < scene.height * 2; tz++)
         for (int tx = 0; tx < scene.width * 2; tx++) {
-            int tile = pallet::map_tile(ctx->rom, scene, tx, tz, &blocks);
-            if (!scene.interior && pallet::cleared(ctx->rom, scene, tx / 2, tz / 2, &blocks))
+            int tile = map_tiles(tx, tz);
+            if (!scene.interior && map_tiles.cleared[size_t(tz / 2) * scene.width + tx / 2])
                 tile = scene.tileset == 3 ? 0x30 : scene.tileset == 23 ? 0x23 : 0x2c;
             float x = scene.origin_x + tx * .5f, z = scene.origin_z + tz * .5f;
             quad(scenery, {x, 0, z}, {x + .5f, 0, z}, {x + .5f, 0, z + .5f}, {x, 0, z + .5f}, White,
                  tile_uv(scene, tile, floor_palette(scene, tile)));
+            scenery_bounds.fold(scenery);
         }
     if (scene.interior) {
-        interior_map(ctx, scene, blocks);
+        interior_map(scene);
         box(scenery, 0, 0, float(scene.width), float(scene.height), -.35f, -.015f,
             {.32f, .36f, .34f});
         return;
     }
-    for (auto h : pallet::houses(scene))
+    for (auto h : pallet::houses(scene)) {
         make_house(scene, h, blocks);
+        scenery_bounds.fold(scenery);
+    }
     for (int iz = 0; iz < scene.height; iz++)
         for (int ix = 0; ix < scene.width; ix++) {
             float x = float(ix + scene.origin_x), z = float(iz + scene.origin_z);
-            auto type = pallet::terrain(ctx->rom, scene, ix, iz, &blocks);
+            auto type = map_tiles.cell(ix, iz);
             if (artistic_scene)
                 type = art::find(type)->reference_mesh;
             UV foliage = tile_uv(scene, scene.tileset == 3 ? 0x16 : 0x41);
@@ -679,8 +908,7 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                 box(scenery, x - .1f, z + .65f, 1.2f, .35f, 1.7f, 1.9f, {.77f, .78f, .63f});
                 for (int row = 0; row < 2; row++)
                     for (int col = 0; col < 2; col++) {
-                        int tile =
-                            pallet::map_tile(ctx->rom, scene, ix * 2 + col, iz * 2 + row, &blocks);
+                        int tile = map_tiles(ix * 2 + col, iz * 2 + row);
                         float left = x + col * .5f, top = 1.7f - row * .85f;
                         quad(scenery, {left, top, z + 1}, {left + .5f, top, z + 1},
                              {left + .5f, top - .85f, z + 1}, {left, top - .85f, z + 1}, White,
@@ -704,7 +932,7 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                 box(scenery, x + .15f, z + .18f, .70f, .64f, 0, .45f, {.49f, .53f, .42f}, stone);
                 box(scenery, x + .24f, z + .26f, .52f, .48f, .45f, .61f, {.63f, .65f, .51f}, stone);
             } else if (type == pallet::Terrain::Ledge) {
-                int bottom = pallet::map_tile(ctx->rom, scene, ix * 2, iz * 2 + 1, &blocks);
+                int bottom = map_tiles(ix * 2, iz * 2 + 1);
                 if (bottom == 0x27)
                     box(scenery, x, z, .24f, 1, 0, .3f, {.57f, .47f, .30f});
                 else if (bottom == 0x0d || bottom == 0x1d)
@@ -741,8 +969,7 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                 box(scenery, x + .1f, z + .4f, .8f, .16f, .45f, .98f, {.58f, .42f, .27f});
                 for (int row = 0; row < 2; row++)
                     for (int col = 0; col < 2; col++) {
-                        int tile =
-                            pallet::map_tile(ctx->rom, scene, ix * 2 + col, iz * 2 + row, &blocks);
+                        int tile = map_tiles(ix * 2 + col, iz * 2 + row);
                         float left = x + .1f + col * .4f, top = .98f - row * .265f;
                         quad(scenery, {left, top, z + .566f}, {left + .4f, top, z + .566f},
                              {left + .4f, top - .265f, z + .566f}, {left, top - .265f, z + .566f},
@@ -751,7 +978,12 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
             } else if (recipe == art::Mesh::GroundBorder) {
                 // A cut tree leaves a flush stump mark. It has no raised
                 // sides and does not occupy the newly walkable cell volume.
-                if (pallet::terrain(ctx->rom, scene, ix, iz) == pallet::Terrain::CutTree) {
+                // Static ROM blocks: live ones only differ inside a changed block.
+                const size_t block = size_t(iz / 2) * (scene.width / 2) + ix / 2;
+                const auto original = blocks[block] == scene.block_data[block]
+                                          ? map_tiles.cell(ix, iz)
+                                          : pallet::terrain(ctx->rom, scene, ix, iz);
+                if (original == pallet::Terrain::CutTree) {
                     for (int i = 0; i < 6; ++i) {
                         const float a = i * 6.28318530718f / 6;
                         const float b = (i + 1) * 6.28318530718f / 6;
@@ -767,14 +999,13 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                 }
                 // Narrow ground-colour bands soften grass/path boundaries.
                 // They stay flush on the path; game coordinates remain y=0.
-                const int bottom = pallet::map_tile(ctx->rom, scene, ix * 2, iz * 2 + 1, &blocks);
+                const int bottom = map_tiles(ix * 2, iz * 2 + 1);
                 if (scene.tileset == 0 && (bottom == 0x00 || bottom == 0x2c))
                     for (const auto &delta : std::array<std::array<int, 2>, 4>{
                              {{{-1, 0}}, {{1, 0}}, {{0, -1}}, {{0, 1}}}}) {
                         const int nx = ix + delta[0], nz = iz + delta[1];
                         if (nx < 0 || nz < 0 || nx >= scene.width || nz >= scene.height ||
-                            pallet::terrain(ctx->rom, scene, nx, nz, &blocks) !=
-                                pallet::Terrain::Grass)
+                            map_tiles.cell(nx, nz) != pallet::Terrain::Grass)
                             continue;
                         const float left = x + (delta[0] > 0 ? .92f : 0);
                         const float back = z + (delta[1] > 0 ? .92f : 0);
@@ -784,6 +1015,7 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                              {.61f, .70f, .43f, .35f});
                     }
             }
+            scenery_bounds.fold(scenery);
         }
     box(scenery, float(scene.origin_x), float(scene.origin_z), float(scene.width),
         float(scene.height), -.8f, -.015f, {.42f, .48f, .34f});
@@ -812,6 +1044,8 @@ void update_meshes(const GBContext *ctx) {
         } else
             ++it;
     }
+    resident_blocks.clear();
+    bool ambient_changed = false;
     for (int id : visible_maps) {
         const auto &scene = *pallet::scene(id);
         auto blocks = scene.block_data;
@@ -830,7 +1064,15 @@ void update_meshes(const GBContext *ctx) {
             // Keep the previous valid mesh until the incoming buffer is stable.
             blocks = mesh.buffer ? mesh.blocks : scene.block_data;
         }
-        if (mesh.buffer && mesh.blocks == blocks && mesh.artistic == artistic_scene)
+        ambient_changed |= !mesh.buffer || mesh.blocks != blocks || mesh.artistic != artistic_scene;
+        resident_blocks.emplace(id, std::move(blocks));
+    }
+    for (int id : visible_maps) {
+        const auto &scene = *pallet::scene(id);
+        auto &blocks = resident_blocks.at(id);
+        auto &mesh = meshes[id];
+        if (mesh.buffer && mesh.blocks == blocks && mesh.artistic == artistic_scene &&
+            !(artistic_scene && ambient_changed))
             continue;
         auto start = std::chrono::steady_clock::now();
         create_map(ctx, scene, blocks);
@@ -840,19 +1082,17 @@ void update_meshes(const GBContext *ctx) {
         glBufferData(GL_ARRAY_BUFFER, scenery.size() * sizeof(Vertex), scenery.data(),
                      GL_STATIC_DRAW);
         mesh.count = scenery.size();
-        mesh.blocks = std::move(blocks);
+        mesh.blocks = blocks;
         mesh.artistic = artistic_scene;
+        scenery_bounds.fold(scenery);
         mesh.bounds = {};
-        for (const auto &v : scenery) {
-            const double dx = std::abs(v.wind) * .13, dz = std::abs(v.wind) * .07;
-            mesh.bounds.add({v.p.x - dx, v.p.y, v.p.z - dz});
-            mesh.bounds.add({v.p.x + dx, v.p.y, v.p.z + dz});
-        }
+        mesh.bounds.low = scenery_bounds.low;
+        mesh.bounds.high = scenery_bounds.high;
         ++mesh_builds;
         double ms =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
                 .count();
-        std::fprintf(stderr, "[3D] mesh map=%d vertices=%zu bytes=%zu build=%.2fms resident=%zu\n",
+        std::fprintf(stderr, "[3D] mesh map=%d vertices=%zu bytes=%zu build=%.6fms resident=%zu\n",
                      id, mesh.count, mesh.count * sizeof(Vertex), ms, meshes.size());
     }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -963,6 +1203,7 @@ bool initialize(const GBContext *ctx) {
         varying SHADOW_PRECISION vec4 shadow_position;
         varying mediump vec3 direct_tint;
         varying SHADOW_PRECISION float shadow_bias;
+        uniform mediump float soft_contacts;
         uniform sampler2D image; uniform float xray; uniform mediump float fog_enabled; uniform mediump float sky;
         varying vec2 uv; varying vec4 tint; varying float distance_to_eye;
         SHADOW_PRECISION float visibility() {
@@ -1003,7 +1244,11 @@ bool initialize(const GBContext *ctx) {
                     c.rgb=mix(c.rgb,mix(vec3(0.68,0.79,0.75),vec3(0.86,0.60,0.46),dusk),smoothstep(18.0,70.0,distance_to_eye));
                 }
             }
-            if(c.a<0.08) discard;
+            // Only translucent geometry using the atlas's reserved white
+            // texel gets a continuous edge. ROM sprites retain alpha cutout.
+            bool contact=soft_contacts>0.5 && tint.a<=0.22 &&
+                         all(greaterThan(uv,vec2(511.0/512.0)));
+            if(c.a<0.08 && !contact) discard;
             if(daylight_enabled>0.5) {
                 float pane=glass*step(0.55,c.r)*step(0.55,c.g)*window_light;
                 vec3 light=lighting_tint;
@@ -1057,6 +1302,7 @@ bool initialize(const GBContext *ctx) {
     fade_loc = glGetUniformLocation(program, "fade_tone");
     dusk_loc = glGetUniformLocation(program, "dusk");
     wind_loc = glGetUniformLocation(program, "wind_time");
+    soft_contacts_loc = glGetUniformLocation(program, "soft_contacts");
     glGenBuffers(1, &buffer);
     glGenTextures(1, &atlas);
     glBindTexture(GL_TEXTURE_2D, atlas);
@@ -1428,6 +1674,7 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(program);
+    glUniform1f(soft_contacts_loc, frame.artistic ? 1.f : 0.f);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, atlas);
     glUniform2f(fade_loc, tone.multiply, tone.add);
@@ -1504,6 +1751,7 @@ void draw_world_frame(int w, int h, fade::Tone tone, bool hide_hero, bool allow_
     glBindTexture(GL_TEXTURE_2D, 0);
     glUniform1f(dusk_loc, 0);
     glUniform1f(wind_loc, 0);
+    glUniform1f(soft_contacts_loc, 0);
     glUniform1f(glGetUniformLocation(program, "daylight_enabled"), 0);
     glUniform1f(glGetUniformLocation(program, "shadow_enabled"), 0);
     glActiveTexture(GL_TEXTURE1);

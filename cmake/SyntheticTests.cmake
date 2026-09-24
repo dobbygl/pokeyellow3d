@@ -5,9 +5,14 @@
 
 get_target_property(gbrt_runtime_dir gbrt SOURCE_DIR)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME art_mesh_report COMMAND "${Python3_EXECUTABLE}" -B
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/art_mesh_report_test.py")
+set_tests_properties(art_mesh_report PROPERTIES LABELS synthetic)
+
 # Header-only state tests: kanto_rom.h, world_scene.h, pallet_state.h and
 # battle_state.h, the last two of which need the runtime's gbrt.h.
-foreach(synthetic_test exterior_geometry_test art_manifest_test rom_reader_synthetic terrain_synthetic view_synthetic battle_state_synthetic battle_phase_synthetic pc_details_test tile_animation_test world_animation_test daylight_test ui_preferences_test rom_font_test pokemon_menu_test item_menu_test dex_menu_test battle_bag_test options_menu_test trainer_card_test naming_menu_test)
+foreach(synthetic_test ambient_occlusion_test exterior_geometry_test art_manifest_test rom_reader_synthetic terrain_synthetic view_synthetic battle_state_synthetic battle_phase_synthetic pc_details_test tile_animation_test world_animation_test daylight_test ui_preferences_test rom_font_test pokemon_menu_test item_menu_test dex_menu_test battle_bag_test options_menu_test trainer_card_test naming_menu_test)
     add_executable(${synthetic_test} tests/${synthetic_test}.cpp)
     target_include_directories(${synthetic_test} PRIVATE src "${gbrt_runtime_dir}/include")
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

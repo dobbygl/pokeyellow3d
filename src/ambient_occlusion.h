@@ -163,7 +163,11 @@ class Field {
         if (!std::isfinite(ax + ay + az) || ax + ay + az < .001f)
             return 1;
         const int axis = ay >= ax && ay >= az ? 1 : ax >= az ? 0 : 2;
-        const float sign = (axis == 0 ? normal.x : axis == 1 ? normal.y : normal.z) > 0 ? 1 : -1;
+        const float sign = (axis == 0   ? normal.x
+                            : axis == 1 ? normal.y
+                                        : normal.z) > 0
+                               ? 1.f
+                               : -1.f;
         int covered = 0;
         for (float a : {-1.f, 1.f})
             for (float b : {-1.f, 1.f}) {

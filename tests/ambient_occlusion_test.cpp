@@ -22,13 +22,13 @@ float expected(const Field &field, Point p, Point normal, const std::vector<Box>
     const float ax = std::abs(normal.x), ay = std::abs(normal.y), az = std::abs(normal.z);
     Point n{}, u{}, v{};
     if (ay >= ax && ay >= az) {
-        n.y = normal.y > 0 ? 1 : -1;
+        n.y = normal.y > 0 ? 1.f : -1.f;
         u.x = v.z = 1;
     } else if (ax >= az) {
-        n.x = normal.x > 0 ? 1 : -1;
+        n.x = normal.x > 0 ? 1.f : -1.f;
         u.y = v.z = 1;
     } else {
-        n.z = normal.z > 0 ? 1 : -1;
+        n.z = normal.z > 0 ? 1.f : -1.f;
         u.x = v.y = 1;
     }
     int covered = 0;

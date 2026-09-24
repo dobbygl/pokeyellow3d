@@ -4,6 +4,13 @@ Base: `e089bd945a58d6fde9e552646ce554f906939749` (B2, PR #34).
 Referencia histórica: `7955aaa0ddbba3d9e2fd78085902be167faccf23`.
 Runtime: `00cc26dafb9a41ea9d935508e9fbe9e25b5f5a6e`.
 
+Integración posterior autorizada por el usuario: se incorpora `939c64d`
+(correcciones B2, PR #36). Se adapta A2 a la nueva construcción de volúmenes
+y exclusión del sólido propio. Los resultados de capturas, recorridos y
+rendimiento de este documento corresponden al código anterior a esa
+integración; no se atribuyen al nuevo algoritmo de oclusión. La integración
+conserva abiertos los criterios generales pendientes del plan.
+
 ## Alcance del cambio
 
 `src/interior_art.h` documenta 143 reglas por tileset y gráficos. Cubren las

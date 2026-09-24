@@ -1120,13 +1120,16 @@ python3 tests/art_b2_catalog_qa.py --smoke "$SMOKE_B2" \
   --rom "$ROM" --state "$PALLET_STATE" --output "$EVIDENCIA_PRIVADA"
 ctest --test-dir build -R 'ambient_|art_mesh_report|render_preview_synthetic' \
   --output-on-failure
-python3 tests/art_mesh_report.py --mode catalog \
-  --reference "$REF1" "$REF2" "$REF3" \
-  --candidate "$B2_1" "$B2_2" "$B2_3" --output "$INFORME"
+python3 tests/art_mesh_run.py --reference "$BENCH_7955AAA" --candidate build/art_benchmark \
+  --rom "$ROM" --state "$PALLET_STATE" --mode catalog --pairs 3 --output "$PARES"
+python3 tests/art_mesh_report.py --manifest "$PARES/manifest.json" --output "$INFORME"
 ```
 
 El informe de mallas exige tres pares completos, diez reconstrucciones por
 mapa y todas las muestras sin filtrado, y comprueba el límite por mapa.
+Solo acepta los logs descritos por el manifiesto de `art_mesh_run.py`, que
+comprueba el orden alternado de cada par, que las ejecuciones no se solapen,
+un binario distinto por papel y contenidos de log únicos.
 Su resultado numérico exige una revisión adicional de procedencia y entorno.
 El driver de benchmark comparte un adaptador de reloj independiente de las
 APIs de menús cambiantes, tanto en el candidato como en la referencia.
@@ -1142,6 +1145,49 @@ Informes locales: `build/qa/logs/b2-local-functional.json`,
 `b2-restored-ctest-inputs.json` y `b2-current-catalogs.json`.
 Estos resultados funcionales no cierran el presupuesto de B2 ni sustituyen
 las regresiones históricas completas de pantallas y recorridos.
+
+### B2 — correcciones de la revisión independiente (24 de septiembre)
+
+La revisión de la PR #34 demostró cuatro defectos de la oclusión integrada
+y un riesgo de invalidación. Todos se corrigen en esta rama; B2 sigue abierto.
+
+- Autooclusión: los sondeos se hacían desde el vértice redondeado a la
+  retícula de caché. Una cara podía caer dentro de su propio volumen: un
+  árbol aislado perdía luz en el 70 % de los vértices de copa y una tapa
+  superior expuesta llegaba a 0,68. Ahora los cuatro sondeos parten de la
+  posición exacta del vértice, desplazados 0,12 según la normal, y omiten
+  las celdas de los volúmenes del propio sólido. Sin caché, el resultado es
+  una función pura del vértice, independiente del orden de generación.
+- Volúmenes finos: una muestra solo contaba si su centro estaba dentro del
+  volumen, y troncos, carteles y postes de portal no ocupaban ninguna. La
+  ocupación es ahora conservadora: toda celda de la retícula tocada es sólida.
+- Invalidación: cualquier cambio en una malla residente reconstruía todas.
+  Cada malla guarda ahora los bloques de los vecinos bajo su halo; solo se
+  reconstruye si cambian. Un cambio en el centro del mapa reconstruye una
+  malla; uno en una costura, además la del vecino que la lee.
+- Perfil de contacto: la GPU interpola linealmente entre centro y borde; la
+  función y su prueba describen ahora ese perfil lineal.
+- El agua conserva su tono original, la vista de área de la Pokédex usa solo
+  bloques estáticos de la ROM y el estado de oclusión se limita a cada
+  construcción de malla.
+- `art_mesh_report.py` aceptaba tres copias idénticas de un log como tres
+  pares. Ahora exige el manifiesto de `art_mesh_run.py` y contenidos únicos.
+
+Pruebas: `ambient_occlusion_test` compara cada vértice de copas reales de C1
+con un oráculo flotante independiente. Un árbol aislado no pierde luz,
+dos árboles contiguos sí; caras fuera de la retícula y tapas expuestas dan
+1,0; los volúmenes finos se registran; las costuras coinciden en puntos
+arbitrarios. Dos controles negativos lo validan: sin exclusión del volumen
+propio o con la regla de centro anterior, la prueba falla.
+`render_preview_synthetic` comprueba en vivo que una escena estática no se
+reconstruye y cuenta 1 y 2 reconstrucciones para un cambio central y otro
+en costura. Su prueba nocturna solo pasaba porque el cartel del fixture no
+ocluía: ahora verifica que de noche no hay pasada de sombras y que el pase
+solo oscurece, dentro del límite de la oclusión.
+
+Los criterios de B2 siguen sin marcar: faltan catálogos y revisión visual
+con este código, baterías históricas, medición limpia de mallas y
+presentación con el nuevo ejecutor, y CI.
 
 ### A2 — clasificación implementada en rama separada (24 de septiembre)
 
@@ -1172,3 +1218,12 @@ idéntico. CI GCC, Clang, 2D, formato y Windows/MSVC con ANGLE en verde para
 `549b47c`. El catálogo estático de interiores mide 1,097× frente a `7955aaa`
 en tres pares alternados, con todas las muestras conservadas. Esta medida
 no cierra los recorridos animados/FP ni el presupuesto de mallas de B2.
+
+### A2 — integración autorizada sobre las correcciones B2
+
+El usuario solicita fusionar A2 a `main`. Se integra la PR #36 (`939c64d`)
+y se conserva su exclusión de autooclusión: tanto los volúmenes de oclusión
+como el sólido que emite la malla usan ahora la clasificación artística de
+A2. La autorización de integración no marca como cerrados los criterios
+pendientes. Las capturas, recorridos y tiempos anteriores corresponden a
+la base `e089bd9`; no certifican la nueva oclusión de la PR #36.

@@ -54,7 +54,11 @@ inline int interior_journey(GBContext *ctx, bool fp = false) {
     verify_bottom_overlay(run, "mother");
     run.require(pallet3d_input_mask() == 255, "conversation neutralizes relative movement");
     capture("mother-dialogue");
-    for (int i = 0; i < 12 && pallet::view(ctx) != pallet::View::Overworld; i++)
+    // The original mother script can include healing and more than one page.
+    // Wait for the engine's return, with the same bounded budget as other NPC
+    // interactions, rather than assuming twelve presses complete every save.
+    for (int frames = 0; frames < 1200 && pallet::view(ctx) != pallet::View::Overworld;
+         frames += 12)
         run.press("B", 12);
     run.require(pallet::view(ctx) == pallet::View::Overworld, "conversation returns to the room");
     run.move(37, 5, 6, "D");

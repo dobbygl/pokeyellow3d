@@ -845,10 +845,11 @@ void prepare_ambient(const GBContext *ctx, const pallet::Scene &current) {
             // The map being built already resolved its tiles for these blocks.
             if (scene.interior)
                 interior_occluders(scene, ix, iz,
-                                   own ? interior::classify_tiles(scene, ix, iz,
-                                                                  map_tiles(ix * 2, iz * 2),
-                                                                  map_tiles(ix * 2, iz * 2 + 1))
-                                       : interior::classify(ctx->rom, scene, ix, iz, &blocks),
+                                   own ? interior::classify_art_tiles(scene, ix, iz,
+                                                                      map_tiles(ix * 2, iz * 2),
+                                                                      map_tiles(ix * 2, iz * 2 + 1),
+                                                                      map_tiles(ix * 2 + 1, iz * 2))
+                                       : interior::classify_art(ctx->rom, scene, ix, iz, &blocks),
                                    boxes);
             else
                 cell_occluders(scene, ix, iz,
@@ -868,8 +869,12 @@ void interior_map(const pallet::Scene &scene) {
     std::array<bool, 256> averaged{};
     for (int z = 0; z < scene.height; z++)
         for (int x = 0; x < scene.width; x++) {
-            auto cell = interior::classify_tiles(scene, x, z, map_tiles(x * 2, z * 2),
-                                                 map_tiles(x * 2, z * 2 + 1));
+            auto cell = artistic_scene
+                            ? interior::classify_art_tiles(scene, x, z, map_tiles(x * 2, z * 2),
+                                                           map_tiles(x * 2, z * 2 + 1),
+                                                           map_tiles(x * 2 + 1, z * 2))
+                            : interior::classify_tiles(scene, x, z, map_tiles(x * 2, z * 2),
+                                                       map_tiles(x * 2, z * 2 + 1));
             ambient_self.clear();
             ambient_owner = {};
             interior_occluders(scene, x, z, cell, ambient_self);

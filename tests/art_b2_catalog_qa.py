@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Private B2 catalog captures: OFF vs parent and v0.4.1, ON vs parent.
+"""Private art catalog captures: OFF vs parent and v0.4.1, ON vs parent.
 
 This checks catalogs only, not the full interactive regression or timing gates.
-The reference helper must be built from 7955aaa; the parent from pre-B2 main.
+The reference helper must be built from 7955aaa; the parent from pre-phase main.
+--phase a2 also requires every exterior ON capture to match the parent.
 Never commit the output (ROM, states and ROM-derived captures).
 """
 import argparse
@@ -31,9 +32,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for key in ('smoke', 'parent', 'reference', 'rom', 'state', 'output'):
         parser.add_argument('--' + key, type=Path, required=True)
+    parser.add_argument('--phase', choices=('b2', 'a2'), default='b2')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    root = Path(tempfile.mkdtemp(prefix='b2-catalog-', dir=args.output.resolve()))
+    root = Path(tempfile.mkdtemp(prefix=args.phase + '-catalog-', dir=args.output.resolve()))
     print(root, flush=True)
     inputs = {}
     for key in ('smoke', 'parent', 'reference', 'rom', 'state'):
@@ -100,16 +102,19 @@ def main():
                         require(off == historical, f'OFF differs from 7955aaa: {style}/{kind}')
                     on = run('smoke', style, camera, kind, 'on')
                     parent_on = run('parent', style, camera, kind, 'on')
-                    require(on[1] == parent_on[1] == off[1], 'B2 changed the guest state')
+                    require(on[1] == parent_on[1] == off[1], 'Art changed the guest state')
                     require(on[0].keys() == parent_on[0].keys(), 'ON inventory mismatch')
-                    require(on[0] != parent_on[0], f'B2 never appeared: {camera}/{kind}')
+                    if args.phase == 'a2' and kind == 'catalog':
+                        require(on[0] == parent_on[0], f'A2 changed exteriors: {style}/{camera}')
+                    else:
+                        require(on[0] != parent_on[0], f'Art never appeared: {camera}/{kind}')
         status = 'PASS_CATALOGS_ONLY'
     except Exception as error:
         status = 'FAIL: ' + str(error)
         raise
     finally:
-        (root / 'result.json').write_text(json.dumps({'status': status, 'runs': results,
-            'scope': 'Catalogs only. FP compares pre-B2 parent; 7955aaa lacks FP preview API. '
+        (root / 'result.json').write_text(json.dumps({'status': status, 'phase': args.phase, 'runs': results,
+            'scope': 'Catalogs only. FP compares pre-phase parent; 7955aaa lacks FP preview API. '
                      'Historical FP journeys, full suites, visual review and performance remain separate.'},
             indent=2) + '\n')
     print(status, flush=True)

@@ -31,10 +31,33 @@ void frustum(Point center, float rx, float rz, float bottom, float top, float ra
              float rotation, Emit emit) {
     if (sides < 3 || sides > 8 || rx <= 0 || rz <= 0 || top <= bottom || ratio <= 0)
         return;
+    // A few (rotation, sides) pairs repeat for every tree and rock: keep their
+    // unit directions, computed by the same expression as before.
+    struct Directions {
+        float rotation;
+        int sides;
+        std::array<float, 8> cos, sin;
+    };
+    static std::array<Directions, 8> cache{};
+    static int cached = 0;
+    const Directions *unit = nullptr;
+    for (int i = 0; i < cached && !unit; ++i)
+        if (cache[i].rotation == rotation && cache[i].sides == sides)
+            unit = &cache[i];
+    Directions local{rotation, sides, {}, {}};
+    for (int i = 0; !unit && i < sides; ++i) {
+        const float angle = rotation + float(i) * 6.28318530718f / float(sides);
+        local.cos[i] = std::cos(angle);
+        local.sin[i] = std::sin(angle);
+    }
+    if (!unit) {
+        if (cached < int(cache.size()))
+            cache[cached++] = local;
+        unit = &local;
+    }
     std::array<Point, 8> low{}, high{};
     for (int i = 0; i < sides; ++i) {
-        const float angle = rotation + float(i) * 6.28318530718f / float(sides);
-        const float dx = std::cos(angle) * rx, dz = std::sin(angle) * rz;
+        const float dx = unit->cos[i] * rx, dz = unit->sin[i] * rz;
         low[i] = {center.x + dx, bottom, center.z + dz};
         high[i] = {center.x + dx * ratio, top, center.z + dz * ratio};
     }

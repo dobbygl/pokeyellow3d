@@ -269,6 +269,15 @@ if(CMAKE_PROJECT_NAME STREQUAL "pokeyellow")
             "${CMAKE_CURRENT_BINARY_DIR}/qa/art-fixtures/five-maps.state" ortho off -1)
         set_tests_properties(art_benchmark_fixture PROPERTIES
             LABELS rom SKIP_RETURN_CODE 77 ENVIRONMENT "${preview_environment}")
+        foreach(catalog_mode catalog interior-catalog)
+            add_test(NAME ambient_${catalog_mode}_fixture COMMAND art_benchmark
+                "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc"
+                "${CMAKE_CURRENT_BINARY_DIR}/qa/art-fixtures/pallet.state"
+                mesh-${catalog_mode} on -1)
+            set_tests_properties(ambient_${catalog_mode}_fixture PROPERTIES
+                LABELS rom SKIP_RETURN_CODE 77 RUN_SERIAL TRUE
+                ENVIRONMENT "${preview_environment}")
+        endforeach()
         if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc")
             add_test(NAME rom_font_cartridge COMMAND rom_font_test "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc")
             add_test(NAME rom_font_vram COMMAND rom_font_test "${CMAKE_CURRENT_BINARY_DIR}/roms/pokeyellow.gbc" "${CMAKE_CURRENT_BINARY_DIR}/qa/ui/font.vram")

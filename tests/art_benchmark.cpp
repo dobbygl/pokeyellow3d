@@ -8,7 +8,7 @@ extern "C" {
 #include "pallet_state.h"
 #include "assets_manifest_pokeyellow.h"
 #include "read_only_memory.h"
-#include "qa_presentation_clock.h"
+#include "art_benchmark_clock.h"
 #include <SDL_opengles2.h>
 #include <chrono>
 #include <cmath>
@@ -25,8 +25,9 @@ int main(int argc, char **argv) {
     // Keep each measurement intact when renderer diagnostics share the log.
     std::setvbuf(stdout, nullptr, _IOLBF, 0);
     if (argc != 6 && argc != 7) {
-        std::fprintf(stderr, "Usage: art_benchmark ROM STATE catalog|interior-catalog|ortho|fp "
-                             "off|on HOUR(-1 disables) [animate]\n");
+        std::fprintf(stderr, "Usage: art_benchmark ROM STATE catalog|interior-catalog|ortho|fp|"
+                             "mesh-catalog|mesh-interior-catalog off|on HOUR(-1 disables) "
+                             "[animate]\n");
         return 2;
     }
     const bool art = !std::strcmp(argv[4], "on");
@@ -38,7 +39,12 @@ int main(int argc, char **argv) {
         return 2;
     }
 #endif
-    const std::string mode = argv[3];
+    std::string mode = argv[3];
+    // Mesh modes rebuild each catalog map in isolation: the GPU is idle before
+    // the build, so the renderer's own build stamp excludes in-flight frames.
+    const bool mesh = mode == "mesh-catalog" || mode == "mesh-interior-catalog";
+    if (mesh)
+        mode = mode.substr(5);
     const bool catalog = mode == "catalog" || mode == "interior-catalog";
     const bool animate = argc == 7 && !std::strcmp(argv[6], "animate");
     if (argc == 7 && (!animate || catalog))
@@ -67,7 +73,7 @@ int main(int argc, char **argv) {
     config.model = config.cartridge_supports_cgb ? GB_MODEL_CGB : GB_MODEL_DMG;
     config.cgb_compatibility_mode = false;
     GBContext *ctx = gb_context_create(&config);
-    if (!ctx || !qa_clock::install() || !gb_platform_init(5))
+    if (!ctx || !benchmark_clock::install() || !gb_platform_init(5))
         return 4;
     struct Shutdown {
         ~Shutdown() {
@@ -136,6 +142,30 @@ int main(int argc, char **argv) {
                !std::memcmp(immutable_rom.data(), ctx->rom, immutable_rom.size());
     };
     std::printf("[ART-GPU] %s\n", glGetString(GL_RENDERER));
+    if (mesh) {
+        constexpr int Repeats = 10;
+        for (size_t index = 0; index < maps.size(); ++index) {
+            const int id = maps[index], other = maps[(index + 1) % maps.size()];
+            for (int repeat = 0; repeat < Repeats; ++repeat) {
+                // Leaving the map deletes its mesh; returning rebuilds it.
+                pallet3d_preview(other);
+                if (!render())
+                    return 8;
+                glFinish();
+                std::printf("[ART-MESH] mode=%s map=%d repeat=%d\n", mode.c_str(), id, repeat);
+                const auto before = pallet3d_stats().mesh_builds;
+                pallet3d_preview(id);
+                if (!render())
+                    return 8;
+                glFinish();
+                const auto stats = pallet3d_stats();
+                if (stats.mesh_builds != before + 1 || stats.resident_maps != 1 || !stats.vertices)
+                    return 9;
+            }
+        }
+        std::puts("PASS: isolated mesh builds, memory intact and zero GL errors per frame");
+        return 0;
+    }
     for (int id : maps) {
         if (catalog)
             pallet3d_preview(id);

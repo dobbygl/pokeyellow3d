@@ -125,6 +125,12 @@ unsigned active_frames = 0;
 std::vector<Vertex> scenery, vertices;
 art::ambient::Field ambient_field;
 bool ambient_ready = false;
+// While a solid emits its faces, its own volumes are excluded from their
+// probes; receivers are off for surfaces that keep their original shade.
+using AmbientBoxes = std::vector<art::ambient::Box>;
+AmbientBoxes ambient_self;
+art::ambient::Field::Owner ambient_owner;
+bool ambient_receiver = true;
 std::map<int, std::vector<uint8_t>> resident_blocks;
 std::vector<Vertex> shadow_hero;
 struct Mesh {
@@ -133,6 +139,8 @@ struct Mesh {
     std::vector<uint8_t> blocks, pending;
     bool artistic = false;
     sunlight::Bounds bounds;
+    // Neighbour blocks under this mesh's AO halo cells (artistic only).
+    std::vector<std::pair<int, std::vector<uint8_t>>> halo;
 };
 std::map<int, Mesh> meshes;
 std::vector<int> visible_maps;
@@ -309,7 +317,8 @@ void emit_quad(std::vector<Vertex> &v, const std::array<Corner, 6> &corners, Col
     const size_t start = v.size();
     v.resize(start + count);
     Vertex *out = v.data() + start;
-    const bool ambient = ambient_ready && &v == &scenery && color.a >= 1 && emissive == 0;
+    const bool ambient =
+        ambient_ready && ambient_receiver && &v == &scenery && color.a >= 1 && emissive == 0;
     std::array<float, 3> first_ao{};
     for (int i = 0; i < count; ++i, ++out) {
         out->p = corners[i].p;
@@ -318,10 +327,11 @@ void emit_quad(std::vector<Vertex> &v, const std::array<Corner, 6> &corners, Col
         out->c = color;
         if (ambient) {
             // The second triangle repeats corners zero and two exactly.
-            const float ao = i == 3   ? first_ao[0]
-                             : i == 4 ? first_ao[2]
-                                      : ambient_field.visibility({out->p.x, out->p.y, out->p.z},
-                                                                 {normal.x, normal.y, normal.z});
+            const float ao =
+                i == 3   ? first_ao[0]
+                : i == 4 ? first_ao[2]
+                         : ambient_field.visibility({out->p.x, out->p.y, out->p.z},
+                                                    {normal.x, normal.y, normal.z}, ambient_owner);
             if (i < 3)
                 first_ao[i] = ao;
             out->c.r *= ao;
@@ -699,15 +709,84 @@ void resolve_tiles(const GBContext *ctx, const pallet::Scene &scene,
         }
 }
 
-// A local halo includes solids across map boundaries. All participating maps
-// use the same staged block snapshots as their meshes, including live Cut.
-// These are presentation volumes, never guest collision or movement data.
-void prepare_ambient(const GBContext *ctx, const pallet::Scene &current) {
-    ambient_ready = false;
-    if (!artistic_scene)
+// Presentation volumes of one cell or building, in world coordinates. The
+// ambient field and the self-exclusion of each emitting solid share these
+// exact boxes. Never guest collision or movement data.
+void house_occluders(const pallet::Scene &scene, const pallet::House &house, AmbientBoxes &out) {
+    const float x = scene.origin_x + house.x, z = scene.origin_z + house.z;
+    out.push_back(
+        {{x + .05f, 0, z + .05f}, {x + house.w - .05f, house.eave - .08f, z + house.d - .05f}});
+    out.push_back({{x, house.eave - .08f, z}, {x + house.w, house.eave, z + house.d}});
+}
+void cell_occluders(const pallet::Scene &scene, int ix, int iz, pallet::Terrain terrain,
+                    AmbientBoxes &out) {
+    const auto *policy = art::find(terrain);
+    if (!policy || policy->occlusion != art::Occlusion::Solid)
         return;
-    ambient_field.reset(current.origin_x - 1, current.origin_z - 1, current.width + 2,
-                        current.height + 2);
+    const float x = float(scene.origin_x + ix), z = float(scene.origin_z + iz);
+    auto add = [&](float left, float back, float w, float d, float bottom, float top) {
+        out.push_back({{left, bottom, back}, {left + w, top, back + d}});
+    };
+    switch (terrain) {
+    case pallet::Terrain::Tree:
+    case pallet::Terrain::CutTree:
+    case pallet::Terrain::TallTree: {
+        const bool tall = terrain == pallet::Terrain::TallTree;
+        const float width = tall ? 2.f : 1.f;
+        add(x + width * .4f, z + width * .4f, width * .2f, width * .2f, 0, tall ? .95f : .65f);
+        add(x + width * .12f, z + width * .12f, width * .76f, width * .76f, tall ? .85f : .5f,
+            tall ? 2.5f : 1.6f);
+        break;
+    }
+    case pallet::Terrain::Rock:
+        add(x + .15f, z + .18f, .7f, .64f, 0, .58f);
+        break;
+    case pallet::Terrain::Wall:
+        add(x, z, 1, 1, 0, 1.15f);
+        break;
+    case pallet::Terrain::Pillar:
+        add(x + .16f, z + .16f, .68f, .68f, 0, 1.65f);
+        break;
+    case pallet::Terrain::Fence:
+        add(x, z + .55f, 1, .14f, .25f, .65f);
+        break;
+    case pallet::Terrain::Sign:
+        add(x + .1f, z + .4f, .8f, .16f, .45f, .98f);
+        break;
+    case pallet::Terrain::Portal:
+        add(x - .1f, z + .65f, .18f, .35f, 0, 1.7f);
+        add(x + .92f, z + .65f, .18f, .35f, 0, 1.7f);
+        add(x - .1f, z + .65f, 1.2f, .35f, 1.7f, 1.9f);
+        break;
+    default:
+        break;
+    }
+}
+void interior_occluders(const pallet::Scene &scene, int ix, int iz, const interior::Cell &cell,
+                        AmbientBoxes &out) {
+    const auto *policy = art::find(cell.kind);
+    if (policy && policy->occlusion == art::Occlusion::Solid && cell.height > 0)
+        out.push_back(
+            {{float(scene.origin_x + ix), 0, float(scene.origin_z + iz)},
+             {float(scene.origin_x + ix + 1), cell.height, float(scene.origin_z + iz + 1)}});
+}
+// Cells of `scene` whose solids can reach the AO halo of `current`: up to one
+// cell around it, plus two for volumes that start before their cell.
+template <typename Visit>
+void halo_cells(const pallet::Scene &current, const pallet::Scene &scene, Visit visit) {
+    for (int iz = 0; iz < scene.height; ++iz)
+        for (int ix = 0; ix < scene.width; ++ix) {
+            const float x = float(scene.origin_x + ix), z = float(scene.origin_z + iz);
+            if (x + 2 < current.origin_x - 1 || z + 2 < current.origin_z - 1 ||
+                x > current.origin_x + current.width + 1 ||
+                z > current.origin_z + current.height + 1)
+                continue;
+            visit(ix, iz);
+        }
+}
+// Maps whose solids can reach a map's AO halo: itself and same-component
+// exteriors overlapping it by up to one cell.
+template <typename Visit> void ambient_halo(const pallet::Scene &current, Visit visit) {
     for (const auto &entry : pallet::catalog->maps) {
         const auto &scene = entry.second;
         if (scene.id != current.id &&
@@ -719,71 +798,67 @@ void prepare_ambient(const GBContext *ctx, const pallet::Scene &current) {
             scene.origin_z + scene.height < current.origin_z - 1)
             continue;
         const auto live = resident_blocks.find(scene.id);
-        const auto &blocks = live == resident_blocks.end() ? scene.block_data : live->second;
-        auto add = [&](float x, float z, float w, float d, float bottom, float top) {
-            ambient_field.add({{x, bottom, z}, {x + w, top, z + d}});
-        };
-        if (!scene.interior)
-            for (const auto &house : pallet::houses(scene)) {
-                const float x = scene.origin_x + house.x, z = scene.origin_z + house.z;
-                add(x + .05f, z + .05f, house.w - .1f, house.d - .1f, 0, house.eave - .08f);
-                add(x, z, house.w, house.d, house.eave - .08f, house.eave);
-            }
-        for (int iz = 0; iz < scene.height; ++iz)
-            for (int ix = 0; ix < scene.width; ++ix) {
-                const float x = float(scene.origin_x + ix), z = float(scene.origin_z + iz);
-                if (x + 2 < current.origin_x - 1 || z + 2 < current.origin_z - 1 ||
-                    x > current.origin_x + current.width + 1 ||
-                    z > current.origin_z + current.height + 1)
-                    continue;
-                if (scene.interior) {
-                    const auto cell = interior::classify(ctx->rom, scene, ix, iz, &blocks);
-                    const auto *policy = art::find(cell.kind);
-                    if (policy && policy->occlusion == art::Occlusion::Solid && cell.height > 0)
-                        add(x, z, 1, 1, 0, cell.height);
-                    continue;
-                }
-                const auto terrain = pallet::terrain(ctx->rom, scene, ix, iz, &blocks);
-                const auto *policy = art::find(terrain);
-                if (!policy || policy->occlusion != art::Occlusion::Solid)
-                    continue;
-                switch (terrain) {
-                case pallet::Terrain::Tree:
-                case pallet::Terrain::CutTree:
-                case pallet::Terrain::TallTree: {
-                    const bool tall = terrain == pallet::Terrain::TallTree;
-                    const float width = tall ? 2.f : 1.f;
-                    add(x + width * .4f, z + width * .4f, width * .2f, width * .2f, 0,
-                        tall ? .95f : .65f);
-                    add(x + width * .12f, z + width * .12f, width * .76f, width * .76f,
-                        tall ? .85f : .5f, tall ? 2.5f : 1.6f);
-                    break;
-                }
-                case pallet::Terrain::Rock:
-                    add(x + .15f, z + .18f, .7f, .64f, 0, .58f);
-                    break;
-                case pallet::Terrain::Wall:
-                    add(x, z, 1, 1, 0, 1.15f);
-                    break;
-                case pallet::Terrain::Pillar:
-                    add(x + .16f, z + .16f, .68f, .68f, 0, 1.65f);
-                    break;
-                case pallet::Terrain::Fence:
-                    add(x, z + .55f, 1, .14f, .25f, .65f);
-                    break;
-                case pallet::Terrain::Sign:
-                    add(x + .1f, z + .4f, .8f, .16f, .45f, .98f);
-                    break;
-                case pallet::Terrain::Portal:
-                    add(x - .1f, z + .65f, .18f, .35f, 0, 1.7f);
-                    add(x + .92f, z + .65f, .18f, .35f, 0, 1.7f);
-                    add(x - .1f, z + .65f, 1.2f, .35f, 1.7f, 1.9f);
-                    break;
-                default:
-                    break;
-                }
-            }
+        visit(scene, live == resident_blocks.end() ? scene.block_data : live->second);
     }
+}
+// Blocks of other maps under a map's AO halo cells, in a fixed visit order.
+// Empty without the artistic pass. Reuses the key's storage between frames.
+using HaloKey = std::vector<std::pair<int, std::vector<uint8_t>>>;
+HaloKey halo_scratch;
+void halo_key(const pallet::Scene &scene, HaloKey &key) {
+    size_t used = 0;
+    if (artistic_scene)
+        ambient_halo(scene, [&](const pallet::Scene &other, const std::vector<uint8_t> &blocks) {
+            if (other.id == scene.id)
+                return;
+            if (used == key.size())
+                key.emplace_back();
+            auto &entry = key[used++];
+            entry.first = other.id;
+            entry.second.clear();
+            halo_cells(scene, other, [&](int ix, int iz) {
+                entry.second.push_back(blocks[size_t(iz / 2) * (other.width / 2) + ix / 2]);
+            });
+        });
+    key.resize(used);
+}
+
+// A local halo includes solids across map boundaries. All participating maps
+// use the same staged block snapshots as their meshes, including live Cut.
+void prepare_ambient(const GBContext *ctx, const pallet::Scene &current) {
+    ambient_ready = false;
+    ambient_self.clear();
+    ambient_owner = {};
+    ambient_receiver = true;
+    if (!artistic_scene)
+        return;
+    ambient_field.reset(current.origin_x - 1, current.origin_z - 1, current.width + 2,
+                        current.height + 2);
+    AmbientBoxes boxes;
+    ambient_halo(current, [&](const pallet::Scene &scene, const std::vector<uint8_t> &blocks) {
+        boxes.clear();
+        if (!scene.interior)
+            for (const auto &house : pallet::houses(scene))
+                house_occluders(scene, house, boxes);
+        const bool own = scene.id == current.id;
+        halo_cells(current, scene, [&](int ix, int iz) {
+            // The map being built already resolved its tiles for these blocks.
+            if (scene.interior)
+                interior_occluders(scene, ix, iz,
+                                   own ? interior::classify_tiles(scene, ix, iz,
+                                                                  map_tiles(ix * 2, iz * 2),
+                                                                  map_tiles(ix * 2, iz * 2 + 1))
+                                       : interior::classify(ctx->rom, scene, ix, iz, &blocks),
+                                   boxes);
+            else
+                cell_occluders(scene, ix, iz,
+                               own ? map_tiles.cell(ix, iz)
+                                   : pallet::terrain(ctx->rom, scene, ix, iz, &blocks),
+                               boxes);
+        });
+        for (const auto &box : boxes)
+            ambient_field.add(box);
+    });
     ambient_ready = true;
 }
 
@@ -795,6 +870,10 @@ void interior_map(const pallet::Scene &scene) {
         for (int x = 0; x < scene.width; x++) {
             auto cell = interior::classify_tiles(scene, x, z, map_tiles(x * 2, z * 2),
                                                  map_tiles(x * 2, z * 2 + 1));
+            ambient_self.clear();
+            ambient_owner = {};
+            interior_occluders(scene, x, z, cell, ambient_self);
+            ambient_owner = ambient_field.owner(ambient_self.data(), ambient_self.size());
             if (artistic_scene)
                 cell.kind = art::find(cell.kind)->reference_mesh;
             if (cell.height <= 0)
@@ -843,9 +922,23 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
     scenery_bounds.reset();
     resolve_tiles(ctx, scene, blocks);
     prepare_ambient(ctx, scene);
+    // AO state belongs to this build only; later writers never inherit it.
+    struct AmbientScope {
+        ~AmbientScope() {
+            ambient_ready = false;
+            ambient_self.clear();
+            ambient_owner = {};
+            ambient_receiver = true;
+        }
+    } ambient_scope;
     for (int tz = 0; tz < scene.height * 2; tz++)
         for (int tx = 0; tx < scene.width * 2; tx++) {
             int tile = map_tiles(tx, tz);
+            // Water keeps its original shade, as its animation does.
+            ambient_receiver =
+                scene.interior
+                    ? !(interior::cave(scene) && map_tiles(tx / 2 * 2, tz / 2 * 2 + 1) == 0x14)
+                    : map_tiles.cell(tx / 2, tz / 2) != pallet::Terrain::Water;
             if (!scene.interior && map_tiles.cleared[size_t(tz / 2) * scene.width + tx / 2])
                 tile = scene.tileset == 3 ? 0x30 : scene.tileset == 23 ? 0x23 : 0x2c;
             float x = scene.origin_x + tx * .5f, z = scene.origin_z + tz * .5f;
@@ -853,20 +946,33 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
                  tile_uv(scene, tile, floor_palette(scene, tile)));
             scenery_bounds.fold(scenery);
         }
+    ambient_receiver = true;
     if (scene.interior) {
         interior_map(scene);
+        ambient_self.clear();
+        ambient_owner = {};
         box(scenery, 0, 0, float(scene.width), float(scene.height), -.35f, -.015f,
             {.32f, .36f, .34f});
         return;
     }
     for (auto h : pallet::houses(scene)) {
+        ambient_self.clear();
+        ambient_owner = {};
+        house_occluders(scene, h, ambient_self);
+        ambient_owner = ambient_field.owner(ambient_self.data(), ambient_self.size());
         make_house(scene, h, blocks);
         scenery_bounds.fold(scenery);
     }
+    ambient_self.clear();
+    ambient_owner = {};
     for (int iz = 0; iz < scene.height; iz++)
         for (int ix = 0; ix < scene.width; ix++) {
             float x = float(ix + scene.origin_x), z = float(iz + scene.origin_z);
             auto type = map_tiles.cell(ix, iz);
+            ambient_self.clear();
+            ambient_owner = {};
+            cell_occluders(scene, ix, iz, type, ambient_self);
+            ambient_owner = ambient_field.owner(ambient_self.data(), ambient_self.size());
             if (artistic_scene)
                 type = art::find(type)->reference_mesh;
             UV foliage = tile_uv(scene, scene.tileset == 3 ? 0x16 : 0x41);
@@ -1017,6 +1123,8 @@ void create_map(const GBContext *ctx, const pallet::Scene &scene,
             }
             scenery_bounds.fold(scenery);
         }
+    ambient_self.clear();
+    ambient_owner = {};
     box(scenery, float(scene.origin_x), float(scene.origin_z), float(scene.width),
         float(scene.height), -.8f, -.015f, {.42f, .48f, .34f});
 }
@@ -1045,7 +1153,6 @@ void update_meshes(const GBContext *ctx) {
             ++it;
     }
     resident_blocks.clear();
-    bool ambient_changed = false;
     for (int id : visible_maps) {
         const auto &scene = *pallet::scene(id);
         auto blocks = scene.block_data;
@@ -1064,15 +1171,17 @@ void update_meshes(const GBContext *ctx) {
             // Keep the previous valid mesh until the incoming buffer is stable.
             blocks = mesh.buffer ? mesh.blocks : scene.block_data;
         }
-        ambient_changed |= !mesh.buffer || mesh.blocks != blocks || mesh.artistic != artistic_scene;
         resident_blocks.emplace(id, std::move(blocks));
     }
     for (int id : visible_maps) {
         const auto &scene = *pallet::scene(id);
         auto &blocks = resident_blocks.at(id);
         auto &mesh = meshes[id];
+        // AO reads neighbours within one cell: only a change in their blocks
+        // under this map's halo (a staged buffer, Cut near a seam) rebuilds it.
+        halo_key(scene, halo_scratch);
         if (mesh.buffer && mesh.blocks == blocks && mesh.artistic == artistic_scene &&
-            !(artistic_scene && ambient_changed))
+            mesh.halo == halo_scratch)
             continue;
         auto start = std::chrono::steady_clock::now();
         create_map(ctx, scene, blocks);
@@ -1084,6 +1193,7 @@ void update_meshes(const GBContext *ctx) {
         mesh.count = scenery.size();
         mesh.blocks = blocks;
         mesh.artistic = artistic_scene;
+        mesh.halo = halo_scratch;
         scenery_bounds.fold(scenery);
         mesh.bounds = {};
         mesh.bounds.low = scenery_bounds.low;

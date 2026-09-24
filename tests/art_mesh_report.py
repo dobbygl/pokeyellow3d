@@ -57,6 +57,42 @@ def parse(text, mode):
     return gpu[0], maps
 
 
+def schedule(manifest_path):
+    """Logs in execution order, checked against art_mesh_run.py's manifest.
+
+    Requires at least three complete pairs, alternating order per pair,
+    non-overlapping runs, one binary per role (different between roles) and
+    distinct log contents: a copied log can never stand in for a new run.
+    """
+    manifest_path = Path(manifest_path)
+    manifest = json.loads(manifest_path.read_text())
+    runs = manifest["runs"]
+    pairs = len(runs) // 2
+    require(len(runs) == 2 * pairs and pairs >= 3, "at least three complete pairs are required")
+    binaries = {}
+    contents = set()
+    reference, candidate = [], []
+    for index, run in enumerate(runs):
+        pair = index // 2
+        expected = ("reference", "candidate") if pair % 2 == 0 else ("candidate", "reference")
+        require(run["pair"] == pair and run["role"] == expected[index % 2],
+                "runs are not alternating pairs in execution order")
+        require(run["started_unix"] < run["ended_unix"], "invalid run interval")
+        if index:
+            require(runs[index - 1]["ended_unix"] <= run["started_unix"], "runs overlap")
+        require(binaries.setdefault(run["role"], run["binary_sha256"]) == run["binary_sha256"],
+                "binary changed within a role")
+        path = manifest_path.parent / run["log"]
+        raw = path.read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        require(digest == run["log_sha256"], "log does not match its manifest hash")
+        require(digest not in contents, "duplicate log content")
+        contents.add(digest)
+        (reference if run["role"] == "reference" else candidate).append(path)
+    require(binaries["reference"] != binaries["candidate"], "reference and candidate are one binary")
+    return manifest, reference, candidate
+
+
 def compare(reference, candidate, mode):
     require(len(reference) == len(candidate) and len(reference) >= 3,
             "at least three complete pairs are required")
@@ -72,6 +108,7 @@ def compare(reference, candidate, mode):
             require(key not in files, "a log was supplied more than once")
             raw = path.read_bytes()
             files[key] = hashlib.sha256(raw).hexdigest()
+            require(list(files.values()).count(files[key]) == 1, "duplicate log content")
             gpu, rows = parse(raw.decode(), mode)
             gpu_names.add(gpu)
             require(roster is None or set(rows) == roster, "map inventory differs")
@@ -97,13 +134,15 @@ def compare(reference, candidate, mode):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("catalog", "interior-catalog"), required=True)
-    parser.add_argument("--reference", nargs="+", type=Path, required=True)
-    parser.add_argument("--candidate", nargs="+", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True,
+                        help="manifest.json written by art_mesh_run.py")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        report = compare(args.reference, args.candidate, args.mode)
+        manifest, reference, candidate = schedule(args.manifest)
+        report = compare(reference, candidate, manifest["mode"])
+        report["manifest"] = str(args.manifest.resolve())
+        report["manifest_sha256"] = hashlib.sha256(args.manifest.read_bytes()).hexdigest()
         with args.output.open("x") as stream:
             json.dump(report, stream, indent=2)
             stream.write("\n")

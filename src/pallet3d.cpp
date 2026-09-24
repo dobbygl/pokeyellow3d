@@ -737,7 +737,7 @@ void prepare_ambient(const GBContext *ctx, const pallet::Scene &current) {
                     z > current.origin_z + current.height + 1)
                     continue;
                 if (scene.interior) {
-                    const auto cell = interior::classify(ctx->rom, scene, ix, iz, &blocks);
+                    const auto cell = interior::classify_art(ctx->rom, scene, ix, iz, &blocks);
                     const auto *policy = art::find(cell.kind);
                     if (policy && policy->occlusion == art::Occlusion::Solid && cell.height > 0)
                         add(x, z, 1, 1, 0, cell.height);
@@ -793,8 +793,12 @@ void interior_map(const pallet::Scene &scene) {
     std::array<bool, 256> averaged{};
     for (int z = 0; z < scene.height; z++)
         for (int x = 0; x < scene.width; x++) {
-            auto cell = interior::classify_tiles(scene, x, z, map_tiles(x * 2, z * 2),
-                                                 map_tiles(x * 2, z * 2 + 1));
+            auto cell = artistic_scene
+                            ? interior::classify_art_tiles(scene, x, z, map_tiles(x * 2, z * 2),
+                                                           map_tiles(x * 2, z * 2 + 1),
+                                                           map_tiles(x * 2 + 1, z * 2))
+                            : interior::classify_tiles(scene, x, z, map_tiles(x * 2, z * 2),
+                                                       map_tiles(x * 2, z * 2 + 1));
             if (artistic_scene)
                 cell.kind = art::find(cell.kind)->reference_mesh;
             if (cell.height <= 0)

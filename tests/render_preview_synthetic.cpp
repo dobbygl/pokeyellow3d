@@ -294,6 +294,108 @@ int main() {
             glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
             check(rgba == room_off, "disabling AO restores every room pixel");
         }
+        // A2 geometry oracle: the old classifier leaves a procedural machine
+        // block flat. AO alone cannot increase its vertex count. Keep every
+        // other cell unchanged and exercise both cameras and the FBO fallback.
+        pallet3d_shutdown();
+        const auto room_header = pallet::scene(plan.interior)->header;
+        std::copy_n(machine.image.begin() + kanto::TilesetHeaders + 12, 12,
+                    machine.image.begin() + kanto::TilesetHeaders + 22 * 12);
+        machine.image[room_header] = 22;
+        for (int i = 0; i < 16; ++i)
+            machine.image[indoor_blocks + 2 * 16 + i] = i / 4 % 2 ? 0x4c : 0x4a;
+        pallet::catalog.reset();
+        check(pallet::load_catalog(ctx->rom, ctx->rom_size), "load A2 machine fixture");
+        check(pallet::ensure_scene(plan.interior) != nullptr, "load A2 room");
+        for (bool fp : {false, true}) {
+            pallet3d_shutdown();
+            pallet3d_artistic(false);
+            pallet3d_preview(plan.interior, fp);
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            const auto off = rgba;
+            const auto flat_vertices = pallet3d_stats().vertices;
+            const auto builds = pallet3d_stats().mesh_builds;
+            Snapshot unchanged{machine};
+            pallet3d_artistic(true);
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            check(pallet3d_stats().vertices > flat_vertices && rgba != off,
+                  "A2 creates visible machine geometry, not only ambient shading");
+            frame();
+            check(pallet3d_stats().mesh_builds == builds + 1,
+                  "A2 toggle rebuilds once and stable frames reuse the mesh");
+            pallet3d_artistic(false);
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            check(rgba == off && pallet3d_stats().vertices == flat_vertices,
+                  "A2 OFF restores every pixel and the original flat geometry");
+            check(unchanged.unchanged(machine) && glGetError() == GL_NO_ERROR,
+                  "A2 toggles preserve guest state and OpenGL");
+
+            pallet3d_shutdown();
+            check(!shadow_map::initialize([](GLenum, const char *) -> GLuint { return 0; },
+                                          [](GLuint, GLuint) {}),
+                  "A2 negative case fails a real incomplete shadow framebuffer");
+            pallet3d_artistic(true);
+            pallet3d_preview(plan.interior, fp);
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            check(rgba == off && pallet3d_stats().vertices == flat_vertices &&
+                      !pallet3d_shadows().artistic_scene,
+                  "A2 FBO failure falls back completely, including new classified objects");
+            check(unchanged.unchanged(machine) && glGetError() == GL_NO_ERROR,
+                  "A2 fallback preserves guest state and OpenGL");
+        }
+        // Visibility oracle on a walkable cell immediately behind the new
+        // machine block. A procedural opaque sprite must still reach the GPU
+        // surface from each room angle (including the existing x-ray path).
+        pallet3d_shutdown();
+        constexpr size_t SpriteCommands = 0x3000;
+        machine.image[pallet::FacingTable] = SpriteCommands & 255;
+        machine.image[pallet::FacingTable + 1] = SpriteCommands >> 8;
+        machine.image[SpriteCommands] = 4;
+        for (int i = 0; i < 4; ++i) {
+            const size_t command = SpriteCommands + 1 + size_t(i) * 4;
+            machine.image[command] = uint8_t(i / 2 * 8);
+            machine.image[command + 1] = uint8_t(i % 2 * 8);
+            machine.image[command + 2] = uint8_t(i);
+            machine.image[command + 3] = 0;
+        }
+        machine.place_player(plan.interior, 4, 3, 0);
+        pallet3d_artistic(true);
+        pallet3d_preview(-1);
+        frame();
+        pallet3d_poll_controls(ctx, false);
+        SDL_Event turn{};
+        turn.type = SDL_KEYDOWN;
+        turn.key.keysym.scancode = SDL_SCANCODE_Q;
+        for (int i = 0; i < 10; ++i)
+            check(pallet3d_event(&turn, false), "room rotation handles the camera key");
+        turn.key.keysym.scancode = SDL_SCANCODE_E;
+        for (int angle = 0; angle < 4; ++angle) {
+            machine.vram.fill(0);
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            const auto without_sprite = rgba;
+            for (size_t byte = 0; byte < 4 * 16; byte += 2)
+                machine.vram[byte] = 255;
+            Snapshot unchanged{machine};
+            frame();
+            glReadPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            size_t visible_pixels = 0;
+            for (size_t i = 0; i < rgba.size(); i += 4)
+                visible_pixels += std::memcmp(rgba.data() + i, without_sprite.data() + i, 3) != 0;
+            check(visible_pixels > 20 && pallet3d_camera().player_drawn,
+                  "player remains visible beside A2 furniture from every tested room angle");
+            check(unchanged.unchanged(machine) && glGetError() == GL_NO_ERROR,
+                  "A2 player visibility frame preserves guest and OpenGL");
+            for (int i = 0; i < 3; ++i)
+                check(pallet3d_event(&turn, false), "room rotation remains available");
+        }
+        std::copy(original_image.begin(), original_image.end(), machine.image.begin());
+        machine.vram.fill(0);
+        machine.place_player(plan.home, 4, 4, 0);
         // Restore the television block before the remaining live/fallback QA.
         pallet3d_shutdown();
         std::copy_n(original_image.begin() + indoor_blocks + 2 * 16, 16,

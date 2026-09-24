@@ -1,7 +1,8 @@
 # Plan: pase artístico e iluminación
 
-Fecha: 2026-09-22; actualización: 2026-09-23. Estado: A1, B1 y C1
-validadas (9/24 criterios). B2, A2, D1, C2 y E1 siguen pendientes. Desarrolla el punto 3 de
+Fecha: 2026-09-22; actualización: 2026-09-24. Estado: A1, B1 y C1
+validadas; A2 implementada con validación parcial (11/24 criterios).
+B2, el cierre de A2, D1, C2 y E1 siguen pendientes. Desarrolla el punto 3 de
 `PLAN_MEJORAS.md`.
 
 ## Análisis del estado actual
@@ -169,9 +170,9 @@ Trabajo:
 
 Criterios de aceptación:
 
-- [ ] `build/qa/logs/interiors.csv` registra cero casillas sin clasificar en los 179 interiores y cero gráficos desconocidos.
+- [x] `build/qa/logs/interiors.csv` registra cero casillas sin clasificar en los 179 interiores y cero gráficos desconocidos.
 - [ ] Ningún mueble oculta permanentemente al jugador ni bloquea la lectura de un cuadro de texto en ambas cámaras.
-- [ ] Contactos de los 25 tilesets revisados (21 de interiores y cuatro exteriores), y la batería de los 179 interiores en PASS en ambos modos.
+- [x] Contactos de los 25 tilesets revisados (21 de interiores y cuatro exteriores), y la batería de los 179 interiores en PASS en ambos modos.
 
 ## Bloque B: iluminación
 
@@ -1141,3 +1142,26 @@ Informes locales: `build/qa/logs/b2-local-functional.json`,
 `b2-restored-ctest-inputs.json` y `b2-current-catalogs.json`.
 Estos resultados funcionales no cierran el presupuesto de B2 ni sustituyen
 las regresiones históricas completas de pantallas y recorridos.
+
+### A2 — clasificación implementada en rama separada (24 de septiembre)
+
+Sobre B2 fusionado en `e089bd9`, `interior_art.h` añade 143 reglas que cubren
+las 2.960 casillas pendientes. El audit da cero casillas sin clasificar y
+cero gráficos desconocidos en los 179 interiores. Se preservan las 869
+paredes que una aplicación anterior al perímetro habría reclasificado.
+OFF conserva el clasificador original. Plantas y caseta quedan bajas; se
+igualan las 100 mitades traseras de mesas FACILITY solo con el pase activo.
+
+Los catálogos completos pasan en ambos modos, cámaras y estilos: 3.906
+imágenes y estados, con 868 pares OFF exactos frente a B2 y 434 frente a
+`7955aaa` en ortográfica. Los exteriores ON tampoco cambian. Se revisaron
+los contactos de los 25 tilesets y 174 imágenes de 29 mapas representativos.
+Se marcan los criterios primero y tercero de A2, no la fase completa.
+
+La prueba gráfica sintética verifica volumen visible, reutilización de
+malla, restauración OFF, fallback completo por fallo de FBO y jugador
+visible junto a una máquina desde cuatro ángulos. La visibilidad general
+de todos los muebles y las regresiones históricas completas siguen siendo
+gates separados; no se infieren del audit ni de unos contactos representativos.
+La fusión queda pendiente de la revisión de B2. Decisiones, alcance de la
+evidencia y recetas: [ART_A2_VALIDATION.md](docs/ART_A2_VALIDATION.md).

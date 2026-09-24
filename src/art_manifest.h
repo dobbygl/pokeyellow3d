@@ -1,5 +1,5 @@
 #pragma once
-#include "interior_scene.h"
+#include "interior_art.h"
 #include "exterior_geometry.h"
 #include <array>
 
@@ -7,7 +7,7 @@
 // A1 deliberately selects the existing meshes. Later phases change the rows and
 // their procedural builders, while the disabled path keeps its original geometry.
 namespace art {
-enum class Material { Earth, Foliage, Stone, Water, Wood, Wall };
+enum class Material { Earth, Foliage, Stone, Water, Wood, Wall, Metal, Glass };
 enum class Occlusion { None, Solid };
 enum class Mesh {
     Reference,
@@ -64,13 +64,17 @@ inline geometry::Roof roof(const pallet::Scene &scene, const pallet::House &hous
             return entry.roof;
     return house.w >= 6 ? geometry::Roof::Hip : geometry::Roof::Gable;
 }
-inline constexpr std::array<Row<Interior>, 6> Interiors{{
+inline constexpr std::array<Row<Interior>, 9> Interiors{{
     {Interior::Floor, "floor", Interior::Floor, Material::Earth, Occlusion::None},
     {Interior::Warp, "warp", Interior::Warp, Material::Earth, Occlusion::None},
     {Interior::Wall, "wall", Interior::Wall, Material::Wall, Occlusion::Solid},
     {Interior::Furniture, "furniture", Interior::Furniture, Material::Wood, Occlusion::Solid},
     {Interior::Counter, "counter", Interior::Counter, Material::Wood, Occlusion::Solid},
     {Interior::Water, "water", Interior::Water, Material::Water, Occlusion::None},
+    // A2 names the families; emission and room lighting belong to D1.
+    {Interior::Machine, "machine", Interior::Furniture, Material::Metal, Occlusion::Solid},
+    {Interior::Window, "window", Interior::Wall, Material::Glass, Occlusion::Solid},
+    {Interior::Rock, "rock", Interior::Furniture, Material::Stone, Occlusion::Solid},
 }};
 template <typename Family, size_t N>
 constexpr const Row<Family> *find(const std::array<Row<Family>, N> &rows, Family family) {

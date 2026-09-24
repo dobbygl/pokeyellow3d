@@ -29,6 +29,10 @@ def main():
     for key in ('build', 'runtime', 'output'):
         parser.add_argument('--' + key, type=Path, required=True)
     parser.add_argument('--parent', required=True, help='Commit immediately before this phase')
+    parser.add_argument('--parent-only', action='store_true',
+                        help='Build only the immediate parent, preserving an existing historical helper')
+    parser.add_argument('--parent-current-smoke', action='store_true',
+                        help='Use current smoke tests against the frozen parent renderer; record test hashes')
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[1]
     build, runtime = args.build.resolve(), args.runtime.resolve()
@@ -59,7 +63,8 @@ def main():
     compiler = next(line.split('=', 1)[1] for line in (build / 'CMakeCache.txt').read_text().splitlines()
                     if line.startswith('CMAKE_CXX_COMPILER:FILEPATH='))
     rt = runtime / 'runtime'
-    for label, revision in (('reference', REFERENCE), ('parent', parent)):
+    revisions = [('parent', parent)] if args.parent_only else [('reference', REFERENCE), ('parent', parent)]
+    for label, revision in revisions:
         directory = root / label
         directory.mkdir()
         commands = []
@@ -92,7 +97,9 @@ def main():
             run(common + ['-c', directory / 'src' / filename, '-o', filename + '.o'])
         run(['ar', 'r', library, 'pallet3d.cpp.o', 'pallet_presentation.cpp.o'])
         for target in ('art_benchmark', 'pallet_render_smoke'):
-            source = project / 'tests/art_benchmark.cpp' if target == 'art_benchmark' else directory / 'tests/pallet_render_smoke.cpp'
+            current_smoke = label == 'parent' and args.parent_current_smoke
+            source = (project / 'tests' / (target + '.cpp') if target == 'art_benchmark' or current_smoke
+                      else directory / 'tests/pallet_render_smoke.cpp')
             definitions = ['-DSDL_MAIN_HANDLED', '-DQA_DETERMINISTIC_SDL_CLOCK']
             if label == 'reference' and target == 'art_benchmark':
                 definitions.append('-DART_REFERENCE_RENDERER')
@@ -104,7 +111,11 @@ def main():
         inputs = [archive, build / 'libpokeyellow_cart.a', build / '_gbrt_build/libgbrt.a',
                   *(project / 'tests' / filename for filename in ('art_benchmark.cpp',
                     'art_benchmark_clock.h', 'read_only_memory.h', 'qa_sdl_clock.cpp'))]
+        if label == 'parent' and args.parent_current_smoke:
+            inputs.extend(sorted(path for path in (project / 'tests').iterdir()
+                                 if path.suffix in ('.cpp', '.h')))
         provenance = {'source_commit': revision, 'runtime_commit': RUNTIME, 'commands': commands,
+                      'smoke_tests': 'current' if label == 'parent' and args.parent_current_smoke else revision,
                       'instrumentation': 'build stamp %.6fms only' if label == 'reference' else 'none',
                       'inputs': {str(path): sha(path) for path in inputs},
                       'binaries': {name: sha(directory / name) for name in ('art_benchmark', 'pallet_render_smoke')}}
